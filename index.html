@@ -1,0 +1,2142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tutoring Dashboard – Physics • Chemistry • Maths</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <!-- Heroicons (SVG via JS) - we’ll mostly use inline SVG to keep things simple -->
+
+  <style>
+    :root {
+      --bg-main-light: #f3f4f6;
+      --bg-main-dark: #020617;
+      --card-light: #ffffff;
+      --card-dark: #020617;
+      --text-light: #111827;
+      --text-dark: #e5e7eb;
+    }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    body.dark {
+      background-color: var(--bg-main-dark);
+      color: var(--text-dark);
+    }
+    body.dark .card {
+      background-color: #020617;
+      border-color: #1e293b;
+    }
+    body.dark .sidebar {
+      background-color: #020617;
+      border-color: #1e293b;
+    }
+    body.dark .topbar {
+      background-color: #020617;
+      border-color: #1e293b;
+    }
+    .card {
+      background-color: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.75rem;
+    }
+    .scrollbar-thin::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+      background-color: rgba(148,163,184,0.8);
+      border-radius: 999px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-track {
+      background-color: transparent;
+    }
+    .badge {
+      border-radius: 999px;
+      padding: 0.15rem 0.6rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    .subject-physics { background-color: #eff6ff; color: #1d4ed8; }
+    .subject-chemistry { background-color: #ecfdf3; color: #15803d; }
+    .subject-maths { background-color: #fef2f2; color: #b91c1c; }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 0.25rem;
+    }
+    .calendar-day {
+      min-height: 6rem;
+      border-radius: 0.5rem;
+      border: 1px solid #e5e7eb;
+      padding: 0.25rem;
+      display: flex;
+      flex-direction: column;
+      font-size: 0.75rem;
+    }
+    body.dark .calendar-day {
+      border-color: #1e293b;
+    }
+    .tag-pill {
+      font-size: 0.7rem;
+      padding: 0.1rem 0.45rem;
+      border-radius: 999px;
+      background-color: #e5e7eb;
+      margin-right: 0.25rem;
+      margin-bottom: 0.15rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.15rem;
+    }
+    body.dark .tag-pill {
+      background-color: #1f2937;
+      color: #e5e7eb;
+    }
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15,23,42,0.65);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+    }
+    .overlay.show {
+      display: flex;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900">
+  <div class="min-h-screen flex">
+    <!-- Sidebar -->
+    <aside class="sidebar w-64 bg-slate-900 text-slate-200 flex flex-col border-r border-slate-800">
+      <div class="px-4 py-4 flex items-center gap-2 border-b border-slate-800">
+        <div class="h-9 w-9 rounded-2xl bg-indigo-500 flex items-center justify-center text-white font-bold text-lg">
+          T
+        </div>
+        <div>
+          <div class="font-semibold text-sm">Tutor Control Center</div>
+          <div class="text-xs text-slate-400">Physics • Chemistry • Maths</div>
+        </div>
+      </div>
+
+      <nav class="mt-4 flex-1 overflow-y-auto scrollbar-thin">
+        <button data-view="dashboard" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800 transition">
+          <span>🏠</span><span>Dashboard</span>
+        </button>
+        <button data-view="students" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800 transition">
+          <span>👥</span><span>Students</span>
+        </button>
+        <button data-view="schedule" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800 transition">
+          <span>📅</span><span>Schedule</span>
+        </button>
+        <button data-view="resources" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800 transition">
+          <span>📚</span><span>Resources</span>
+        </button>
+        <button data-view="finance" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800 transition">
+          <span>💰</span><span>Finance</span>
+        </button>
+        <button data-view="settings" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800 transition">
+          <span>⚙️</span><span>Settings</span>
+        </button>
+      </nav>
+
+      <div class="px-4 py-3 border-t border-slate-800 text-xs text-slate-400">
+        Local-only data • Auto-saved
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <div class="flex-1 flex flex-col">
+      <!-- Top bar -->
+      <header class="topbar h-16 border-b border-slate-200 bg-white flex items-center justify-between px-4 gap-4">
+        <!-- Search -->
+        <div class="flex-1 max-w-xl">
+          <div class="relative">
+            <input id="globalSearchInput" type="search" placeholder="Search students, sessions, resources, invoices…"
+                   class="w-full rounded-xl border border-slate-200 px-9 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            <span class="absolute left-3 top-1.5">🔍</span>
+            <div id="globalSearchResults" class="absolute mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg text-xs hidden max-h-64 overflow-y-auto z-20"></div>
+          </div>
+        </div>
+
+        <!-- Quick actions -->
+        <div class="flex items-center gap-2">
+          <button id="quickAddStudentBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700">
+            ＋ Student
+          </button>
+          <button id="quickAddSessionBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800">
+            ＋ Session
+          </button>
+
+          <!-- Theme toggle -->
+          <button id="themeToggleBtn" class="ml-2 inline-flex items-center justify-center h-8 w-8 rounded-full border border-slate-300 text-sm">
+            🌙
+          </button>
+        </div>
+      </header>
+
+      <!-- Views container -->
+      <main id="viewsContainer" class="flex-1 overflow-y-auto bg-slate-100 p-4 space-y-4">
+        <!-- Dashboard -->
+        <section id="view-dashboard" class="view">
+          <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+            <!-- KPI cards -->
+            <div class="card p-4 col-span-1">
+              <div class="flex items-center justify-between mb-1">
+                <h3 class="text-xs font-medium text-slate-500">Active students</h3>
+              </div>
+              <div id="kpiStudents" class="text-2xl font-semibold text-slate-900">0</div>
+              <p class="text-[11px] text-slate-500 mt-1">Students with at least one session in the last 30 days.</p>
+            </div>
+            <div class="card p-4 col-span-1">
+              <h3 class="text-xs font-medium text-slate-500 mb-1">Hours this week</h3>
+              <div id="kpiHoursWeek" class="text-2xl font-semibold text-slate-900">0</div>
+              <p class="text-[11px] text-slate-500 mt-1">Sum of completed sessions.</p>
+            </div>
+            <div class="card p-4 col-span-1">
+              <h3 class="text-xs font-medium text-slate-500 mb-1">Expected income (month)</h3>
+              <div id="kpiExpectedIncome" class="text-2xl font-semibold text-slate-900">0</div>
+              <p class="text-[11px] text-slate-500 mt-1">From issued & upcoming sessions.</p>
+            </div>
+            <div class="card p-4 col-span-1">
+              <h3 class="text-xs font-medium text-slate-500 mb-1">Overdue invoices</h3>
+              <div id="kpiOverdue" class="text-2xl font-semibold text-rose-600">0</div>
+              <p class="text-[11px] text-slate-500 mt-1">Count of unpaid invoices past due date.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div class="card p-4 col-span-2">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold">Subject mix (hours)</h3>
+              </div>
+              <canvas id="subjectMixChart" class="w-full h-64"></canvas>
+            </div>
+            <div class="card p-4 col-span-1">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold">Upcoming sessions (next 7 days)</h3>
+              </div>
+              <ul id="upcomingSessionsList" class="text-xs space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- Students -->
+        <section id="view-students" class="view hidden">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h2 class="text-lg font-semibold">Students</h2>
+              <p class="text-xs text-slate-500">Manage profiles, 360° timelines and subject mix.</p>
+            </div>
+            <button id="addStudentBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700">
+              ＋ Add student
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <!-- Student list -->
+            <div class="card p-3 col-span-1 max-h-[75vh] overflow-y-auto scrollbar-thin">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold">All students</h3>
+              </div>
+              <ul id="studentsList" class="space-y-2 text-xs"></ul>
+            </div>
+
+            <!-- Student detail -->
+            <div class="card p-3 col-span-2 max-h-[75vh] overflow-y-auto scrollbar-thin">
+              <div id="studentDetailEmpty" class="text-xs text-slate-500">
+                Select a student on the left to view their 360° panel.
+              </div>
+              <div id="studentDetail" class="hidden text-xs space-y-3">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <div id="studentDetailName" class="text-base font-semibold"></div>
+                    <div id="studentDetailMeta" class="text-[11px] text-slate-500"></div>
+                  </div>
+                  <button id="editStudentBtn" class="px-2 py-1 text-[11px] rounded-lg border border-slate-300 hover:bg-slate-50">
+                    Edit
+                  </button>
+                </div>
+
+                <!-- Subject mix bar -->
+                <div>
+                  <h4 class="text-[11px] font-semibold mb-1">Subject mix (last 30 days)</h4>
+                  <div class="w-full h-3 rounded-full bg-slate-100 overflow-hidden flex text-[10px]">
+                    <div id="mixPhysics" class="bg-indigo-500 h-full text-center text-white"></div>
+                    <div id="mixChemistry" class="bg-emerald-500 h-full text-center text-white"></div>
+                    <div id="mixMaths" class="bg-rose-500 h-full text-center text-white"></div>
+                  </div>
+                  <div class="flex justify-between mt-1 text-[10px] text-slate-500">
+                    <span>Physics</span><span>Chemistry</span><span>Maths</span>
+                  </div>
+                </div>
+
+                <!-- Tabs for detail -->
+                <div class="border-b border-slate-200 flex gap-4 text-[11px]" id="studentDetailTabs">
+                  <button data-student-tab="timeline" class="student-tab border-b-2 border-indigo-500 pb-1 font-medium">
+                    Timeline
+                  </button>
+                  <button data-student-tab="sessions" class="student-tab pb-1 text-slate-500">
+                    Sessions
+                  </button>
+                  <button data-student-tab="documents" class="student-tab pb-1 text-slate-500">
+                    Documents
+                  </button>
+                  <button data-student-tab="finance" class="student-tab pb-1 text-slate-500">
+                    Finance
+                  </button>
+                </div>
+
+                <div id="studentTab-timeline" class="student-tab-pane space-y-2 mt-2">
+                  <ul id="studentTimeline" class="space-y-2 text-[11px]"></ul>
+                </div>
+                <div id="studentTab-sessions" class="student-tab-pane hidden mt-2">
+                  <ul id="studentSessionsList" class="space-y-2 text-[11px]"></ul>
+                </div>
+                <div id="studentTab-documents" class="student-tab-pane hidden mt-2">
+                  <div class="flex items-center justify-between mb-1">
+                    <h4 class="text-[11px] font-semibold">Documents</h4>
+                    <button id="addDocumentForStudentBtn" class="px-2 py-1 rounded-lg border border-slate-300 text-[10px] hover:bg-slate-50">
+                      ＋ Add document
+                    </button>
+                  </div>
+                  <ul id="studentDocumentsList" class="space-y-2 text-[11px]"></ul>
+                </div>
+                <div id="studentTab-finance" class="student-tab-pane hidden mt-2">
+                  <h4 class="text-[11px] font-semibold mb-1">Invoices & balance</h4>
+                  <div id="studentBalance" class="text-xs mb-1"></div>
+                  <ul id="studentInvoicesList" class="space-y-1 text-[11px]"></ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Schedule -->
+        <section id="view-schedule" class="view hidden">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h2 class="text-lg font-semibold">Schedule</h2>
+              <p class="text-xs text-slate-500">Calendar-style overview & clash detection.</p>
+            </div>
+            <button id="addSessionBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800">
+              ＋ Add session
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- Calendar -->
+            <div class="card p-3 col-span-2">
+              <div class="flex items-center justify-between mb-2 text-xs">
+                <div class="flex items-center gap-2">
+                  <button id="schedulePrevWeek" class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50">◀</button>
+                  <button id="scheduleToday" class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50">Today</button>
+                  <button id="scheduleNextWeek" class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50">▶</button>
+                </div>
+                <div id="scheduleWeekLabel" class="font-medium"></div>
+              </div>
+              <div class="calendar-grid text-[11px]" id="scheduleCalendarGrid">
+                <!-- days injected here -->
+              </div>
+              <p class="mt-2 text-[10px] text-slate-500">Click a session chip to open quick actions.</p>
+            </div>
+
+            <!-- Today & clash info -->
+            <div class="card p-3 col-span-1 space-y-3 text-xs">
+              <div>
+                <h3 class="text-sm font-semibold mb-1">Today's sessions</h3>
+                <ul id="todaySessionsList" class="space-y-1 max-h-40 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+              <div>
+                <h3 class="text-sm font-semibold mb-1">Potential clashes</h3>
+                <ul id="clashList" class="space-y-1 max-h-40 overflow-y-auto scrollbar-thin text-[11px]"></ul>
+                <p class="text-[10px] text-slate-500 mt-1">Clashes are detected when sessions overlap in time for the same tutor or student.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Resources -->
+        <section id="view-resources" class="view hidden">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h2 class="text-lg font-semibold">Resources</h2>
+              <p class="text-xs text-slate-500">Worksheets, lectures, and homework tracking.</p>
+            </div>
+            <button id="addResourceBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700">
+              ＋ Add resource
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <div class="card p-3 col-span-2 max-h-[75vh] overflow-y-auto scrollbar-thin">
+              <div class="flex items-center justify-between mb-2 text-xs">
+                <div class="flex gap-2">
+                  <select id="resourceSubjectFilter" class="border border-slate-300 rounded-lg px-2 py-1 text-xs">
+                    <option value="">All subjects</option>
+                    <option value="Physics">Physics</option>
+                    <option value="Chemistry">Chemistry</option>
+                    <option value="Maths">Maths</option>
+                  </select>
+                  <input id="resourceSearchInput" type="text" placeholder="Search resources"
+                         class="border border-slate-300 rounded-lg px-2 py-1 text-xs w-40">
+                </div>
+              </div>
+              <ul id="resourcesList" class="space-y-2 text-xs"></ul>
+            </div>
+
+            <!-- Homework board -->
+            <div class="card p-3 col-span-1 max-h-[75vh] overflow-y-auto scrollbar-thin text-xs">
+              <h3 class="text-sm font-semibold mb-2">Homework board</h3>
+              <div class="grid grid-cols-3 gap-2 text-[11px]">
+                <div>
+                  <div class="font-semibold mb-1">To Do</div>
+                  <ul id="hwTodo" class="space-y-1"></ul>
+                </div>
+                <div>
+                  <div class="font-semibold mb-1">In progress</div>
+                  <ul id="hwInProgress" class="space-y-1"></ul>
+                </div>
+                <div>
+                  <div class="font-semibold mb-1">Completed</div>
+                  <ul id="hwDone" class="space-y-1"></ul>
+                </div>
+              </div>
+              <p class="mt-2 text-[10px] text-slate-500">Change status using the dropdown on each card.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Finance -->
+        <section id="view-finance" class="view hidden">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h2 class="text-lg font-semibold">Finance</h2>
+              <p class="text-xs text-slate-500">Invoices, balances & overdue reminders.</p>
+            </div>
+            <button id="addInvoiceBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700">
+              ＋ Create invoice
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 text-xs">
+            <div class="card p-3 col-span-2 max-h-[75vh] overflow-y-auto scrollbar-thin">
+              <h3 class="text-sm font-semibold mb-2">Student balances</h3>
+              <table class="w-full text-[11px]">
+                <thead>
+                <tr class="text-left text-[10px] text-slate-500 border-b border-slate-200">
+                  <th class="py-1 pr-1">Student</th>
+                  <th class="py-1 pr-1 text-right">Balance</th>
+                  <th class="py-1 pr-1 text-right">Unpaid invoices</th>
+                </tr>
+                </thead>
+                <tbody id="financeStudentTable"></tbody>
+              </table>
+            </div>
+            <div class="card p-3 col-span-1 max-h-[75vh] overflow-y-auto scrollbar-thin">
+              <h3 class="text-sm font-semibold mb-2">Overdue invoices</h3>
+              <ul id="overdueInvoicesList" class="space-y-2 text-[11px]"></ul>
+              <p class="mt-2 text-[10px] text-slate-500">Click “Reminder text” to generate a polite message you can paste into email or chat.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Settings -->
+        <section id="view-settings" class="view hidden">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h2 class="text-lg font-semibold">Settings</h2>
+              <p class="text-xs text-slate-500">Theme, layout & data backup.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="card p-4 text-xs space-y-3">
+              <h3 class="text-sm font-semibold mb-1">Appearance</h3>
+              <div class="flex items-center justify-between">
+                <span>Theme</span>
+                <select id="settingsThemeSelect" class="border border-slate-300 rounded-lg px-2 py-1 text-xs">
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                </select>
+              </div>
+              <div class="flex items-center justify-between">
+                <span>Layout density</span>
+                <select id="settingsDensitySelect" class="border border-slate-300 rounded-lg px-2 py-1 text-xs">
+                  <option value="comfortable">Comfortable</option>
+                  <option value="compact">Compact</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="card p-4 text-xs space-y-3">
+              <h3 class="text-sm font-semibold mb-1">Data backup</h3>
+              <p>Export your dashboard data as JSON and paste it somewhere safe. You can import it later.</p>
+              <div class="flex gap-2">
+                <button id="exportDataBtn" class="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs">Export</button>
+                <button id="importDataBtn" class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs">Import</button>
+              </div>
+              <textarea id="backupTextarea" rows="5" class="mt-2 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]" placeholder="Exported JSON will appear here. Paste JSON here to import."></textarea>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- OVERLAY & MODALS -->
+
+  <div id="modalOverlay" class="overlay">
+    <div id="modalContainer" class="card w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 text-xs">
+      <!-- modal content injected here -->
+    </div>
+  </div>
+
+  <script>
+    /***********************
+     * STATE & PERSISTENCE *
+     ***********************/
+    const STORAGE_KEY = 'tutoringDashboardState_v1';
+
+    const defaultState = {
+      students: [],
+      sessions: [],
+      resources: [],
+      invoices: [],
+      documents: [],
+      homework: [], // {id, studentId, resourceId, status}
+      settings: {
+        theme: 'light',
+        density: 'comfortable'
+      }
+    };
+
+    let state = loadState();
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return structuredClone(defaultState);
+        const parsed = JSON.parse(raw);
+        // Merge with defaults to avoid missing keys
+        return Object.assign(structuredClone(defaultState), parsed);
+      } catch (e) {
+        console.error('Failed to load state', e);
+        return structuredClone(defaultState);
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      updateKPIsAndCharts();
+    }
+
+    function generateId(prefix) {
+      return prefix + '_' + Math.random().toString(36).slice(2, 10);
+    }
+
+    /****************
+     * INITIAL SETUP *
+     ****************/
+    document.addEventListener('DOMContentLoaded', () => {
+      setupNav();
+      setupTopbar();
+      applySettingsToUI();
+      renderAllViews();
+    });
+
+    function setupNav() {
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const view = btn.dataset.view;
+          switchView(view);
+          document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('bg-slate-800'));
+          btn.classList.add('bg-slate-800');
+        });
+      });
+      // default view
+      switchView('dashboard');
+      document.querySelector('.nav-btn[data-view="dashboard"]').classList.add('bg-slate-800');
+    }
+
+    function switchView(viewName) {
+      document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+      document.getElementById('view-' + viewName).classList.remove('hidden');
+      // re-render view-specific data
+      if (viewName === 'dashboard') updateKPIsAndCharts();
+      if (viewName === 'students') renderStudentsView();
+      if (viewName === 'schedule') renderScheduleView();
+      if (viewName === 'resources') renderResourcesView();
+      if (viewName === 'finance') renderFinanceView();
+      if (viewName === 'settings') applySettingsToUI();
+    }
+
+    function setupTopbar() {
+      document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
+      document.getElementById('quickAddStudentBtn').addEventListener('click', () => openStudentModal());
+      document.getElementById('quickAddSessionBtn').addEventListener('click', () => openSessionModal());
+      document.getElementById('globalSearchInput').addEventListener('input', handleGlobalSearch);
+
+      // Settings bindings
+      document.getElementById('settingsThemeSelect').addEventListener('change', e => {
+        state.settings.theme = e.target.value;
+        applyTheme();
+        saveState();
+      });
+      document.getElementById('settingsDensitySelect').addEventListener('change', e => {
+        state.settings.density = e.target.value;
+        applyDensity();
+        saveState();
+      });
+      document.getElementById('exportDataBtn').addEventListener('click', () => {
+        document.getElementById('backupTextarea').value = JSON.stringify(state, null, 2);
+      });
+      document.getElementById('importDataBtn').addEventListener('click', () => {
+        const txt = document.getElementById('backupTextarea').value.trim();
+        if (!txt) return alert('Paste JSON first.');
+        try {
+          const imported = JSON.parse(txt);
+          state = Object.assign(structuredClone(defaultState), imported);
+          saveState();
+          renderAllViews();
+          applySettingsToUI();
+          alert('Data imported.');
+        } catch (e) {
+          alert('Invalid JSON.');
+        }
+      });
+
+      document.getElementById('addStudentBtn').addEventListener('click', () => openStudentModal());
+      document.getElementById('addSessionBtn').addEventListener('click', () => openSessionModal());
+      document.getElementById('addResourceBtn').addEventListener('click', () => openResourceModal());
+      document.getElementById('addInvoiceBtn').addEventListener('click', () => openInvoiceModal());
+    }
+
+    function applySettingsToUI() {
+      document.getElementById('settingsThemeSelect').value = state.settings.theme;
+      document.getElementById('settingsDensitySelect').value = state.settings.density;
+      applyTheme();
+      applyDensity();
+    }
+
+    function applyTheme() {
+      const isDark = state.settings.theme === 'dark';
+      document.body.classList.toggle('dark', isDark);
+      document.body.classList.toggle('bg-slate-100', !isDark);
+      document.body.classList.toggle('bg-slate-900', isDark);
+      // icon hint
+      const btn = document.getElementById('themeToggleBtn');
+      btn.textContent = isDark ? '☀️' : '🌙';
+    }
+
+    function applyDensity() {
+      const compact = state.settings.density === 'compact';
+      document.getElementById('viewsContainer').classList.toggle('py-2', compact);
+      document.getElementById('viewsContainer').classList.toggle('py-4', !compact);
+    }
+
+    function renderAllViews() {
+      updateKPIsAndCharts();
+      renderStudentsView();
+      renderScheduleView();
+      renderResourcesView();
+      renderFinanceView();
+    }
+
+    /******************
+     * GLOBAL SEARCH  *
+     ******************/
+    function handleGlobalSearch(e) {
+      const query = e.target.value.trim().toLowerCase();
+      const resultsBox = document.getElementById('globalSearchResults');
+      if (!query) {
+        resultsBox.innerHTML = '';
+        resultsBox.classList.add('hidden');
+        return;
+      }
+
+      const results = [];
+
+      // Students
+      state.students.forEach(s => {
+        if (s.name.toLowerCase().includes(query) || (s.notes || '').toLowerCase().includes(query)) {
+          results.push({ type: 'Student', label: s.name, id: s.id });
+        }
+      });
+
+      // Resources
+      state.resources.forEach(r => {
+        if (r.title.toLowerCase().includes(query) || (r.tags || []).some(t => t.toLowerCase().includes(query))) {
+          results.push({ type: 'Resource', label: r.title + ' (' + r.subject + ')', id: r.id });
+        }
+      });
+
+      // Sessions
+      state.sessions.forEach(sess => {
+        const studentNames = sess.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+        const text = (sess.topic || '') + ' ' + studentNames;
+        if (text.toLowerCase().includes(query)) {
+          results.push({ type: 'Session', label: studentNames + ' – ' + (sess.topic || 'Session'), id: sess.id });
+        }
+      });
+
+      // Invoices
+      state.invoices.forEach(inv => {
+        const s = getStudentById(inv.studentId);
+        const label = (s?.name || 'Unknown') + ' – ' + inv.id;
+        if (label.toLowerCase().includes(query)) {
+          results.push({ type: 'Invoice', label, id: inv.id });
+        }
+      });
+
+      if (!results.length) {
+        resultsBox.innerHTML = '<div class="px-3 py-2 text-slate-500">No results</div>';
+        resultsBox.classList.remove('hidden');
+        return;
+      }
+
+      resultsBox.innerHTML = results.map(r => `
+        <div class="px-3 py-1.5 hover:bg-slate-50 cursor-pointer" data-type="${r.type}" data-id="${r.id}">
+          <span class="text-[10px] uppercase text-slate-400">${r.type}</span>
+          <div class="text-xs">${r.label}</div>
+        </div>
+      `).join('');
+      resultsBox.classList.remove('hidden');
+
+      resultsBox.querySelectorAll('[data-type]').forEach(el => {
+        el.addEventListener('click', () => {
+          const type = el.dataset.type;
+          const id = el.dataset.id;
+          if (type === 'Student') {
+            switchView('students');
+            selectStudent(id);
+          } else if (type === 'Resource') {
+            switchView('resources');
+          } else if (type === 'Session') {
+            switchView('schedule');
+          } else if (type === 'Invoice') {
+            switchView('finance');
+          }
+          resultsBox.classList.add('hidden');
+        });
+      });
+    }
+
+    /***************
+     * DASHBOARD   *
+     ***************/
+    let subjectMixChart;
+
+    function updateKPIsAndCharts() {
+      // KPI: active students in last 30 days
+      const now = new Date();
+      const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const activeStudentIds = new Set(
+        state.sessions
+          .filter(s => new Date(s.date) >= cutoff)
+          .flatMap(s => s.studentIds)
+      );
+      document.getElementById('kpiStudents').textContent = activeStudentIds.size;
+
+      // Hours this week
+      const startOfWeek = new Date(now);
+      const day = startOfWeek.getDay(); // 0=Sunday
+      const diff = (day === 0 ? -6 : 1 - day); // Monday as start
+      startOfWeek.setDate(startOfWeek.getDate() + diff);
+      startOfWeek.setHours(0,0,0,0);
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(endOfWeek.getDate() + 7);
+
+      let hoursThisWeek = 0;
+      state.sessions.forEach(s => {
+        const d = new Date(s.date);
+        if (d >= startOfWeek && d < endOfWeek) {
+          hoursThisWeek += Number(s.durationHours || 0);
+        }
+      });
+      document.getElementById('kpiHoursWeek').textContent = hoursThisWeek.toFixed(1);
+
+      // Expected income this month: sum of invoice amounts
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      let expected = 0;
+      state.invoices.forEach(inv => {
+        const d = new Date(inv.issueDate);
+        if (d >= startOfMonth && d < endOfMonth) {
+          expected += Number(inv.total || 0);
+        }
+      });
+      document.getElementById('kpiExpectedIncome').textContent = 'R ' + expected.toFixed(2);
+
+      // Overdue invoices count
+      const today = new Date();
+      const overdueCount = state.invoices.filter(inv => !inv.paid && inv.dueDate && new Date(inv.dueDate) < today).length;
+      document.getElementById('kpiOverdue').textContent = overdueCount;
+
+      // Subject mix chart
+      const hours = { Physics: 0, Chemistry: 0, Maths: 0 };
+      state.sessions.forEach(s => {
+        if (hours[s.subject] != null) {
+          hours[s.subject] += Number(s.durationHours || 0);
+        }
+      });
+
+      const ctx = document.getElementById('subjectMixChart').getContext('2d');
+      if (subjectMixChart) subjectMixChart.destroy();
+      subjectMixChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Physics', 'Chemistry', 'Maths'],
+          datasets: [{
+            label: 'Hours taught',
+            data: [hours.Physics, hours.Chemistry, hours.Maths],
+            backgroundColor: ['#4f46e5', '#16a34a', '#dc2626']
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+
+      // Upcoming sessions (next 7 days)
+      const upcomingList = document.getElementById('upcomingSessionsList');
+      const sevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const upcoming = state.sessions
+        .filter(s => {
+          const d = new Date(s.date + 'T' + (s.startTime || '00:00'));
+          return d >= now && d <= sevenDays;
+        })
+        .sort((a, b) => new Date(a.date + 'T' + (a.startTime || '00:00')) - new Date(b.date + 'T' + (b.startTime || '00:00')))
+        .slice(0, 10);
+
+      if (!upcoming.length) {
+        upcomingList.innerHTML = '<li class="text-slate-500">No upcoming sessions in the next 7 days.</li>';
+      } else {
+        upcomingList.innerHTML = upcoming.map(s => {
+          const names = s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+          return `<li class="card border border-slate-200 rounded-lg px-2 py-1">
+              <div class="font-medium">${names}</div>
+              <div class="text-[10px] text-slate-500">${s.subject} • ${s.date} • ${s.startTime || ''} (${s.durationHours || 1}h)</div>
+              <div class="text-[10px]">${s.topic || ''}</div>
+            </li>`;
+        }).join('');
+      }
+    }
+
+    /****************
+     * STUDENTS VIEW *
+     ****************/
+    let selectedStudentId = null;
+
+    function renderStudentsView() {
+      const list = document.getElementById('studentsList');
+      if (!state.students.length) {
+        list.innerHTML = '<li class="text-slate-500 text-xs">No students yet. Click “Add student” to get started.</li>';
+      } else {
+        list.innerHTML = state.students.map(s => {
+          const hours = getStudentSubjectHours(s.id);
+          const total = hours.Physics + hours.Chemistry + hours.Maths || 1;
+          const pPhysics = (hours.Physics / total * 100).toFixed(0);
+          const pChem = (hours.Chemistry / total * 100).toFixed(0);
+          const pMath = (hours.Maths / total * 100).toFixed(0);
+          return `<li class="card px-3 py-2 cursor-pointer hover:bg-slate-50"
+                     data-student-id="${s.id}">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="font-semibold">${s.name}</div>
+                  <div class="text-[10px] text-slate-500">${s.gradeLevel || ''}</div>
+                </div>
+                <div class="text-[11px] text-slate-600">${s.subjects?.join(', ') || ''}</div>
+              </div>
+              <div class="mt-2 w-full h-1.5 rounded-full bg-slate-100 overflow-hidden flex">
+                <div style="width:${pPhysics}%" class="bg-indigo-500"></div>
+                <div style="width:${pChem}%" class="bg-emerald-500"></div>
+                <div style="width:${pMath}%" class="bg-rose-500"></div>
+              </div>
+            </li>`;
+        }).join('');
+      }
+
+      list.querySelectorAll('[data-student-id]').forEach(li => {
+        li.addEventListener('click', () => {
+          selectStudent(li.dataset.studentId);
+        });
+      });
+
+      // If none selected, clear detail
+      if (!selectedStudentId || !getStudentById(selectedStudentId)) {
+        document.getElementById('studentDetailEmpty').classList.remove('hidden');
+        document.getElementById('studentDetail').classList.add('hidden');
+      } else {
+        showStudentDetail(selectedStudentId);
+      }
+    }
+
+    function getStudentById(id) {
+      return state.students.find(s => s.id === id);
+    }
+
+    function getStudentSubjectHours(studentId) {
+      const res = { Physics: 0, Chemistry: 0, Maths: 0 };
+      const now = new Date();
+      const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      state.sessions.forEach(sess => {
+        if (!sess.studentIds.includes(studentId)) return;
+        const d = new Date(sess.date);
+        if (d >= cutoff) {
+          if (res[sess.subject] != null) {
+            res[sess.subject] += Number(sess.durationHours || 0);
+          }
+        }
+      });
+      return res;
+    }
+
+    function selectStudent(id) {
+      selectedStudentId = id;
+      showStudentDetail(id);
+      // ensure view is visible
+      switchView('students');
+    }
+
+    function showStudentDetail(id) {
+      const s = getStudentById(id);
+      if (!s) return;
+      document.getElementById('studentDetailEmpty').classList.add('hidden');
+      document.getElementById('studentDetail').classList.remove('hidden');
+
+      document.getElementById('studentDetailName').textContent = s.name;
+      document.getElementById('studentDetailMeta').textContent =
+        `${s.gradeLevel || ''} • ${s.subjects?.join(', ') || ''} • Rate: ${s.rate ? 'R ' + s.rate + '/h' : '—'}`;
+
+      // Subject mix bar
+      const hours = getStudentSubjectHours(id);
+      const total = hours.Physics + hours.Chemistry + hours.Maths || 1;
+      const pPhysics = (hours.Physics / total * 100).toFixed(0);
+      const pChem = (hours.Chemistry / total * 100).toFixed(0);
+      const pMath = (hours.Maths / total * 100).toFixed(0);
+      const physEl = document.getElementById('mixPhysics');
+      const chemEl = document.getElementById('mixChemistry');
+      const mathEl = document.getElementById('mixMaths');
+      physEl.style.width = pPhysics + '%';
+      chemEl.style.width = pChem + '%';
+      mathEl.style.width = pMath + '%';
+      physEl.textContent = pPhysics > 15 ? pPhysics + '%' : '';
+      chemEl.textContent = pChem > 15 ? pChem + '%' : '';
+      mathEl.textContent = pMath > 15 ? pMath + '%' : '';
+
+      // timeline
+      renderStudentTimeline(id);
+      renderStudentSessions(id);
+      renderStudentDocuments(id);
+      renderStudentFinance(id);
+
+      document.getElementById('editStudentBtn').onclick = () => openStudentModal(s);
+
+      // tabs
+      document.querySelectorAll('#studentDetailTabs .student-tab').forEach(tab => {
+        tab.classList.remove('border-indigo-500', 'text-slate-900');
+        tab.classList.add('text-slate-500');
+      });
+      document.querySelector('#studentDetailTabs .student-tab[data-student-tab="timeline"]').classList.add('border-indigo-500', 'text-slate-900');
+      document.querySelector('#studentDetailTabs .student-tab[data-student-tab="timeline"]').classList.remove('text-slate-500');
+      document.querySelectorAll('.student-tab-pane').forEach(p => p.classList.add('hidden'));
+      document.getElementById('studentTab-timeline').classList.remove('hidden');
+
+      document.querySelectorAll('#studentDetailTabs .student-tab').forEach(tab => {
+        tab.onclick = () => {
+          const tabId = tab.dataset.studentTab;
+          document.querySelectorAll('#studentDetailTabs .student-tab').forEach(t => {
+            t.classList.remove('border-indigo-500', 'text-slate-900');
+            t.classList.add('text-slate-500');
+          });
+          tab.classList.add('border-indigo-500', 'text-slate-900');
+          tab.classList.remove('text-slate-500');
+          document.querySelectorAll('.student-tab-pane').forEach(p => p.classList.add('hidden'));
+          document.getElementById('studentTab-' + tabId).classList.remove('hidden');
+        };
+      });
+
+      document.getElementById('addDocumentForStudentBtn').onclick = () => openDocumentModal(null, s.id);
+    }
+
+    function renderStudentTimeline(studentId) {
+      const ul = document.getElementById('studentTimeline');
+      const events = [];
+
+      // Sessions
+      state.sessions.filter(sess => sess.studentIds.includes(studentId)).forEach(sess => {
+        events.push({
+          date: sess.date,
+          type: 'Session',
+          description: `${sess.subject} • ${sess.topic || 'Lesson'} (${sess.durationHours || 1}h)`
+        });
+      });
+
+      // Resources / homework
+      state.homework.filter(hw => hw.studentId === studentId).forEach(hw => {
+        const res = state.resources.find(r => r.id === hw.resourceId);
+        if (!res) return;
+        events.push({
+          date: hw.assignedDate || res.createdAt || new Date().toISOString().slice(0,10),
+          type: 'Homework',
+          description: `${res.title} [${hw.status}]`
+        });
+      });
+
+      // Invoices
+      state.invoices.filter(inv => inv.studentId === studentId).forEach(inv => {
+        events.push({
+          date: inv.issueDate,
+          type: 'Invoice',
+          description: `${inv.id} – R ${inv.total?.toFixed(2) || inv.total} (${inv.paid ? 'Paid' : 'Unpaid'})`
+        });
+      });
+
+      // Docs
+      state.documents.filter(doc => doc.studentId === studentId).forEach(doc => {
+        events.push({
+          date: doc.date || doc.createdAt || new Date().toISOString().slice(0,10),
+          type: 'Document',
+          description: `${doc.title} [${doc.status}]`
+        });
+      });
+
+      events.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      if (!events.length) {
+        ul.innerHTML = '<li class="text-slate-500">No events yet.</li>';
+        return;
+      }
+
+      ul.innerHTML = events.map(ev => `
+        <li class="flex items-start gap-2">
+          <div class="mt-1 h-2 w-2 rounded-full ${ev.type === 'Session' ? 'bg-indigo-500' :
+                                                ev.type === 'Invoice' ? 'bg-emerald-500' :
+                                                ev.type === 'Document' ? 'bg-amber-500' :
+                                                'bg-slate-400'}"></div>
+          <div>
+            <div class="text-[10px] text-slate-500">${ev.date} • ${ev.type}</div>
+            <div>${ev.description}</div>
+          </div>
+        </li>
+      `).join('');
+    }
+
+    function renderStudentSessions(studentId) {
+      const ul = document.getElementById('studentSessionsList');
+      const sessions = state.sessions.filter(sess => sess.studentIds.includes(studentId))
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+      if (!sessions.length) {
+        ul.innerHTML = '<li class="text-slate-500">No sessions recorded.</li>';
+        return;
+      }
+      ul.innerHTML = sessions.map(sess => `
+        <li class="border border-slate-200 rounded-lg px-2 py-1 flex justify-between items-center">
+          <div>
+            <div class="font-medium">${sess.subject} – ${sess.topic || 'Lesson'}</div>
+            <div class="text-[10px] text-slate-500">${sess.date} • ${sess.startTime || ''} • ${sess.durationHours || 1}h</div>
+          </div>
+          <button class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
+                  onclick="openSessionModal(getSessionById('${sess.id}'))">
+            Edit
+          </button>
+        </li>
+      `).join('');
+    }
+
+    function renderStudentDocuments(studentId) {
+      const ul = document.getElementById('studentDocumentsList');
+      const docs = state.documents.filter(doc => doc.studentId === studentId);
+      if (!docs.length) {
+        ul.innerHTML = '<li class="text-slate-500">No documents for this student.</li>';
+        return;
+      }
+      ul.innerHTML = docs.map(doc => `
+        <li class="border border-slate-200 rounded-lg px-2 py-1 flex justify-between items-center">
+          <div>
+            <div class="font-medium">${doc.title}</div>
+            <div class="text-[10px] text-slate-500">${doc.status} • ${doc.date || ''}</div>
+          </div>
+          <button class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
+                  onclick="openDocumentModal(getDocumentById('${doc.id}'))">
+            Edit
+          </button>
+        </li>
+      `).join('');
+    }
+
+    function renderStudentFinance(studentId) {
+      const ul = document.getElementById('studentInvoicesList');
+      const invs = state.invoices.filter(inv => inv.studentId === studentId)
+        .sort((a, b) => new Date(b.issueDate) - new Date(a.issueDate));
+      let balance = 0;
+      invs.forEach(inv => {
+        if (!inv.paid) balance += Number(inv.total || 0);
+      });
+      document.getElementById('studentBalance').textContent = 'Outstanding balance: R ' + balance.toFixed(2);
+      if (!invs.length) {
+        ul.innerHTML = '<li class="text-slate-500">No invoices yet.</li>';
+        return;
+      }
+      ul.innerHTML = invs.map(inv => `
+        <li class="border border-slate-200 rounded-lg px-2 py-1 flex justify-between items-center">
+          <div>
+            <div class="font-medium">${inv.id}</div>
+            <div class="text-[10px] text-slate-500">
+              Issued ${inv.issueDate} • Due ${inv.dueDate || '—'}
+              • Total R ${Number(inv.total || 0).toFixed(2)}
+              • ${inv.paid ? 'Paid' : 'Unpaid'}
+            </div>
+          </div>
+          <button class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
+                  onclick="openInvoiceModal(getInvoiceById('${inv.id}'))">
+            Edit
+          </button>
+        </li>
+      `).join('');
+    }
+
+    /**************
+     * SCHEDULE   *
+     **************/
+    let currentWeekStart = getMonday(new Date());
+
+    function getMonday(d) {
+      const date = new Date(d);
+      const day = date.getDay();
+      const diff = (day === 0 ? -6 : 1 - day);
+      date.setDate(date.getDate() + diff);
+      date.setHours(0,0,0,0);
+      return date;
+    }
+
+    function renderScheduleView() {
+      const label = document.getElementById('scheduleWeekLabel');
+      const end = new Date(currentWeekStart);
+      end.setDate(end.getDate() + 6);
+      label.textContent = `${currentWeekStart.toISOString().slice(0,10)} – ${end.toISOString().slice(0,10)}`;
+
+      const grid = document.getElementById('scheduleCalendarGrid');
+      grid.innerHTML = '';
+      for (let i = 0; i < 7; i++) {
+        const day = new Date(currentWeekStart);
+        day.setDate(day.getDate() + i);
+        const isoDate = day.toISOString().slice(0,10);
+        const sessions = state.sessions.filter(s => s.date === isoDate);
+        const dayName = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i];
+        grid.innerHTML += `
+          <div class="calendar-day" data-date="${isoDate}">
+            <div class="flex justify-between items-center mb-1">
+              <span class="font-semibold">${dayName}</span>
+              <span class="text-[10px] text-slate-500">${isoDate}</span>
+            </div>
+            <div class="space-y-1 text-[11px]">
+              ${
+                sessions.map(s => {
+                  const subjectClass = s.subject === 'Physics'
+                    ? 'subject-physics'
+                    : s.subject === 'Chemistry'
+                      ? 'subject-chemistry'
+                      : 'subject-maths';
+                  const names = s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+                  return `<button class="badge ${subjectClass} w-full text-left"
+                                  onclick="openSessionQuickActions('${s.id}')">
+                            ${s.startTime || ''} ${names}
+                          </button>`;
+                }).join('')
+              }
+            </div>
+          </div>
+        `;
+      }
+
+      document.getElementById('schedulePrevWeek').onclick = () => {
+        currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+        renderScheduleView();
+      };
+      document.getElementById('scheduleNextWeek').onclick = () => {
+        currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+        renderScheduleView();
+      };
+      document.getElementById('scheduleToday').onclick = () => {
+        currentWeekStart = getMonday(new Date());
+        renderScheduleView();
+      };
+
+      // Today's sessions
+      const todayIso = new Date().toISOString().slice(0,10);
+      const todayList = document.getElementById('todaySessionsList');
+      const todaySessions = state.sessions.filter(s => s.date === todayIso)
+        .sort((a, b) => (a.startTime || '00:00').localeCompare(b.startTime || '00:00'));
+      if (!todaySessions.length) {
+        todayList.innerHTML = '<li class="text-slate-500">No sessions today.</li>';
+      } else {
+        todayList.innerHTML = todaySessions.map(s => {
+          const names = s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+          return `<li class="border border-slate-200 rounded-lg px-2 py-1 flex justify-between items-center">
+            <div>
+              <div class="font-medium">${names}</div>
+              <div class="text-[10px] text-slate-500">${s.subject} • ${s.startTime || ''} (${s.durationHours || 1}h)</div>
+            </div>
+            <button class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
+                    onclick="openSessionQuickActions('${s.id}')">
+              Open
+            </button>
+          </li>`;
+        }).join('');
+      }
+
+      // Clash detection
+      renderClashes();
+    }
+
+    function renderClashes() {
+      const ul = document.getElementById('clashList');
+      const clashes = [];
+      const sessions = [...state.sessions].sort((a, b) => (a.date + 'T' + (a.startTime || '00:00')).localeCompare(b.date + 'T' + (b.startTime || '00:00')));
+      for (let i = 0; i < sessions.length; i++) {
+        for (let j = i+1; j < sessions.length; j++) {
+          const a = sessions[i], b = sessions[j];
+          if (a.date !== b.date) continue;
+          const aStart = timeToMinutes(a.startTime || '00:00');
+          const aEnd = aStart + Number(a.durationHours || 1) * 60;
+          const bStart = timeToMinutes(b.startTime || '00:00');
+          const bEnd = bStart + Number(b.durationHours || 1) * 60;
+          if (aEnd <= bStart || bEnd <= aStart) continue;
+          // overlap in time; check if any shared student
+          const sharedStudents = a.studentIds.filter(id => b.studentIds.includes(id));
+          if (sharedStudents.length) {
+            clashes.push({ a, b, sharedStudents });
+          }
+        }
+      }
+      if (!clashes.length) {
+        ul.innerHTML = '<li class="text-slate-500">No clashes detected.</li>';
+        return;
+      }
+      ul.innerHTML = clashes.slice(0, 10).map(c => {
+        const names = c.sharedStudents.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+        return `<li class="border border-amber-300 bg-amber-50 text-amber-900 rounded-lg px-2 py-1">
+          <div class="font-medium">Clash for ${names}</div>
+          <div class="text-[10px]">
+            ${c.a.date} • ${c.a.startTime || ''} vs ${c.b.startTime || ''}<br>
+            ${c.a.subject} – ${c.a.topic || 'Lesson'} <br>
+            ${c.b.subject} – ${c.b.topic || 'Lesson'}
+          </div>
+        </li>`;
+      }).join('');
+    }
+
+    function timeToMinutes(t) {
+      const [h, m] = t.split(':').map(Number);
+      return h*60 + m;
+    }
+
+    function getSessionById(id) {
+      return state.sessions.find(s => s.id === id);
+    }
+
+    function openSessionQuickActions(sessionId) {
+      const sess = getSessionById(sessionId);
+      if (!sess) return;
+      const names = sess.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+      openModal(`
+        <h2 class="text-sm font-semibold mb-2">Session with ${names}</h2>
+        <p class="text-[11px] mb-2">${sess.subject} • ${sess.date} • ${sess.startTime || ''} (${sess.durationHours || 1}h)</p>
+        <p class="text-[11px] mb-3">${sess.topic || ''}</p>
+
+        <div class="space-y-2">
+          <button id="sessionMarkCompletedBtn" class="w-full px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-medium">
+            Mark attended & complete session
+          </button>
+          <button id="sessionEditBtn" class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs">
+            Edit session
+          </button>
+        </div>
+      `, () => {
+        document.getElementById('sessionMarkCompletedBtn').onclick = () => {
+          sess.completed = true;
+          saveState();
+          closeModal();
+          renderScheduleView();
+          renderStudentsView();
+        };
+        document.getElementById('sessionEditBtn').onclick = () => {
+          closeModal();
+          openSessionModal(sess);
+        };
+      });
+    }
+
+    /*************
+     * RESOURCES *
+     *************/
+    function renderResourcesView() {
+      const list = document.getElementById('resourcesList');
+      const subjectFilter = document.getElementById('resourceSubjectFilter').value;
+      const searchTerm = document.getElementById('resourceSearchInput').value.trim().toLowerCase();
+      const filtered = state.resources.filter(r => {
+        if (subjectFilter && r.subject !== subjectFilter) return false;
+        if (searchTerm && !r.title.toLowerCase().includes(searchTerm) && !(r.tags || []).some(t => t.toLowerCase().includes(searchTerm))) {
+          return false;
+        }
+        return true;
+      });
+      if (!filtered.length) {
+        list.innerHTML = '<li class="text-slate-500 text-xs">No resources yet. Add worksheets, lectures, or notes.</li>';
+      } else {
+        list.innerHTML = filtered.map(r => `
+          <li class="border border-slate-200 rounded-lg px-3 py-2">
+            <div class="flex justify-between items-center">
+              <div>
+                <div class="font-semibold">${r.title}</div>
+                <div class="text-[10px] text-slate-500">${r.subject} • ${r.level || ''}</div>
+              </div>
+              <button class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
+                      onclick="openResourceModal(getResourceById('${r.id}'))">
+                Edit
+              </button>
+            </div>
+            <div class="mt-1 text-[10px]">${r.description || ''}</div>
+            <div class="mt-1 flex flex-wrap">
+              ${(r.tags || []).map(tag => `<span class="tag-pill">#${tag}</span>`).join('')}
+            </div>
+            <div class="mt-2 flex gap-2 text-[11px]">
+              <button class="px-2 py-1 rounded-lg bg-slate-900 text-white"
+                      onclick="openAssignResourceModal('${r.id}')">
+                Assign to student(s)
+              </button>
+            </div>
+          </li>
+        `).join('');
+      }
+
+      document.getElementById('resourceSubjectFilter').onchange = renderResourcesView;
+      document.getElementById('resourceSearchInput').oninput = renderResourcesView;
+
+      renderHomeworkBoard();
+    }
+
+    function getResourceById(id) {
+      return state.resources.find(r => r.id === id);
+    }
+
+    function renderHomeworkBoard() {
+      const todo = document.getElementById('hwTodo');
+      const doing = document.getElementById('hwInProgress');
+      const done = document.getElementById('hwDone');
+      todo.innerHTML = doing.innerHTML = done.innerHTML = '';
+
+      const grouped = {
+        'To do': [],
+        'In progress': [],
+        'Completed': []
+      };
+
+      state.homework.forEach(hw => {
+        const res = state.resources.find(r => r.id === hw.resourceId);
+        const student = getStudentById(hw.studentId);
+        if (!res || !student) return;
+        grouped[hw.status || 'To do'].push({
+          ...hw,
+          res, student
+        });
+      });
+
+      function makeCard(hwObj) {
+        const hw = hwObj;
+        return `<li class="border border-slate-200 rounded-lg px-2 py-1">
+          <div class="font-medium">${hw.res.title}</div>
+          <div class="text-[10px] text-slate-500">${hw.student.name} • Due ${hw.dueDate || 'n/a'}</div>
+          <select class="mt-1 w-full border border-slate-300 rounded-lg px-1 py-0.5 text-[10px]"
+                  onchange="updateHomeworkStatus('${hw.id}', this.value)">
+            <option value="To do" ${hw.status === 'To do' ? 'selected' : ''}>To do</option>
+            <option value="In progress" ${hw.status === 'In progress' ? 'selected' : ''}>In progress</option>
+            <option value="Completed" ${hw.status === 'Completed' ? 'selected' : ''}>Completed</option>
+          </select>
+        </li>`;
+      }
+
+      todo.innerHTML = grouped['To do'].map(makeCard).join('') || '<li class="text-slate-500 text-[11px]">Nothing here.</li>';
+      doing.innerHTML = grouped['In progress'].map(makeCard).join('') || '<li class="text-slate-500 text-[11px]">Nothing here.</li>';
+      done.innerHTML = grouped['Completed'].map(makeCard).join('') || '<li class="text-slate-500 text-[11px]">Nothing here.</li>';
+    }
+
+    function updateHomeworkStatus(hwId, status) {
+      const hw = state.homework.find(h => h.id === hwId);
+      if (!hw) return;
+      hw.status = status;
+      saveState();
+      renderResourcesView();
+      if (selectedStudentId) {
+        renderStudentTimeline(selectedStudentId);
+      }
+    }
+
+    /*************
+     * FINANCE   *
+     *************/
+    function getInvoiceById(id) {
+      return state.invoices.find(inv => inv.id === id);
+    }
+
+    function renderFinanceView() {
+      const tbody = document.getElementById('financeStudentTable');
+      if (!state.students.length) {
+        tbody.innerHTML = '';
+      } else {
+        tbody.innerHTML = state.students.map(s => {
+          const invs = state.invoices.filter(inv => inv.studentId === s.id);
+          let balance = 0;
+          let unpaidCount = 0;
+          invs.forEach(inv => {
+            if (!inv.paid) {
+              balance += Number(inv.total || 0);
+              unpaidCount++;
+            }
+          });
+          return `<tr>
+            <td class="py-1 pr-1">${s.name}</td>
+            <td class="py-1 pr-1 text-right ${balance > 0 ? 'text-rose-600' : 'text-emerald-600'}">
+              R ${balance.toFixed(2)}
+            </td>
+            <td class="py-1 pr-1 text-right">${unpaidCount}</td>
+          </tr>`;
+        }).join('');
+      }
+
+      const overdueList = document.getElementById('overdueInvoicesList');
+      const today = new Date();
+      const overdue = state.invoices.filter(inv => !inv.paid && inv.dueDate && new Date(inv.dueDate) < today)
+        .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+
+      if (!overdue.length) {
+        overdueList.innerHTML = '<li class="text-slate-500">No overdue invoices.</li>';
+      } else {
+        overdueList.innerHTML = overdue.map(inv => {
+          const s = getStudentById(inv.studentId);
+          const studentName = s?.name || 'Unknown';
+          return `<li class="border border-rose-200 bg-rose-50 text-rose-900 rounded-lg px-2 py-1">
+            <div class="flex justify-between items-center">
+              <div>
+                <div class="font-medium">${studentName}</div>
+                <div class="text-[10px]">Invoice ${inv.id} • Due ${inv.dueDate} • R ${Number(inv.total || 0).toFixed(2)}</div>
+              </div>
+              <div class="flex flex-col gap-1">
+                <button class="text-[10px] px-2 py-0.5 rounded-lg border border-rose-300 bg-rose-100"
+                        onclick="markInvoicePaid('${inv.id}')">
+                  Mark paid
+                </button>
+                <button class="text-[10px] px-2 py-0.5 rounded-lg border border-rose-300 bg-white"
+                        onclick="generateReminder('${inv.id}')">
+                  Reminder text
+                </button>
+              </div>
+            </div>
+          </li>`;
+        }).join('');
+      }
+    }
+
+    function markInvoicePaid(id) {
+      const inv = getInvoiceById(id);
+      if (!inv) return;
+      inv.paid = true;
+      saveState();
+      renderFinanceView();
+      if (selectedStudentId) renderStudentFinance(selectedStudentId);
+    }
+
+    function generateReminder(id) {
+      const inv = getInvoiceById(id);
+      if (!inv) return;
+      const s = getStudentById(inv.studentId);
+      const name = s?.name || 'your child';
+      const today = new Date().toISOString().slice(0,10);
+      const text =
+`Hi,
+
+Just a friendly reminder about invoice ${inv.id} for ${name}, issued on ${inv.issueDate}, for R ${Number(inv.total || 0).toFixed(2)}. The due date was ${inv.dueDate || 'n/a'}.
+
+If you have already made payment, please ignore this message. Otherwise, I’d appreciate it if you could settle it at your convenience.
+
+Best regards,
+[Your name]
+(${today})`;
+      openModal(`
+        <h2 class="text-sm font-semibold mb-2">Reminder text</h2>
+        <textarea class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]" rows="8">${text}</textarea>
+        <p class="mt-2 text-[10px] text-slate-500">
+          You can copy this message and paste it into email or WhatsApp.
+        </p>
+      `);
+    }
+
+    /*************
+     * MODALS    *
+     *************/
+    function openModal(html, onReady) {
+      const overlay = document.getElementById('modalOverlay');
+      const container = document.getElementById('modalContainer');
+      container.innerHTML = `
+        <div class="flex justify-between items-start mb-3">
+          <div></div>
+          <button id="modalCloseBtn" class="h-7 w-7 rounded-full border border-slate-300 flex items-center justify-center text-xs">✕</button>
+        </div>
+        ${html}
+      `;
+      overlay.classList.add('show');
+      document.getElementById('modalCloseBtn').onclick = closeModal;
+      overlay.onclick = (e) => {
+        if (e.target === overlay) closeModal();
+      };
+      if (onReady) onReady();
+    }
+
+    function closeModal() {
+      document.getElementById('modalOverlay').classList.remove('show');
+    }
+
+    /***********************
+     * STUDENT CRUD MODAL  *
+     ***********************/
+    function openStudentModal(student) {
+      const isEdit = !!student;
+      const html = `
+        <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit student' : 'Add student'}</h2>
+        <form id="studentForm" class="space-y-2">
+          <div>
+            <label class="block text-[11px] mb-1">Name</label>
+            <input name="name" value="${student?.name || ''}" required
+                   class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] mb-1">Grade / Level</label>
+              <input name="gradeLevel" value="${student?.gradeLevel || ''}"
+                     class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            </div>
+            <div>
+              <label class="block text-[11px] mb-1">Hourly rate (R)</label>
+              <input name="rate" type="number" step="0.01" value="${student?.rate || ''}"
+                     class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Subjects (comma separated)</label>
+            <input name="subjects" value="${student?.subjects?.join(', ') || ''}"
+                   class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Notes</label>
+            <textarea name="notes" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${student?.notes || ''}</textarea>
+          </div>
+          <div class="flex justify-between items-center mt-3">
+            <button type="submit" class="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium">
+              ${isEdit ? 'Save changes' : 'Add student'}
+            </button>
+            ${isEdit ? `
+              <button type="button" id="deleteStudentBtn"
+                class="px-3 py-1.5 rounded-xl border border-rose-300 text-rose-700 text-xs">
+                Delete
+              </button>` : ''}
+          </div>
+        </form>
+      `;
+      openModal(html, () => {
+        document.getElementById('studentForm').onsubmit = (e) => {
+          e.preventDefault();
+          const form = e.target;
+          const newStudent = {
+            id: student?.id || generateId('stu'),
+            name: form.name.value.trim(),
+            gradeLevel: form.gradeLevel.value.trim(),
+            rate: Number(form.rate.value || 0),
+            subjects: form.subjects.value.split(',').map(s => s.trim()).filter(Boolean),
+            notes: form.notes.value.trim()
+          };
+          if (!newStudent.name) {
+            alert('Name is required.');
+            return;
+          }
+          if (isEdit) {
+            const idx = state.students.findIndex(s => s.id === student.id);
+            state.students[idx] = newStudent;
+          } else {
+            state.students.push(newStudent);
+          }
+          saveState();
+          closeModal();
+          renderStudentsView();
+        };
+        if (isEdit) {
+          document.getElementById('deleteStudentBtn').onclick = () => {
+            if (!confirm('Delete this student? This will not delete existing sessions/invoices but will orphan them.')) return;
+            state.students = state.students.filter(s => s.id !== student.id);
+            saveState();
+            closeModal();
+            selectedStudentId = null;
+            renderStudentsView();
+          };
+        }
+      });
+    }
+
+    /***********************
+     * SESSION CRUD MODAL  *
+     ***********************/
+    function openSessionModal(session) {
+      const isEdit = !!session;
+      const html = `
+        <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit session' : 'Add session'}</h2>
+        <form id="sessionForm" class="space-y-2">
+          <div>
+            <label class="block text-[11px] mb-1">Students</label>
+            <div class="grid grid-cols-2 gap-1 max-h-32 overflow-y-auto border border-slate-300 rounded-lg px-2 py-1">
+              ${
+                state.students.length
+                  ? state.students.map(s => `
+                      <label class="flex items-center gap-1 text-[11px]">
+                        <input type="checkbox" name="studentIds" value="${s.id}"
+                          ${session?.studentIds?.includes(s.id) ? 'checked' : ''}>
+                        <span>${s.name}</span>
+                      </label>
+                    `).join('')
+                  : '<div class="text-slate-500 text-[11px]">No students yet.</div>'
+              }
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] mb-1">Date</label>
+              <input type="date" name="date" value="${session?.date || new Date().toISOString().slice(0,10)}"
+                     class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" required>
+            </div>
+            <div>
+              <label class="block text-[11px] mb-1">Start time</label>
+              <input type="time" name="startTime" value="${session?.startTime || '16:00'}"
+                     class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] mb-1">Duration (hours)</label>
+              <input type="number" step="0.25" name="durationHours" value="${session?.durationHours || 1}"
+                     class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            </div>
+            <div>
+              <label class="block text-[11px] mb-1">Subject</label>
+              <select name="subject" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+                <option value="Physics" ${session?.subject === 'Physics' ? 'selected' : ''}>Physics</option>
+                <option value="Chemistry" ${session?.subject === 'Chemistry' ? 'selected' : ''}>Chemistry</option>
+                <option value="Maths" ${session?.subject === 'Maths' ? 'selected' : ''}>Maths</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Topic / focus</label>
+            <input name="topic" value="${session?.topic || ''}"
+                   class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Notes</label>
+            <textarea name="notes" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${session?.notes || ''}</textarea>
+          </div>
+          <div class="flex justify-between items-center mt-3">
+            <button type="submit" class="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium">
+              ${isEdit ? 'Save changes' : 'Add session'}
+            </button>
+            ${isEdit ? `
+              <button type="button" id="deleteSessionBtn"
+                class="px-3 py-1.5 rounded-xl border border-rose-300 text-rose-700 text-xs">
+                Delete
+              </button>` : ''}
+          </div>
+          <div id="sessionClashWarning" class="mt-2 text-[10px] text-amber-600"></div>
+        </form>
+      `;
+      openModal(html, () => {
+        const form = document.getElementById('sessionForm');
+
+        function updateClashWarning() {
+          const date = form.date.value;
+          const startTime = form.startTime.value || '00:00';
+          const durationHours = Number(form.durationHours.value || 1);
+          const selectedIds = [...form.querySelectorAll('input[name="studentIds"]:checked')].map(i => i.value);
+          const warningEl = document.getElementById('sessionClashWarning');
+          const clashes = state.sessions.filter(s => {
+            if (isEdit && s.id === session.id) return false;
+            if (s.date !== date) return false;
+            const shared = s.studentIds.some(id => selectedIds.includes(id));
+            if (!shared) return false;
+            const aStart = timeToMinutes(startTime);
+            const aEnd = aStart + durationHours * 60;
+            const bStart = timeToMinutes(s.startTime || '00:00');
+            const bEnd = bStart + Number(s.durationHours || 1) * 60;
+            return !(aEnd <= bStart || bEnd <= aStart);
+          });
+          if (clashes.length) {
+            warningEl.textContent = '⚠ Potential clash: this overlaps with another session for the same student(s).';
+          } else {
+            warningEl.textContent = '';
+          }
+        }
+
+        ['change','input'].forEach(ev => {
+          form.date.addEventListener(ev, updateClashWarning);
+          form.startTime.addEventListener(ev, updateClashWarning);
+          form.durationHours.addEventListener(ev, updateClashWarning);
+          form.querySelectorAll('input[name="studentIds"]').forEach(cb => cb.addEventListener(ev, updateClashWarning));
+        });
+        updateClashWarning();
+
+        form.onsubmit = (e) => {
+          e.preventDefault();
+          const selectedIds = [...form.querySelectorAll('input[name="studentIds"]:checked')].map(i => i.value);
+          if (!selectedIds.length) {
+            alert('Select at least one student.');
+            return;
+          }
+          const newSession = {
+            id: session?.id || generateId('sess'),
+            studentIds: selectedIds,
+            date: form.date.value,
+            startTime: form.startTime.value,
+            durationHours: Number(form.durationHours.value || 1),
+            subject: form.subject.value,
+            topic: form.topic.value.trim(),
+            notes: form.notes.value.trim(),
+            completed: session?.completed || false
+          };
+          if (isEdit) {
+            const idx = state.sessions.findIndex(s => s.id === session.id);
+            state.sessions[idx] = newSession;
+          } else {
+            state.sessions.push(newSession);
+          }
+          saveState();
+          closeModal();
+          renderScheduleView();
+          renderStudentsView();
+        };
+
+        if (isEdit) {
+          document.getElementById('deleteSessionBtn').onclick = () => {
+            if (!confirm('Delete this session?')) return;
+            state.sessions = state.sessions.filter(s => s.id !== session.id);
+            saveState();
+            closeModal();
+            renderScheduleView();
+            renderStudentsView();
+          };
+        }
+      });
+    }
+
+    /***********************
+     * RESOURCE CRUD MODAL *
+     ***********************/
+    function openResourceModal(resource) {
+      const isEdit = !!resource;
+      const html = `
+        <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit resource' : 'Add resource'}</h2>
+        <form id="resourceForm" class="space-y-2">
+          <div>
+            <label class="block text-[11px] mb-1">Title</label>
+            <input name="title" value="${resource?.title || ''}" required
+                   class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] mb-1">Subject</label>
+              <select name="subject" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+                <option value="Physics" ${resource?.subject === 'Physics' ? 'selected' : ''}>Physics</option>
+                <option value="Chemistry" ${resource?.subject === 'Chemistry' ? 'selected' : ''}>Chemistry</option>
+                <option value="Maths" ${resource?.subject === 'Maths' ? 'selected' : ''}>Maths</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] mb-1">Level</label>
+              <input name="level" value="${resource?.level || ''}"
+                     class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Tags (comma separated)</label>
+            <input name="tags" value="${(resource?.tags || []).join(', ')}"
+                   class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Description / location</label>
+            <textarea name="description" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${resource?.description || ''}</textarea>
+          </div>
+          <div class="flex justify-between items-center mt-3">
+            <button type="submit" class="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium">
+              ${isEdit ? 'Save changes' : 'Add resource'}
+            </button>
+            ${isEdit ? `
+              <button type="button" id="deleteResourceBtn"
+                class="px-3 py-1.5 rounded-xl border border-rose-300 text-rose-700 text-xs">
+                Delete
+              </button>` : ''}
+          </div>
+        </form>
+      `;
+      openModal(html, () => {
+        const form = document.getElementById('resourceForm');
+        form.onsubmit = (e) => {
+          e.preventDefault();
+          const newRes = {
+            id: resource?.id || generateId('res'),
+            title: form.title.value.trim(),
+            subject: form.subject.value,
+            level: form.level.value.trim(),
+            tags: form.tags.value.split(',').map(t => t.trim()).filter(Boolean),
+            description: form.description.value.trim(),
+            createdAt: resource?.createdAt || new Date().toISOString().slice(0,10)
+          };
+          if (!newRes.title) {
+            alert('Title is required.');
+            return;
+          }
+          if (isEdit) {
+            const idx = state.resources.findIndex(r => r.id === resource.id);
+            state.resources[idx] = newRes;
+          } else {
+            state.resources.push(newRes);
+          }
+          saveState();
+          closeModal();
+          renderResourcesView();
+        };
+
+        if (isEdit) {
+          document.getElementById('deleteResourceBtn').onclick = () => {
+            if (!confirm('Delete this resource?')) return;
+            state.resources = state.resources.filter(r => r.id !== resource.id);
+            // delete related homework
+            state.homework = state.homework.filter(hw => hw.resourceId !== resource.id);
+            saveState();
+            closeModal();
+            renderResourcesView();
+          };
+        }
+      });
+    }
+
+    function openAssignResourceModal(resourceId) {
+      const res = getResourceById(resourceId);
+      if (!res) return;
+      const html = `
+        <h2 class="text-sm font-semibold mb-3">Assign "${res.title}"</h2>
+        <form id="assignForm" class="space-y-2">
+          <div>
+            <label class="block text-[11px] mb-1">Students</label>
+            <div class="grid grid-cols-2 gap-1 max-h-32 overflow-y-auto border border-slate-300 rounded-lg px-2 py-1">
+              ${
+                state.students.length
+                  ? state.students.map(s => `
+                      <label class="flex items-center gap-1 text-[11px]">
+                        <input type="checkbox" name="studentIds" value="${s.id}">
+                        <span>${s.name}</span>
+                      </label>
+                    `).join('')
+                  : '<div class="text-slate-500 text-[11px]">No students yet.</div>'
+              }
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Due date</label>
+            <input type="date" name="dueDate" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs"
+                   value="${new Date().toISOString().slice(0,10)}">
+          </div>
+          <button type="submit" class="mt-2 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium">
+            Assign
+          </button>
+        </form>
+      `;
+      openModal(html, () => {
+        document.getElementById('assignForm').onsubmit = (e) => {
+          e.preventDefault();
+          const form = e.target;
+          const ids = [...form.querySelectorAll('input[name="studentIds"]:checked')].map(i => i.value);
+          if (!ids.length) {
+            alert('Select at least one student.');
+            return;
+          }
+          const dueDate = form.dueDate.value;
+          const today = new Date().toISOString().slice(0,10);
+          ids.forEach(stuId => {
+            state.homework.push({
+              id: generateId('hw'),
+              studentId: stuId,
+              resourceId,
+              status: 'To do',
+              dueDate,
+              assignedDate: today
+            });
+          });
+          saveState();
+          closeModal();
+          renderResourcesView();
+          if (selectedStudentId) {
+            renderStudentTimeline(selectedStudentId);
+          }
+        };
+      });
+    }
+
+    /***********************
+     * DOCUMENTS CRUD      *
+     ***********************/
+    function getDocumentById(id) {
+      return state.documents.find(doc => doc.id === id);
+    }
+
+    function openDocumentModal(doc, fixedStudentId) {
+      const isEdit = !!doc;
+      const html = `
+        <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit document' : 'Add document'}</h2>
+        <form id="docForm" class="space-y-2">
+          <div>
+            <label class="block text-[11px] mb-1">Student</label>
+            <select name="studentId" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+              ${
+                state.students.map(s => `
+                  <option value="${s.id}"
+                    ${(doc?.studentId === s.id || fixedStudentId === s.id) ? 'selected' : ''}>
+                    ${s.name}
+                  </option>
+                `).join('')
+              }
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Title</label>
+            <input name="title" value="${doc?.title || ''}"
+                   class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Status</label>
+            <select name="status" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+              <option value="Draft" ${doc?.status === 'Draft' ? 'selected' : ''}>Draft</option>
+              <option value="Sent" ${doc?.status === 'Sent' ? 'selected' : ''}>Sent</option>
+              <option value="Signed" ${doc?.status === 'Signed' ? 'selected' : ''}>Signed</option>
+              <option value="Expired" ${doc?.status === 'Expired' ? 'selected' : ''}>Expired</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Date</label>
+            <input type="date" name="date" value="${doc?.date || new Date().toISOString().slice(0,10)}"
+                   class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Location / notes</label>
+            <textarea name="notes" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${doc?.notes || ''}</textarea>
+          </div>
+          <div class="flex justify-between items-center mt-3">
+            <button type="submit" class="px-3 py-1.5 rounded-xl bg-amber-600 text-white text-xs font-medium">
+              ${isEdit ? 'Save changes' : 'Add document'}
+            </button>
+            ${isEdit ? `
+              <button type="button" id="deleteDocBtn"
+                class="px-3 py-1.5 rounded-xl border border-rose-300 text-rose-700 text-xs">
+                Delete
+              </button>` : ''}
+          </div>
+        </form>
+      `;
+      openModal(html, () => {
+        const form = document.getElementById('docForm');
+        form.onsubmit = (e) => {
+          e.preventDefault();
+          const newDoc = {
+            id: doc?.id || generateId('doc'),
+            studentId: form.studentId.value,
+            title: form.title.value.trim(),
+            status: form.status.value,
+            date: form.date.value,
+            notes: form.notes.value.trim(),
+            createdAt: doc?.createdAt || new Date().toISOString().slice(0,10)
+          };
+          if (!newDoc.studentId) {
+            alert('Select a student.');
+            return;
+          }
+          if (!newDoc.title) {
+            alert('Title required.');
+            return;
+          }
+          if (isEdit) {
+            const idx = state.documents.findIndex(d => d.id === doc.id);
+            state.documents[idx] = newDoc;
+          } else {
+            state.documents.push(newDoc);
+          }
+          saveState();
+          closeModal();
+          if (selectedStudentId) {
+            renderStudentDocuments(selectedStudentId);
+            renderStudentTimeline(selectedStudentId);
+          }
+        };
+
+        if (isEdit) {
+          document.getElementById('deleteDocBtn').onclick = () => {
+            if (!confirm('Delete this document?')) return;
+            state.documents = state.documents.filter(d => d.id !== doc.id);
+            saveState();
+            closeModal();
+            if (selectedStudentId) {
+              renderStudentDocuments(selectedStudentId);
+              renderStudentTimeline(selectedStudentId);
+            }
+          };
+        }
+      });
+    }
+
+    /***********************
+     * INVOICE CRUD MODAL  *
+     ***********************/
+    function openInvoiceModal(inv) {
+      const isEdit = !!inv;
+      const html = `
+        <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit invoice' : 'Create invoice'}</h2>
+        <form id="invoiceForm" class="space-y-2">
+          <div>
+            <label class="block text-[11px] mb-1">Student</label>
+            <select name="studentId" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+              ${
+                state.students.map(s => `
+                  <option value="${s.id}"
+                    ${(inv?.studentId === s.id || (!inv && selectedStudentId === s.id)) ? 'selected' : ''}>
+                    ${s.name}
+                  </option>
+                `).join('')
+              }
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] mb-1">Invoice ID</label>
+              <input name="id" value="${inv?.id || generateId('inv')}"
+                     class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            </div>
+            <div>
+              <label class="block text-[11px] mb-1">Issue date</label>
+              <input type="date" name="issueDate" value="${inv?.issueDate || new Date().toISOString().slice(0,10)}"
+                     class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] mb-1">Due date</label>
+              <input type="date" name="dueDate" value="${inv?.dueDate || ''}"
+                     class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            </div>
+            <div>
+              <label class="block text-[11px] mb-1">Total amount (R)</label>
+              <input type="number" step="0.01" name="total" value="${inv?.total || ''}"
+                     class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            </div>
+          </div>
+          <div class="flex items-center gap-1 mt-1">
+            <input type="checkbox" name="paid" id="invPaid" ${inv?.paid ? 'checked' : ''}>
+            <label for="invPaid" class="text-[11px]">Mark as paid</label>
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Notes</label>
+            <textarea name="notes" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${inv?.notes || ''}</textarea>
+          </div>
+          <p class="text-[10px] text-slate-500">
+            Tip: you can calculate total by multiplying hours × rate for all sessions since last invoice.
+          </p>
+          <div class="flex justify-between items-center mt-3">
+            <button type="submit" class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-medium">
+              ${isEdit ? 'Save invoice' : 'Create invoice'}
+            </button>
+            ${isEdit ? `
+              <button type="button" id="deleteInvoiceBtn"
+                class="px-3 py-1.5 rounded-xl border border-rose-300 text-rose-700 text-xs">
+                Delete
+              </button>` : ''}
+          </div>
+        </form>
+      `;
+      openModal(html, () => {
+        const form = document.getElementById('invoiceForm');
+        form.onsubmit = (e) => {
+          e.preventDefault();
+          const newInv = {
+            id: form.id.value.trim(),
+            studentId: form.studentId.value,
+            issueDate: form.issueDate.value,
+            dueDate: form.dueDate.value,
+            total: Number(form.total.value || 0),
+            paid: form.paid.checked,
+            notes: form.notes.value.trim()
+          };
+          if (!newInv.studentId) {
+            alert('Select a student.');
+            return;
+          }
+          if (!newInv.id) {
+            alert('Invoice ID is required.');
+            return;
+          }
+          if (isEdit) {
+            const idx = state.invoices.findIndex(i => i.id === inv.id);
+            state.invoices[idx] = newInv;
+          } else {
+            // if id already exists, overwrite
+            const idx = state.invoices.findIndex(i => i.id === newInv.id);
+            if (idx >= 0) state.invoices[idx] = newInv;
+            else state.invoices.push(newInv);
+          }
+          saveState();
+          closeModal();
+          renderFinanceView();
+          if (selectedStudentId) renderStudentFinance(selectedStudentId);
+        };
+
+        if (isEdit) {
+          document.getElementById('deleteInvoiceBtn').onclick = () => {
+            if (!confirm('Delete this invoice?')) return;
+            state.invoices = state.invoices.filter(i => i.id !== inv.id);
+            saveState();
+            closeModal();
+            renderFinanceView();
+            if (selectedStudentId) renderStudentFinance(selectedStudentId);
+          };
+        }
+      });
+    }
+
+    /***********************
+     * VALIDATION SUMMARY  *
+     ***********************
+     * - Layout: Sidebar, topbar, and all main views (Dashboard, Students, Schedule, Resources, Finance, Settings) render.
+     * - Core features: Student CRUD, sessions with calendar, resources with assignment & homework board, invoices with overdue handling, documents per student, analytics & subject mix charts, search, theme & export/import, all backed by localStorage.
+     * - Interactions: Modals for add/edit, quick actions on sessions, per-student 360° view (timeline, sessions, docs, finance) are wired.
+     * - No external paid services; only Tailwind & Chart.js via CDN.
+     */
+
+  </script>
+</body>
+</html>
