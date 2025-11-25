@@ -15,8 +15,6 @@
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
-  <!-- Heroicons (SVG via JS) - we’ll mostly use inline SVG to keep things simple -->
-
   <style>
     :root {
       --bg-main-light: #f3f4f6;
@@ -510,6 +508,11 @@
      ***********************/
     const STORAGE_KEY = 'tutoringDashboardState_v1';
 
+    // SAFE deep clone helper (replaces structuredClone)
+    function deepClone(obj) {
+      return JSON.parse(JSON.stringify(obj));
+    }
+
     const defaultState = {
       students: [],
       sessions: [],
@@ -528,13 +531,13 @@
     function loadState() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return structuredClone(defaultState);
+        if (!raw) return deepClone(defaultState);
         const parsed = JSON.parse(raw);
         // Merge with defaults to avoid missing keys
-        return Object.assign(structuredClone(defaultState), parsed);
+        return Object.assign(deepClone(defaultState), parsed);
       } catch (e) {
         console.error('Failed to load state', e);
-        return structuredClone(defaultState);
+        return deepClone(defaultState);
       }
     }
 
@@ -555,6 +558,22 @@
       setupTopbar();
       applySettingsToUI();
       renderAllViews();
+
+      // expose some functions for inline onclick safety
+      window.openSessionModal = openSessionModal;
+      window.getSessionById = getSessionById;
+      window.openSessionQuickActions = openSessionQuickActions;
+      window.openResourceModal = openResourceModal;
+      window.getResourceById = getResourceById;
+      window.openAssignResourceModal = openAssignResourceModal;
+      window.updateHomeworkStatus = updateHomeworkStatus;
+      window.openDocumentModal = openDocumentModal;
+      window.getDocumentById = getDocumentById;
+      window.openInvoiceModal = openInvoiceModal;
+      window.getInvoiceById = getInvoiceById;
+      window.markInvoicePaid = markInvoicePaid;
+      window.generateReminder = generateReminder;
+      window.selectStudent = selectStudent;
     });
 
     function setupNav() {
@@ -608,7 +627,7 @@
         if (!txt) return alert('Paste JSON first.');
         try {
           const imported = JSON.parse(txt);
-          state = Object.assign(structuredClone(defaultState), imported);
+          state = Object.assign(deepClone(defaultState), imported);
           saveState();
           renderAllViews();
           applySettingsToUI();
@@ -641,10 +660,17 @@
       btn.textContent = isDark ? '☀️' : '🌙';
     }
 
+    function toggleTheme() {
+      state.settings.theme = state.settings.theme === 'dark' ? 'light' : 'dark';
+      applyTheme();
+      saveState();
+    }
+
     function applyDensity() {
       const compact = state.settings.density === 'compact';
-      document.getElementById('viewsContainer').classList.toggle('py-2', compact);
-      document.getElementById('viewsContainer').classList.toggle('py-4', !compact);
+      const container = document.getElementById('viewsContainer');
+      container.classList.toggle('py-2', compact);
+      container.classList.toggle('py-4', !compact);
     }
 
     function renderAllViews() {
@@ -909,7 +935,6 @@
     function selectStudent(id) {
       selectedStudentId = id;
       showStudentDetail(id);
-      // ensure view is visible
       switchView('students');
     }
 
@@ -2104,7 +2129,6 @@ Best regards,
             const idx = state.invoices.findIndex(i => i.id === inv.id);
             state.invoices[idx] = newInv;
           } else {
-            // if id already exists, overwrite
             const idx = state.invoices.findIndex(i => i.id === newInv.id);
             if (idx >= 0) state.invoices[idx] = newInv;
             else state.invoices.push(newInv);
@@ -2131,10 +2155,12 @@ Best regards,
     /***********************
      * VALIDATION SUMMARY  *
      ***********************
-     * - Layout: Sidebar, topbar, and all main views (Dashboard, Students, Schedule, Resources, Finance, Settings) render.
-     * - Core features: Student CRUD, sessions with calendar, resources with assignment & homework board, invoices with overdue handling, documents per student, analytics & subject mix charts, search, theme & export/import, all backed by localStorage.
-     * - Interactions: Modals for add/edit, quick actions on sessions, per-student 360° view (timeline, sessions, docs, finance) are wired.
-     * - No external paid services; only Tailwind & Chart.js via CDN.
+     * Change in this debug pass:
+     * - Replaced structuredClone with deepClone to avoid runtime errors in Safari and older browsers.
+     * - Rewired import logic to use deepClone.
+     * - Exposed key functions on window so inline onclick handlers are guaranteed to work.
+     * Expected result:
+     * - All topbar and view-specific buttons (Add student, Add session, Add resource, Create invoice, etc.) now open modals and work as intended.
      */
 
   </script>
