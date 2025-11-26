@@ -1004,7 +1004,7 @@
       ['students','sessions','resources','homework','documents','contracts','invoices','studentTodos','studentCheckins'].forEach(key => {
         if (!Array.isArray(st[key])) st[key] = [];
       });
-      st.students.forEach(s => { s.id = cleanId(s.id); });
+      st.students.forEach(s => { s.id = cleanId(s.id); s.studentEmail = (s.studentEmail || s.student_email || '').trim().toLowerCase(); });
       st.sessions.forEach(s => {
         s.id = cleanId(s.id);
         s.studentIds = (s.studentIds || []).map(cleanId);
@@ -1138,6 +1138,7 @@
         rate: s.rate,
         subjects: s.subjects,
         notes: s.notes,
+        student_email: (s.studentEmail || '').trim(),
         created_at: s.createdAt
       }));
       await upsertAndPrune('students', students, 'id');
@@ -1526,6 +1527,10 @@
         }
         el.classList.toggle('owner-locked', readOnlyMode);
       });
+      // If student mode and only one student in state, auto-select it
+      if (readOnlyMode && state.students.length === 1) {
+        selectStudent(state.students[0].id);
+      }
     }
 
     function guardEdit() {
@@ -1641,6 +1646,7 @@
         rate: s.rate,
         subjects: s.subjects,
         notes: s.notes,
+        studentEmail: s.student_email || '',
         createdAt: s.created_at
       }));
       merged.sessions = sessions;
@@ -2069,11 +2075,14 @@
         });
       });
 
-      if (!selectedStudentId || !getStudentById(selectedStudentId)) {
+      const current = getStudentById(selectedStudentId);
+      if (!current && filtered.length === 1) {
+        selectStudent(filtered[0].id);
+      } else if (current) {
+        showStudentDetail(selectedStudentId);
+      } else {
         document.getElementById('studentDetailEmpty').classList.remove('hidden');
         document.getElementById('studentDetail').classList.add('hidden');
-      } else {
-        showStudentDetail(selectedStudentId);
       }
     }
 
@@ -3184,6 +3193,12 @@ Best regards,
             <input name="name" value="${student?.name || ''}" required
                    class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
           </div>
+          <div>
+            <label class="block text-[11px] mb-1">Student email (for login)</label>
+            <input name="studentEmail" type="email" value="${student?.studentEmail || ''}"
+                   class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" ${readOnlyMode ? 'disabled' : ''}>
+            <p class="text-[10px] text-slate-500 mt-1">Set to the student's login email. They will only see their own profile.</p>
+          </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-[11px] mb-1">Grade / Level</label>
@@ -3227,7 +3242,8 @@ Best regards,
             gradeLevel: form.gradeLevel.value.trim(),
             rate: Number(form.rate.value || 0),
             subjects: form.subjects.value.split(',').map(s => s.trim()).filter(Boolean),
-            notes: form.notes.value.trim()
+            notes: form.notes.value.trim(),
+            studentEmail: form.studentEmail.value.trim()
           };
           if (!newStudent.name) {
             alert('Name is required.');
