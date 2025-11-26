@@ -1399,6 +1399,11 @@
       if (banner) banner.classList.toggle('hidden', !readOnlyMode);
       const main = document.querySelector('main#viewsContainer');
       if (main) main.classList.toggle('opacity-70', readOnlyMode);
+      if (readOnlyMode) {
+        state = deepClone(defaultState);
+        localStorage.removeItem(STORAGE_KEY);
+        renderAllViews();
+      }
       document.querySelectorAll('[data-owner-only]').forEach(el => {
         if (el.tagName === 'BUTTON' || el.tagName === 'SELECT' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
           el.disabled = readOnlyMode;
@@ -1416,21 +1421,26 @@
     }
 
     async function tryLoadRemoteThenLocal() {
+      if (supabaseAvailable && !supabaseSession) {
+        state = deepClone(defaultState);
+        return;
+      }
       if (isSupabaseReady()) {
         try {
           state = await loadStateFromSupabase();
-          saveState(); // persist locally as cache
+          if (!readOnlyMode) saveState(); // persist locally as cache for owner only
           return;
         } catch (e) {
           console.error('Failed to load from Supabase, falling back to local', e);
         }
       }
-      state = loadState();
+      state = supabaseAvailable ? deepClone(defaultState) : loadState();
     }
 
     async function loadStateFromSupabase() {
       const uid = supabaseSession?.user?.id;
-      if (!uid) return loadState();
+      if (!uid) return supabaseAvailable ? deepClone(defaultState) : loadState();
+      if (!isOwner()) return deepClone(defaultState);
       const [
         studentsRes,
         sessionsRes,
