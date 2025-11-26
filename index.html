@@ -1269,26 +1269,7 @@
         const { error } = await supabaseClient.from(table).upsert(rows);
         if (error) throw error;
       }
-      // Delete rows not present locally (per user)
-      const ids =
-        Array.isArray(pk)
-          ? rows.map(r => pk.map(k => r[k]).join('|'))
-          : rows.map(r => r[pk]);
-      if (Array.isArray(pk)) {
-        // delete all for user then re-upsert already done; skip prune to avoid complexity
-        return;
-      }
-      if (ids.length) {
-        const { error } = await supabaseClient
-          .from(table)
-          .delete()
-          .eq('user_id', uid)
-          .not('id', 'in', `(${ids.map(i => `'${i}'`).join(',')})`);
-        if (error) throw error;
-      } else {
-        const { error } = await supabaseClient.from(table).delete().eq('user_id', uid);
-        if (error) throw error;
-      }
+      // Prune skipped to avoid accidental deletions; Supabase is source of truth.
     }
 
     function generateId(prefix) {
@@ -1550,7 +1531,7 @@
       if (isSupabaseReady()) {
         try {
           state = await loadStateFromSupabase();
-          if (!readOnlyMode) saveState(); // persist locally as cache for owner only
+          if (!readOnlyMode) saveState(); // persist locally as cache
           return;
         } catch (e) {
           console.error('Failed to load from Supabase, falling back to local', e);
@@ -1562,7 +1543,6 @@
     async function loadStateFromSupabase() {
       const uid = supabaseSession?.user?.id;
       if (!uid) return supabaseAvailable ? deepClone(defaultState) : loadState();
-      if (!isOwner()) return deepClone(defaultState);
       const [
         studentsRes,
         sessionsRes,
