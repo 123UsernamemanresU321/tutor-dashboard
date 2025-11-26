@@ -1360,6 +1360,12 @@
     /****************
      * INITIAL SETUP *
      ****************/
+    // Catch any unhandled promise rejections so Safari doesn’t throw “output” ReferenceErrors
+    window.addEventListener('unhandledrejection', (event) => {
+      console.error('Unhandled promise rejection', event.reason);
+      event.preventDefault();
+    });
+
     document.addEventListener('DOMContentLoaded', async () => {
       await initSupabaseAuth();
       setupNav();
