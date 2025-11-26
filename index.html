@@ -3425,14 +3425,30 @@ Best regards,
         if (isEdit) {
           document.getElementById('deleteSessionBtn').onclick = () => {
             if (!confirm('Delete this session?')) return;
-            state.sessions = state.sessions.filter(s => s.id !== session.id);
-            saveState();
-            closeModal();
-            renderScheduleView();
-            renderStudentsView();
+            deleteSessionAndLinks(session.id).then(() => {
+              closeModal();
+              renderScheduleView();
+              renderStudentsView();
+            }).catch(err => {
+              console.error(err);
+              alert('Delete failed. See console for details.');
+            });
           };
         }
       });
+    }
+
+    async function deleteSessionAndLinks(sessionId) {
+      // remove locally
+      state.sessions = state.sessions.filter(s => s.id !== sessionId);
+      saveState();
+      // remove remotely if connected
+      if (isSupabaseReady()) {
+        const { error: linkErr } = await supabaseClient.from('session_students').delete().eq('session_id', sessionId);
+        if (linkErr) throw linkErr;
+        const { error: sessErr } = await supabaseClient.from('sessions').delete().eq('id', sessionId);
+        if (sessErr) throw sessErr;
+      }
     }
 
     /***********************
