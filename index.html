@@ -1383,7 +1383,13 @@
     window.addEventListener('unhandledrejection', (event) => {
       console.error('Unhandled promise rejection', event.reason);
       event.preventDefault();
+      return true;
     });
+    window.onunhandledrejection = (event) => {
+      console.error('Unhandled promise rejection (onunhandledrejection)', event.reason);
+      if (event.preventDefault) event.preventDefault();
+      return true;
+    };
 
     document.addEventListener('DOMContentLoaded', async () => {
       await initSupabaseAuth();
@@ -1699,23 +1705,27 @@
       });
       const sessionsWithStudents = sessions.filter(s => (s.studentIds || []).length > 0);
 
-      // Fetch signed URLs for contracts if storage_path exists
+      // Fetch signed URLs for contracts if storage_path exists (ignore missing/forbidden)
       const contracts = await Promise.all(
         (contractsRes.data || []).map(async c => {
-          if (c.storage_path && supabaseClient.storage) {
-            const { data, error } = await supabaseClient.storage.from('contracts').createSignedUrl(c.storage_path, 60 * 60 * 24);
-            if (!error && data?.signedUrl) {
-              return {
-                id: c.id,
-                studentId: c.student_id,
-                fileName: c.file_name,
-                storage_path: c.storage_path,
-                status: c.status,
-                notes: c.notes,
-                uploadedAt: c.uploaded_at,
-                signedUrl: data.signedUrl
-              };
+          try {
+            if (c.storage_path && supabaseClient.storage) {
+              const { data, error } = await supabaseClient.storage.from('contracts').createSignedUrl(c.storage_path, 60 * 60 * 24);
+              if (!error && data?.signedUrl) {
+                return {
+                  id: c.id,
+                  studentId: c.student_id,
+                  fileName: c.file_name,
+                  storage_path: c.storage_path,
+                  status: c.status,
+                  notes: c.notes,
+                  uploadedAt: c.uploaded_at,
+                  signedUrl: data.signedUrl
+                };
+              }
             }
+          } catch (err) {
+            console.warn('Contract signed URL fetch failed', err);
           }
           return {
             id: c.id,
@@ -1744,9 +1754,13 @@
       const resources = await Promise.all(
         (resourcesRes.data || []).map(async r => {
           let signedUrl = '';
-          if (r.storage_path && supabaseClient.storage) {
-            const { data, error } = await supabaseClient.storage.from('resources').createSignedUrl(r.storage_path, 60 * 60 * 24);
-            if (!error && data?.signedUrl) signedUrl = data.signedUrl;
+          try {
+            if (r.storage_path && supabaseClient.storage) {
+              const { data, error } = await supabaseClient.storage.from('resources').createSignedUrl(r.storage_path, 60 * 60 * 24);
+              if (!error && data?.signedUrl) signedUrl = data.signedUrl;
+            }
+          } catch (err) {
+            console.warn('Resource signed URL fetch failed', err);
           }
           return {
             id: r.id,
