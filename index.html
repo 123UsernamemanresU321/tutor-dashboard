@@ -1643,9 +1643,11 @@
           return;
         } catch (e) {
           console.error('Failed to load from Supabase, falling back to local', e);
+          state = loadState(); // keep local data instead of wiping to defaults
+          return;
         }
       }
-      state = supabaseAvailable ? deepClone(defaultState) : loadState();
+      state = loadState();
     }
 
     async function loadStateFromSupabase() {
