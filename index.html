@@ -680,50 +680,70 @@
 
         <!-- Schedule -->
         <section id="view-schedule" class="view hidden">
-          <div class="section-shell space-y-4">
-            <div class="flex items-center justify-between mb-1">
+          <div class="section-shell space-y-6">
+            <div class="flex items-center justify-between">
               <div>
+                <p class="text-[10px] uppercase tracking-wide text-slate-500">Planner</p>
                 <h2 class="text-lg font-semibold">Schedule</h2>
-                <p class="text-xs text-slate-500">Calendar-style overview & clash detection.</p>
+                <p class="text-xs text-slate-500">Week grid, quick stats, and conflict signals.</p>
               </div>
-              <button id="addSessionBtn" data-owner-only class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 shadow-sm">
-                ＋ Add session
-              </button>
+              <div class="flex items-center gap-2">
+                <button id="schedulePrevWeek" class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs hover:bg-slate-50">← Prev</button>
+                <button id="scheduleToday" class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs hover:bg-slate-50">Today</button>
+                <button id="scheduleNextWeek" class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs hover:bg-slate-50">Next →</button>
+                <button id="addSessionBtn" data-owner-only class="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 shadow-sm">
+                  ＋ Session
+                </button>
+              </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Calendar -->
-            <div class="card p-5 col-span-2">
-              <div class="flex items-center justify-between mb-2 text-xs">
-                <div class="flex items-center gap-2">
-                  <button id="schedulePrevWeek" class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50">◀</button>
-                  <button id="scheduleToday" class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50">Today</button>
-                  <button id="scheduleNextWeek" class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50">▶</button>
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+              <!-- Left column: week grid -->
+              <div class="card p-5 col-span-2 space-y-3">
+                <div class="flex items-center justify-between text-xs">
+                  <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-700"><span class="h-2 w-2 rounded-full bg-indigo-500"></span> Physics</span>
+                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-700"><span class="h-2 w-2 rounded-full bg-emerald-500"></span> Chemistry</span>
+                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-700"><span class="h-2 w-2 rounded-full bg-rose-500"></span> Maths</span>
+                  </div>
+                  <div id="scheduleWeekLabel" class="font-medium text-slate-700"></div>
                 </div>
-                <div id="scheduleWeekLabel" class="font-medium"></div>
+                <div id="dayLoadRow" class="grid grid-cols-7 gap-2 text-[11px]"></div>
+                <div class="calendar-grid text-[11px]" id="scheduleCalendarGrid">
+                  <!-- days injected here -->
+                </div>
+                <div class="flex items-center justify-between text-[10px] text-slate-500">
+                  <span>Click a session chip to open quick actions.</span>
+                  <span class="flex items-center gap-2">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">⚠ Clash</span>
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">⏱ Tight gap</span>
+                  </span>
+                </div>
               </div>
-              <div id="dayLoadRow" class="grid grid-cols-7 gap-1 text-[10px] mb-2"></div>
-              <div class="calendar-grid text-[11px]" id="scheduleCalendarGrid">
-                <!-- days injected here -->
-              </div>
-              <p class="mt-2 text-[10px] text-slate-500">Click a session chip to open quick actions.</p>
-            </div>
 
-            <!-- Today & clash info -->
-            <div class="card p-5 col-span-1 space-y-3 text-xs">
-              <div>
-                <h3 class="text-sm font-semibold mb-1">Today's sessions</h3>
-                <ul id="todaySessionsList" class="space-y-1 max-h-40 overflow-y-auto scrollbar-thin"></ul>
-              </div>
-              <div>
-                <h3 class="text-sm font-semibold mb-1">Potential clashes</h3>
-                <ul id="clashList" class="space-y-1 max-h-40 overflow-y-auto scrollbar-thin text-[11px]"></ul>
-                <p class="text-[10px] text-slate-500 mt-1">Clashes are detected when sessions overlap in time for the same tutor or student.</p>
-              </div>
-              <div>
-                <h3 class="text-sm font-semibold mb-1">Tight transitions</h3>
-                <ul id="tightTransitionsList" class="space-y-1 max-h-32 overflow-y-auto scrollbar-thin text-[11px]"></ul>
-                <p class="text-[10px] text-slate-500 mt-1">Under 20 minutes between any sessions.</p>
+              <!-- Right column: daily + conflict cards -->
+              <div class="flex flex-col gap-4">
+                <div class="card p-4 text-xs space-y-2">
+                  <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-semibold">Today</h3>
+                    <span class="text-[10px] text-slate-500">Live list</span>
+                  </div>
+                  <ul id="todaySessionsList" class="space-y-1 max-h-48 overflow-y-auto scrollbar-thin"></ul>
+                </div>
+                <div class="card p-4 text-xs space-y-2">
+                  <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-semibold">Potential clashes</h3>
+                    <span class="text-[10px] text-amber-600">Overlap same student</span>
+                  </div>
+                  <ul id="clashList" class="space-y-1 max-h-32 overflow-y-auto scrollbar-thin text-[11px]"></ul>
+                </div>
+                <div class="card p-4 text-xs space-y-2">
+                  <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-semibold">Tight transitions</h3>
+                    <span class="text-[10px] text-slate-500">&lt; 20 min gap</span>
+                  </div>
+                  <ul id="tightTransitionsList" class="space-y-1 max-h-32 overflow-y-auto scrollbar-thin text-[11px]"></ul>
+                </div>
               </div>
             </div>
           </div>
@@ -2389,7 +2409,7 @@
       invs.forEach(inv => {
         if (!inv.paid) balance += Number(inv.total || 0);
       });
-      const balanceLabel = balance > 0 ? 'Outstanding balance' : 'Balance';
+      const balanceLabel = balance > 0 ? 'Owed balance' : 'Balance';
       document.getElementById('studentBalance').textContent = `${balanceLabel}: R ${balance.toFixed(2)}`;
       if (!invs.length) {
         ul.innerHTML = '<li class="text-slate-500">No invoices yet.</li>';
