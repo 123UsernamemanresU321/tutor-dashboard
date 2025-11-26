@@ -1261,7 +1261,11 @@
         storage_path: r.storage_path,
         file_name: r.fileName
       }));
-      await upsertAndPrune('resources', resources, 'id');
+      try {
+        await upsertAndPrune('resources', resources, 'id');
+      } catch (err) {
+        console.error('Resources upsert failed (check RLS on table "resources")', err);
+      }
 
       const homework = state.homework.map(h => ({
         id: cleanId(h.id),
@@ -3663,6 +3667,9 @@ Best regards,
         const msg = uploadErr?.message || '';
         if (msg.toLowerCase().includes('bucket')) {
           throw new Error('Supabase bucket "resources" is missing. Create a private bucket named "resources" in Storage and retry.');
+        }
+        if (msg.toLowerCase().includes('policy') || msg.toLowerCase().includes('row-level')) {
+          throw new Error('Storage write blocked by RLS. In Supabase, add owner-only policies on bucket "resources" using auth.uid() folder prefix, then retry while signed in.');
         }
         throw uploadErr;
       }
