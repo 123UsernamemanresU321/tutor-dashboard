@@ -181,6 +181,18 @@
       display: flex;
     }
 
+    .read-only-banner {
+      background: #fef3c7;
+      color: #92400e;
+      border-bottom: 1px solid #f59e0b;
+    }
+
+    .owner-locked {
+      opacity: 0.55;
+      pointer-events: none;
+      cursor: not-allowed;
+    }
+
     /* NAV */
     .nav-btn {
       border-radius: 999px;
@@ -354,10 +366,10 @@
 
         <!-- Quick actions -->
         <div class="flex items-center gap-2">
-          <button id="quickAddStudentBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 shadow-sm">
+          <button id="quickAddStudentBtn" data-owner-only class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 shadow-sm">
             ＋ Student
           </button>
-          <button id="quickAddSessionBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 shadow-sm">
+          <button id="quickAddSessionBtn" data-owner-only class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 shadow-sm">
             ＋ Session
           </button>
           <button id="signOutBtn" class="hidden inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl border border-slate-300 text-xs font-medium hover:bg-slate-50">
@@ -370,6 +382,9 @@
           </button>
         </div>
       </header>
+      <div id="readOnlyBanner" class="read-only-banner hidden px-6 py-2 text-xs">
+        Read-only mode: sign in as the owner to edit.
+      </div>
 
       <!-- Views container -->
       <main id="viewsContainer" class="flex-1 overflow-y-auto bg-transparent px-8 py-8 space-y-8 max-w-7xl mx-auto w-full">
@@ -506,7 +521,7 @@
                 <h2 class="text-lg font-semibold">Students</h2>
                 <p class="text-xs text-slate-500">Manage profiles, 360° timelines and subject mix.</p>
               </div>
-              <button id="addStudentBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 shadow-sm">
+              <button id="addStudentBtn" data-owner-only class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 shadow-sm">
                 ＋ Add student
               </button>
             </div>
@@ -544,7 +559,7 @@
                     <div id="studentDetailName" class="text-base font-semibold"></div>
                     <div id="studentDetailMeta" class="text-[11px] text-slate-500"></div>
                   </div>
-                  <button id="editStudentBtn" class="px-2 py-1 text-[11px] rounded-lg border border-slate-300 hover:bg-slate-50">
+                  <button id="editStudentBtn" data-owner-only class="px-2 py-1 text-[11px] rounded-lg border border-slate-300 hover:bg-slate-50">
                     Edit
                   </button>
                 </div>
@@ -642,7 +657,7 @@
                 <div id="studentTab-documents" class="student-tab-pane hidden mt-2">
                   <div class="flex items-center justify-between mb-1">
                     <h4 class="text-[11px] font-semibold">Documents</h4>
-                    <button id="addDocumentForStudentBtn" class="px-2 py-1 rounded-lg border border-slate-300 text-[10px] hover:bg-slate-50">
+                    <button id="addDocumentForStudentBtn" data-owner-only class="px-2 py-1 rounded-lg border border-slate-300 text-[10px] hover:bg-slate-50">
                       ＋ Add document
                     </button>
                   </div>
@@ -651,7 +666,7 @@
                 <div id="studentTab-finance" class="student-tab-pane hidden mt-2">
                   <div class="flex items-center justify-between mb-1">
                     <h4 class="text-[11px] font-semibold">Invoices & balance</h4>
-                    <button id="studentCreateInvoiceBtn" class="px-2 py-1 rounded-lg border border-emerald-500 text-emerald-600 text-[10px] hover:bg-emerald-50">
+                    <button id="studentCreateInvoiceBtn" data-owner-only class="px-2 py-1 rounded-lg border border-emerald-500 text-emerald-600 text-[10px] hover:bg-emerald-50">
                       ＋ Invoice for this student
                     </button>
                   </div>
@@ -671,7 +686,7 @@
                 <h2 class="text-lg font-semibold">Schedule</h2>
                 <p class="text-xs text-slate-500">Calendar-style overview & clash detection.</p>
               </div>
-              <button id="addSessionBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 shadow-sm">
+              <button id="addSessionBtn" data-owner-only class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 shadow-sm">
                 ＋ Add session
               </button>
             </div>
@@ -722,7 +737,7 @@
                 <h2 class="text-lg font-semibold">Resources</h2>
                 <p class="text-xs text-slate-500">Worksheets, lectures, and homework tracking.</p>
               </div>
-              <button id="addResourceBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 shadow-sm">
+              <button id="addResourceBtn" data-owner-only class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 shadow-sm">
                 ＋ Add resource
               </button>
             </div>
@@ -776,7 +791,7 @@
                 <h2 class="text-lg font-semibold">Finance</h2>
                 <p class="text-xs text-slate-500">Invoices, balances & overdue reminders.</p>
               </div>
-              <button id="addInvoiceBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 shadow-sm">
+              <button id="addInvoiceBtn" data-owner-only class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 shadow-sm">
                 ＋ Create invoice
               </button>
             </div>
@@ -922,8 +937,9 @@
     /***********************
      * SUPABASE CONFIG      *
      ***********************/
-    const SUPABASE_URL = 'https://wdsqnbebutuhwckjpwqf.supabase.co'; // TODO: replace
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkc3FuYmVidXR1aHdja2pwd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxMDE1NzcsImV4cCI6MjA3OTY3NzU3N30.pJglpTaZouSQFUVCbQONHK1UsB9CgWewKQCIV13NOEM'; // TODO: replace
+    const SUPABASE_URL = 'https://wdsqnbebutuhwckjpwqf.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkc3FuYmVidXR1aHdja2pwd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxMDE1NzcsImV4cCI6MjA3OTY3NzU3N30.pJglpTaZouSQFUVCbQONHK1UsB9CgWewKQCIV13NOEM';
+    const OWNER_EMAIL = 'erichuang.shangjing@outlook.com';
     const supabaseAvailable =
       typeof supabase !== 'undefined' &&
       SUPABASE_URL.startsWith('https://') &&
@@ -932,6 +948,7 @@
       !SUPABASE_ANON_KEY.includes('YOUR_ANON');
     let supabaseClient = null;
     let supabaseSession = null;
+    let readOnlyMode = false;
 
     // SAFE deep clone helper
     function deepClone(obj) {
@@ -975,6 +992,10 @@
     }
 
     function saveState() {
+      if (readOnlyMode) {
+        console.warn('Read-only mode: changes are not saved.');
+        return;
+      }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       updateKPIsAndCharts();
       if (isSupabaseReady()) {
@@ -987,6 +1008,7 @@
     }
 
     async function syncStateToSupabase() {
+      if (readOnlyMode) return;
       const uid = supabaseSession?.user?.id;
       if (!uid) return;
 
@@ -1167,6 +1189,7 @@
         await tryLoadRemoteThenLocal();
         renderAllViews();
       }
+      updateReadOnlyUI();
 
       // expose functions for inline onclick handlers
       window.openSessionModal = openSessionModal;
@@ -1223,8 +1246,8 @@
 
     function setupTopbar() {
       document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
-      document.getElementById('quickAddStudentBtn').addEventListener('click', () => openStudentModal());
-      document.getElementById('quickAddSessionBtn').addEventListener('click', () => openSessionModal());
+      document.getElementById('quickAddStudentBtn').addEventListener('click', () => { if (guardEdit()) openStudentModal(); });
+      document.getElementById('quickAddSessionBtn').addEventListener('click', () => { if (guardEdit()) openSessionModal(); });
       document.getElementById('globalSearchInput').addEventListener('input', handleGlobalSearch);
       const signOutBtn = document.getElementById('signOutBtn');
       if (signOutBtn) {
@@ -1282,10 +1305,10 @@
         }
       });
 
-      document.getElementById('addStudentBtn').addEventListener('click', () => openStudentModal());
-      document.getElementById('addSessionBtn').addEventListener('click', () => openSessionModal());
-      document.getElementById('addResourceBtn').addEventListener('click', () => openResourceModal());
-      document.getElementById('addInvoiceBtn').addEventListener('click', () => openInvoiceModal());
+      document.getElementById('addStudentBtn').addEventListener('click', () => { if (guardEdit()) openStudentModal(); });
+      document.getElementById('addSessionBtn').addEventListener('click', () => { if (guardEdit()) openSessionModal(); });
+      document.getElementById('addResourceBtn').addEventListener('click', () => { if (guardEdit()) openResourceModal(); });
+      document.getElementById('addInvoiceBtn').addEventListener('click', () => { if (guardEdit()) openInvoiceModal(); });
     }
 
     function applySettingsToUI() {
@@ -1314,24 +1337,18 @@
       if (supabaseSession) {
         document.getElementById('signOutBtn')?.classList.remove('hidden');
       }
-      const main = document.querySelector('main#viewsContainer');
-      if (main && supabaseAvailable && !supabaseSession) {
-        main.classList.add('pointer-events-none', 'opacity-50');
-      }
+      updateReadOnlyUI();
       supabaseClient.auth.onAuthStateChange((event, session) => {
         supabaseSession = session;
         toggleAuthOverlay(!session);
         if (session) {
           document.getElementById('signOutBtn')?.classList.remove('hidden');
-          const main = document.querySelector('main#viewsContainer');
-          if (main) main.classList.remove('pointer-events-none', 'opacity-50');
           tryLoadRemoteThenLocal().then(renderAllViews);
         } else {
           document.getElementById('signOutBtn')?.classList.add('hidden');
-          const main = document.querySelector('main#viewsContainer');
-          if (main) main.classList.add('pointer-events-none', 'opacity-50');
           state = deepClone(defaultState);
         }
+        updateReadOnlyUI();
       });
 
       const authForm = document.getElementById('authForm');
@@ -1369,6 +1386,33 @@
       } else {
         document.body.classList.remove('overflow-hidden');
       }
+    }
+
+    function isOwner() {
+      if (!supabaseAvailable) return true;
+      return !!(supabaseSession && supabaseSession.user?.email === OWNER_EMAIL);
+    }
+
+    function updateReadOnlyUI() {
+      readOnlyMode = supabaseAvailable ? !isOwner() : false;
+      const banner = document.getElementById('readOnlyBanner');
+      if (banner) banner.classList.toggle('hidden', !readOnlyMode);
+      const main = document.querySelector('main#viewsContainer');
+      if (main) main.classList.toggle('opacity-70', readOnlyMode);
+      document.querySelectorAll('[data-owner-only]').forEach(el => {
+        if (el.tagName === 'BUTTON' || el.tagName === 'SELECT' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+          el.disabled = readOnlyMode;
+        }
+        el.classList.toggle('owner-locked', readOnlyMode);
+      });
+    }
+
+    function guardEdit() {
+      if (readOnlyMode) {
+        alert('Read-only mode: sign in as the owner to edit.');
+        return false;
+      }
+      return true;
     }
 
     async function tryLoadRemoteThenLocal() {
@@ -2021,7 +2065,7 @@
       renderStudentContracts(id);
 
       document.getElementById('editStudentBtn').onclick = () => openStudentModal(s);
-      document.getElementById('studentCreateInvoiceBtn').onclick = () => openInvoiceModal(null);
+      document.getElementById('studentCreateInvoiceBtn').onclick = () => { if (guardEdit()) openInvoiceModal(null); };
 
       document.querySelectorAll('#studentDetailTabs .student-tab').forEach(tab => {
         tab.classList.remove('border-indigo-500', 'text-slate-900');
@@ -2047,10 +2091,11 @@
         };
       });
 
-      document.getElementById('addDocumentForStudentBtn').onclick = () => openDocumentModal(null, s.id);
+      document.getElementById('addDocumentForStudentBtn').onclick = () => { if (guardEdit()) openDocumentModal(null, s.id); };
       const todoForm = document.getElementById('studentTodoForm');
       if (todoForm) {
         todoForm.onsubmit = (e) => {
+          if (!guardEdit()) return;
           e.preventDefault();
           const text = todoForm.todoText.value.trim();
           const dueDate = todoForm.todoDue.value;
@@ -2070,6 +2115,7 @@
       const checkinForm = document.getElementById('studentCheckinForm');
       if (checkinForm) {
         checkinForm.onsubmit = (e) => {
+          if (!guardEdit()) return;
           e.preventDefault();
           const text = checkinForm.checkinText.value.trim();
           if (!text) return;
@@ -2180,8 +2226,8 @@
             <div class="font-medium">${sess.subject} – ${sess.topic || 'Lesson'}</div>
             <div class="text-[10px] text-slate-500">${sess.date} • ${sess.startTime || ''} • ${sess.durationHours || 1}h</div>
           </div>
-          <button class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
-                  onclick="openSessionModal(getSessionById('${sess.id}'))">
+            <button data-owner-only class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
+                    onclick="if(guardEdit()) openSessionModal(getSessionById('${sess.id}'))">
             Edit
           </button>
         </li>
@@ -2201,8 +2247,8 @@
             <div class="font-medium">${doc.title}</div>
             <div class="text-[10px] text-slate-500">${doc.status} • ${doc.date || ''}</div>
           </div>
-          <button class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
-                  onclick="openDocumentModal(getDocumentById('${doc.id}'))">
+          <button data-owner-only class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
+                  onclick="if(guardEdit()) openDocumentModal(getDocumentById('${doc.id}'))">
             Edit
           </button>
         </li>
@@ -2234,8 +2280,8 @@
               ${inv.shortApplied && inv.shortNoticePercent ? ` • Short notice ${inv.shortNoticePercent}%` : ''}
             </div>
           </div>
-          <button class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
-                  onclick="openInvoiceModal(getInvoiceById('${inv.id}'))">
+          <button data-owner-only class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
+                  onclick="if(guardEdit()) openInvoiceModal(getInvoiceById('${inv.id}'))">
             Edit
           </button>
         </li>
@@ -2275,6 +2321,7 @@
     }
 
     function deleteTodo(todoId) {
+      if (!guardEdit()) return;
       state.studentTodos = state.studentTodos.filter(t => t.id !== todoId);
       saveState();
       if (selectedStudentId) renderStudentTodos(selectedStudentId);
@@ -2299,8 +2346,8 @@
           <div class="flex gap-1">
             ${c.signedUrl ? `<a class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" href="${c.signedUrl}" target="_blank">Open</a>` : ''}
             ${c.dataUrl ? `<a class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" href="${c.dataUrl}" download="${c.fileName || 'contract'}" target="_blank">Open</a>` : ''}
-            <button class="text-[10px] px-2 py-0.5 rounded-lg border border-emerald-300 text-emerald-700"
-                    onclick="markContractStatus('${c.id}', '${c.status === 'Signed' ? 'Pending' : 'Signed'}')">
+            <button data-owner-only class="text-[10px] px-2 py-0.5 rounded-lg border border-emerald-300 text-emerald-700"
+                    onclick="if(guardEdit()) markContractStatus('${c.id}', '${c.status === 'Signed' ? 'Pending' : 'Signed'}')">
               ${c.status === 'Signed' ? 'Mark pending' : 'Mark signed'}
             </button>
           </div>
@@ -2329,6 +2376,7 @@
     function openContractUpload(studentId) {
       const student = getStudentById(studentId);
       if (!student) return;
+      if (!guardEdit()) return;
       const html = `
         <h2 class="text-sm font-semibold mb-3">Upload contract for ${student.name}</h2>
         <form id="contractForm" class="space-y-2">
@@ -2628,15 +2676,16 @@
         <p class="text-[11px] mb-3">${sess.topic || ''}</p>
 
         <div class="space-y-2">
-          <button id="sessionMarkCompletedBtn" class="w-full px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-medium">
+          <button id="sessionMarkCompletedBtn" class="w-full px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-medium" data-owner-only>
             Mark attended & complete session
           </button>
-          <button id="sessionEditBtn" class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs">
+          <button id="sessionEditBtn" class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs" data-owner-only>
             Edit session
           </button>
         </div>
       `, () => {
         document.getElementById('sessionMarkCompletedBtn').onclick = () => {
+          if (!guardEdit()) return;
           sess.completed = true;
           saveState();
           closeModal();
@@ -2644,6 +2693,7 @@
           renderStudentsView();
         };
         document.getElementById('sessionEditBtn').onclick = () => {
+          if (!guardEdit()) return;
           closeModal();
           openSessionModal(sess);
         };
@@ -2712,15 +2762,15 @@
               </div>
             </div>
             <div class="mt-1 text-[10px]">${r.description || ''}</div>
-            <div class="mt-1 flex flex-wrap">
+          <div class="mt-1 flex flex-wrap">
               ${(r.tags || []).map(tag => `<span class="tag-pill">#${tag}</span>`).join('')}
             </div>
             <div class="mt-1 text-[10px] text-slate-500">
               ${getResourceUsageText(r.id)}
             </div>
             <div class="mt-2 flex gap-2 text-[11px] flex-wrap">
-              <button class="px-2 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
-                      onclick="openAssignResourceModal('${r.id}')">
+              <button data-owner-only class="px-2 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
+                      onclick="if(guardEdit()) openAssignResourceModal('${r.id}')">
                 Assign to student(s)
               </button>
             </div>
@@ -2932,6 +2982,7 @@
     }
 
     function markInvoicePaid(id) {
+      if (!guardEdit()) return;
       const inv = getInvoiceById(id);
       if (!inv) return;
       inv.paid = true;
@@ -2994,6 +3045,7 @@ Best regards,
      * STUDENT CRUD MODAL  *
      ***********************/
     function openStudentModal(student) {
+      if (!guardEdit()) return;
       const isEdit = !!student;
       const html = `
         <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit student' : 'Add student'}</h2>
@@ -3079,6 +3131,7 @@ Best regards,
      * SESSION CRUD MODAL  *
      ***********************/
     function openSessionModal(session) {
+      if (!guardEdit()) return;
       const isEdit = !!session;
       const html = `
         <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit session' : 'Add session'}</h2>
@@ -3230,6 +3283,7 @@ Best regards,
      * RESOURCE CRUD MODAL *
      ***********************/
     function openResourceModal(resource) {
+      if (!guardEdit()) return;
       const isEdit = !!resource;
       const html = `
         <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit resource' : 'Add resource'}</h2>
@@ -3317,6 +3371,7 @@ Best regards,
     }
 
     function openAssignResourceModal(resourceId) {
+      if (!guardEdit()) return;
       const res = getResourceById(resourceId);
       if (!res) return;
       const html = `
@@ -3386,6 +3441,7 @@ Best regards,
     }
 
     function openDocumentModal(doc, fixedStudentId) {
+      if (!guardEdit()) return;
       const isEdit = !!doc;
       const html = `
         <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit document' : 'Add document'}</h2>
@@ -3492,6 +3548,7 @@ Best regards,
      * INVOICE CRUD MODAL  *
      ***********************/
     function openInvoiceModal(inv) {
+      if (!guardEdit()) return;
       const isEdit = !!inv;
       const html = `
         <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit invoice' : 'Create invoice'}</h2>
