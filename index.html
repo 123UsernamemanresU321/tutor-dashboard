@@ -1203,32 +1203,36 @@
       }));
       await upsertAndPrune('students', students, 'id');
 
-      const sessions = state.sessions.map(sess => {
-        const { studentIds, ...rest } = sess;
-        return {
-          id: cleanId(sess.id),
-          user_id: uid,
-          date: sess.date,
-          start_time: sess.startTime,
-          duration_hours: sess.durationHours,
-          subject: sess.subject,
-          topic: sess.topic,
-          notes: sess.notes,
-          completed: sess.completed
-        };
-      });
+      const sessionsClean = state.sessions
+        .map(sess => ({
+          ...sess,
+          studentIds: (sess.studentIds || []).map(cleanId).filter(Boolean)
+        }))
+        .filter(sess => sess.date && sess.studentIds.length > 0);
+
+      const sessions = sessionsClean.map(sess => ({
+        id: cleanId(sess.id),
+        user_id: uid,
+        date: sess.date,
+        start_time: sess.startTime,
+        duration_hours: sess.durationHours,
+        subject: sess.subject,
+        topic: sess.topic,
+        notes: sess.notes,
+        completed: sess.completed
+      }));
       await upsertAndPrune('sessions', sessions, 'id');
 
       const sessionStudents = [];
       const pairSeen = new Set();
-      state.sessions.forEach(sess => {
+      sessionsClean.forEach(sess => {
         const sId = cleanId(sess.id);
-        if (!sId || !(sess.studentIds || []).length) return;
+        if (!sId) return;
         (sess.studentIds || []).forEach(stuId => {
           const stuClean = cleanId(stuId);
           if (!stuClean) return;
           const key = `${sId}|${stuClean}`;
-          if (pairSeen.has(key)) return; // prevent duplicate PK conflicts
+          if (pairSeen.has(key)) return;
           pairSeen.add(key);
           sessionStudents.push({
             session_id: sId,
@@ -1237,15 +1241,11 @@
           });
         });
       });
-      // replace join table entirely for simplicity; swallow conflicts so the rest of the sync still runs
-      try {
-        await supabaseClient.from('session_students').delete().eq('user_id', uid);
-        if (sessionStudents.length) {
-          const { error } = await supabaseClient.from('session_students').insert(sessionStudents);
-          if (error) console.error('session_students insert failed', error);
-        }
-      } catch (err) {
-        console.error('session_students sync failed', err);
+      if (sessionStudents.length) {
+        const { error } = await supabaseClient
+          .from('session_students')
+          .upsert(sessionStudents, { onConflict: 'session_id,student_id', ignoreDuplicates: true });
+        if (error) console.error('session_students insert failed', error);
       }
 
       const resources = state.resources.map(r => ({
