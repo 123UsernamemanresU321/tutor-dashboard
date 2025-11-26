@@ -2667,17 +2667,22 @@
             </div>
             <div class="space-y-1 text-[11px]">
               ${
-                sessions.map(s => {
+        sessions.map(s => {
                   const subjectClass = s.subject === 'Physics'
-                    ? 'subject-physics'
+                    ? 'bg-indigo-100 text-indigo-700 border border-indigo-200'
                     : s.subject === 'Chemistry'
-                      ? 'subject-chemistry'
-                      : 'subject-maths';
+                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                      : 'bg-rose-100 text-rose-700 border border-rose-200';
                   const names = s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
-                  return `<button class="badge ${subjectClass} w-full text-left"
+                  return `<div class="w-full rounded-xl px-2 py-2 text-left flex flex-col gap-0.5 ${subjectClass} cursor-pointer hover:shadow-sm transition"
                                   onclick="openSessionQuickActions('${s.id}')">
-                            ${s.startTime || ''} ${names}
-                          </button>`;
+                            <div class="flex items-center justify-between text-[11px] font-semibold">
+                              <span>${s.startTime || ''}</span>
+                              <span class="text-[10px] uppercase tracking-wide">${s.subject}</span>
+                            </div>
+                            <div class="text-[11px] font-medium">${names}</div>
+                            <div class="text-[10px] text-slate-600">${s.topic || ''}</div>
+                          </div>`;
                 }).join('')
               }
             </div>
