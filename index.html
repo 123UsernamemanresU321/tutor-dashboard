@@ -1544,6 +1544,13 @@
     async function loadStateFromSupabase() {
       const uid = supabaseSession?.user?.id;
       if (!uid) return supabaseAvailable ? deepClone(defaultState) : loadState();
+      const isOwnerUser = isOwner();
+
+      const fetchTable = (table, cols = '*') => {
+        const base = supabaseClient.from(table).select(cols);
+        return isOwnerUser ? base.eq('user_id', uid) : base;
+      };
+
       const [
         studentsRes,
         sessionsRes,
@@ -1556,16 +1563,16 @@
         todosRes,
         checkinsRes
       ] = await Promise.all([
-        supabaseClient.from('students').select('*').eq('user_id', uid),
-        supabaseClient.from('sessions').select('*').eq('user_id', uid),
-        supabaseClient.from('session_students').select('*').eq('user_id', uid),
-        supabaseClient.from('resources').select('*').eq('user_id', uid),
-        supabaseClient.from('homework').select('*').eq('user_id', uid),
-        supabaseClient.from('documents').select('*').eq('user_id', uid),
-        supabaseClient.from('contracts').select('*').eq('user_id', uid),
-        supabaseClient.from('invoices').select('*').eq('user_id', uid),
-        supabaseClient.from('student_todos').select('*').eq('user_id', uid),
-        supabaseClient.from('student_checkins').select('*').eq('user_id', uid)
+        fetchTable('students'),
+        fetchTable('sessions'),
+        fetchTable('session_students'),
+        fetchTable('resources'),
+        fetchTable('homework'),
+        fetchTable('documents'),
+        fetchTable('contracts'),
+        fetchTable('invoices'),
+        fetchTable('student_todos'),
+        fetchTable('student_checkins')
       ]);
 
       [studentsRes, sessionsRes, sessionStudentsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes].forEach(res => {
