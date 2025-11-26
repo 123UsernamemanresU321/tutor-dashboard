@@ -1828,6 +1828,32 @@
         createdAt: c.created_at
       }));
       merged.settings = loadState().settings; // keep local settings
+
+      // Merge in any local resources not yet in Supabase so they don't disappear on reload/switch
+      const localState = loadState();
+      if (localState?.resources?.length) {
+        const remoteIds = new Set(merged.resources.map(r => cleanId(r.id)));
+        localState.resources.forEach(r => {
+          const id = cleanId(r.id);
+          if (!remoteIds.has(id)) {
+            merged.resources.push({
+              id,
+              title: r.title,
+              subject: r.subject,
+              level: r.level,
+              tags: r.tags,
+              description: r.description,
+              createdAt: r.createdAt,
+              favorite: r.favorite,
+              storage_path: r.storage_path,
+              fileName: r.fileName,
+              signedUrl: r.signedUrl,
+              dataUrl: r.dataUrl
+            });
+          }
+        });
+      }
+
       sanitizeState(merged);
       normalizeIdsToUuid();
       return merged;
