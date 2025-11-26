@@ -3687,6 +3687,11 @@ Best regards,
         if (isEdit) {
           document.getElementById('deleteResourceBtn').onclick = () => {
             if (!confirm('Delete this resource?')) return;
+            // attempt to delete from storage if present
+            if (resource?.storage_path && isSupabaseReady()) {
+              supabaseClient.storage.from('resources').remove([resource.storage_path])
+                .catch(err => console.warn('Storage delete failed', err));
+            }
             state.resources = state.resources.filter(r => r.id !== resource.id);
             state.homework = state.homework.filter(hw => hw.resourceId !== resource.id);
             saveState();
