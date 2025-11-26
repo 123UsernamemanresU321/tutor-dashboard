@@ -991,11 +991,73 @@
       }
     }
 
+    function isUuid(val) {
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val || '');
+    }
+
+    function normalizeIdsToUuid() {
+      const maps = {
+        students: new Map(),
+        sessions: new Map(),
+        resources: new Map(),
+        homework: new Map(),
+        documents: new Map(),
+        contracts: new Map(),
+        studentTodos: new Map(),
+        studentCheckins: new Map()
+      };
+      function ensureId(entity, key, map) {
+        if (isUuid(entity.id)) return entity.id;
+        const existing = map.get(entity.id);
+        if (existing) {
+          entity.id = existing;
+          return existing;
+        }
+        const newId = crypto.randomUUID();
+        map.set(entity.id, newId);
+        entity.id = newId;
+        return newId;
+      }
+      state.students.forEach(s => ensureId(s, 'students', maps.students));
+      state.sessions.forEach(sess => ensureId(sess, 'sessions', maps.sessions));
+      state.resources.forEach(r => ensureId(r, 'resources', maps.resources));
+      state.homework.forEach(hw => ensureId(hw, 'homework', maps.homework));
+      state.documents.forEach(d => ensureId(d, 'documents', maps.documents));
+      state.contracts.forEach(c => ensureId(c, 'contracts', maps.contracts));
+      state.studentTodos.forEach(t => ensureId(t, 'studentTodos', maps.studentTodos));
+      state.studentCheckins.forEach(c => ensureId(c, 'studentCheckins', maps.studentCheckins));
+
+      // remap references
+      state.sessions.forEach(sess => {
+        sess.studentIds = (sess.studentIds || []).map(id => maps.students.get(id) || id);
+      });
+      state.homework.forEach(hw => {
+        hw.studentId = maps.students.get(hw.studentId) || hw.studentId;
+        hw.resourceId = maps.resources.get(hw.resourceId) || hw.resourceId;
+      });
+      state.documents.forEach(d => {
+        d.studentId = maps.students.get(d.studentId) || d.studentId;
+      });
+      state.contracts.forEach(c => {
+        c.studentId = maps.students.get(c.studentId) || c.studentId;
+      });
+      state.invoices.forEach(inv => {
+        inv.studentId = maps.students.get(inv.studentId) || inv.studentId;
+      });
+      state.studentTodos.forEach(t => {
+        t.studentId = maps.students.get(t.studentId) || t.studentId;
+      });
+      state.studentCheckins.forEach(c => {
+        c.studentId = maps.students.get(c.studentId) || c.studentId;
+      });
+    }
+
     function saveState() {
       if (readOnlyMode) {
         console.warn('Read-only mode: changes are not saved.');
         return;
       }
+      normalizeIdsToUuid();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       updateKPIsAndCharts();
       if (isSupabaseReady()) {
@@ -1009,6 +1071,7 @@
 
     async function syncStateToSupabase() {
       if (readOnlyMode) return;
+      normalizeIdsToUuid();
       const uid = supabaseSession?.user?.id;
       if (!uid) return;
 
@@ -1394,16 +1457,15 @@
     }
 
     function updateReadOnlyUI() {
+      if (supabaseAvailable && !supabaseSession) {
+        // Session not resolved yet; keep UI as-is
+        return;
+      }
       readOnlyMode = supabaseAvailable ? !isOwner() : false;
       const banner = document.getElementById('readOnlyBanner');
       if (banner) banner.classList.toggle('hidden', !readOnlyMode);
       const main = document.querySelector('main#viewsContainer');
       if (main) main.classList.toggle('opacity-70', readOnlyMode);
-      if (readOnlyMode) {
-        state = deepClone(defaultState);
-        localStorage.removeItem(STORAGE_KEY);
-        renderAllViews();
-      }
       document.querySelectorAll('[data-owner-only]').forEach(el => {
         if (el.tagName === 'BUTTON' || el.tagName === 'SELECT' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
           el.disabled = readOnlyMode;
@@ -1422,7 +1484,8 @@
 
     async function tryLoadRemoteThenLocal() {
       if (supabaseAvailable && !supabaseSession) {
-        state = deepClone(defaultState);
+        // hold current/local state until session resolved
+        state = loadState();
         return;
       }
       if (isSupabaseReady()) {
