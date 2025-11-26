@@ -1536,11 +1536,6 @@
         }
         el.classList.toggle('owner-locked', readOnlyMode);
       });
-      // In student mode, auto-select the first available student so they land on their profile
-      if (readOnlyMode && state.students.length) {
-        const first = state.students[0];
-        selectStudent(first.id);
-      }
     }
 
     function guardEdit() {
@@ -1575,8 +1570,8 @@
       const isOwnerUser = isOwner();
 
       const fetchTable = (table, cols = '*') => {
-        const base = supabaseClient.from(table).select(cols);
-        return isOwnerUser ? base.eq('user_id', uid) : base; // owner: scoped; students: rely on RLS
+        // rely on RLS; do not add extra filters that might drop older rows
+        return supabaseClient.from(table).select(cols);
       };
 
       const [
@@ -2093,9 +2088,7 @@
       });
 
       const current = getStudentById(selectedStudentId);
-      if (!current && filtered.length === 1) {
-        selectStudent(filtered[0].id);
-      } else if (current) {
+      if (current) {
         showStudentDetail(selectedStudentId);
       } else {
         document.getElementById('studentDetailEmpty').classList.remove('hidden');
