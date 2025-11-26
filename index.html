@@ -1181,8 +1181,8 @@
 
       const sessionStudents = state.sessions.flatMap(sess =>
         (sess.studentIds || []).map(stuId => ({
-          session_id: sess.id,
-          student_id: stuId,
+          session_id: cleanId(sess.id),
+          student_id: cleanId(stuId),
           user_id: uid
         }))
       );
@@ -1568,13 +1568,12 @@
 
       const fetchTable = (table, cols = '*') => {
         const base = supabaseClient.from(table).select(cols);
-        return isOwnerUser ? base.eq('user_id', uid) : base;
+        return isOwnerUser ? base : base; // rely on RLS for students
       };
 
       const [
         studentsRes,
         sessionsRes,
-        sessionStudentsRes,
         resourcesRes,
         homeworkRes,
         documentsRes,
@@ -1584,8 +1583,7 @@
         checkinsRes
       ] = await Promise.all([
         fetchTable('students'),
-        fetchTable('sessions'),
-        fetchTable('session_students'),
+        supabaseClient.from('sessions').select('*, session_students(session_id, student_id)'),
         fetchTable('resources'),
         fetchTable('homework'),
         fetchTable('documents'),
@@ -1595,14 +1593,12 @@
         fetchTable('student_checkins')
       ]);
 
-      [studentsRes, sessionsRes, sessionStudentsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes].forEach(res => {
+      [studentsRes, sessionsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes].forEach(res => {
         if (res.error) throw res.error;
       });
 
       const sessions = (sessionsRes.data || []).map(sess => {
-        const studentIds = (sessionStudentsRes.data || [])
-          .filter(ss => ss.session_id === sess.id)
-          .map(ss => ss.student_id);
+        const studentIds = (sess.session_students || []).map(ss => ss.student_id);
         return {
           id: sess.id,
           date: sess.date,
