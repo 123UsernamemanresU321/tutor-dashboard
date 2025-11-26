@@ -2996,12 +2996,13 @@
             <div class="mt-1 text-[10px] text-slate-500">
               ${getResourceUsageText(r.id)}
             </div>
-            <div class="mt-2 flex gap-2 text-[11px] flex-wrap">
+            <div class="mt-2 flex gap-2 text-[11px] flex-wrap items-center">
               <button data-owner-only class="px-2 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
                       onclick="if(guardEdit()) openAssignResourceModal('${r.id}')">
                 Assign to student(s)
               </button>
               ${r.signedUrl ? `<a class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50" href="${r.signedUrl}" target="_blank">Download file</a>` : ''}
+              ${!r.signedUrl && r.dataUrl ? `<a class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50" href="${r.dataUrl}" download="${r.fileName || 'resource'}" target="_blank">Download local copy</a>` : ''}
             </div>
           </li>
         `).join('');
@@ -3651,9 +3652,10 @@ Best regards,
                 ...(resource || { id: generateId('res') }),
                 storage_path: uploaded.storage_path,
                 fileName: uploaded.fileName,
-                signedUrl: uploaded.signedUrl
+                signedUrl: uploaded.signedUrl,
+                dataUrl: uploaded.dataUrl || ''
               };
-              alert('File uploaded. Save the resource to keep the link.');
+              alert(uploaded.storage_path ? 'File uploaded. Save the resource to keep the link.' : 'Stored file locally. Save to keep the link (Supabase storage was blocked).');
             } catch (err) {
               console.error(err);
               alert('Upload failed. See console for details.');
@@ -3664,18 +3666,30 @@ Best regards,
     }
 
     async function uploadResourceFile(file) {
+      // Fallback-friendly upload: try Supabase storage; if blocked by RLS/bucket issues, fall back to data URL so the user can still attach the file.
+      const readAsDataUrl = (blob) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+
       const uid = supabaseSession?.user?.id;
-      if (!uid) throw new Error('No session');
+      // If not signed in, store locally as data URL
+      if (!uid || !supabaseClient?.storage) {
+        const dataUrl = await readAsDataUrl(file);
+        return { dataUrl, fileName: file.name, storage_path: '', signedUrl: '' };
+      }
+
       const ext = file.name.includes('.') ? file.name.split('.').pop() : 'bin';
       const path = `resources/${uid}/${generateId('file')}.${ext}`;
       const { error: uploadErr } = await supabaseClient.storage.from('resources').upload(path, file, { upsert: false });
       if (uploadErr) {
-        const msg = uploadErr?.message || '';
-        if (msg.toLowerCase().includes('bucket')) {
-          throw new Error('Supabase bucket "resources" is missing. Create a private bucket named "resources" in Storage and retry.');
-        }
-        if (msg.toLowerCase().includes('policy') || msg.toLowerCase().includes('row-level')) {
-          throw new Error('Storage write blocked by RLS. In Supabase, add owner-only policies on bucket "resources" using auth.uid() folder prefix, then retry while signed in.');
+        const msg = (uploadErr?.message || '').toLowerCase();
+        if (msg.includes('bucket') || msg.includes('policy') || msg.includes('row-level')) {
+          console.warn('Storage upload blocked, using local data URL fallback', uploadErr);
+          const dataUrl = await readAsDataUrl(file);
+          return { dataUrl, fileName: file.name, storage_path: '', signedUrl: '' };
         }
         throw uploadErr;
       }
