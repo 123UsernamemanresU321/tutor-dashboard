@@ -7,6 +7,8 @@
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- Google Font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -160,6 +162,22 @@
       backdrop-filter: blur(18px);
     }
     .overlay.show {
+      display: flex;
+    }
+
+    /* AUTH OVERLAY */
+    .auth-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15,23,42,0.75);
+      backdrop-filter: blur(20px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 60;
+      padding: 1.5rem;
+    }
+    .auth-overlay.show {
       display: flex;
     }
 
@@ -341,6 +359,9 @@
           </button>
           <button id="quickAddSessionBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 shadow-sm">
             ＋ Session
+          </button>
+          <button id="signOutBtn" class="hidden inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl border border-slate-300 text-xs font-medium hover:bg-slate-50">
+            ⏏ Sign out
           </button>
 
           <!-- Theme toggle -->
@@ -867,11 +888,50 @@
     </div>
   </div>
 
+  <!-- AUTH OVERLAY -->
+  <div id="authOverlay" class="auth-overlay">
+    <div class="card w-full max-w-sm p-5 space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="text-base font-semibold">Sign in</h2>
+      </div>
+      <p class="text-[11px] text-slate-500">Private access to your dashboard. Sign up once, confirm your email, then sign in.</p>
+      <form id="authForm" class="space-y-2">
+        <div>
+          <label class="block text-[11px] mb-1">Email</label>
+          <input type="email" name="email" required class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+        </div>
+        <div>
+          <label class="block text-[11px] mb-1">Password</label>
+          <input type="password" name="password" required class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" data-action="signin" class="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium">Sign in</button>
+          <button type="submit" data-action="signup" class="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 text-xs">Sign up</button>
+        </div>
+      </form>
+      <div id="authMessage" class="text-[11px] text-rose-600"></div>
+    </div>
+  </div>
+
   <script>
     /***********************
      * STATE & PERSISTENCE *
      ***********************/
     const STORAGE_KEY = 'tutoringDashboardState_v1';
+
+    /***********************
+     * SUPABASE CONFIG      *
+     ***********************/
+    const SUPABASE_URL = 'https://wdsqnbebutuhwckjpwqf.supabase.co'; // TODO: replace
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkc3FuYmVidXR1aHdja2pwd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxMDE1NzcsImV4cCI6MjA3OTY3NzU3N30.pJglpTaZouSQFUVCbQONHK1UsB9CgWewKQCIV13NOEM'; // TODO: replace
+    const supabaseAvailable =
+      typeof supabase !== 'undefined' &&
+      SUPABASE_URL.startsWith('https://') &&
+      !SUPABASE_URL.includes('YOUR_PROJECT') &&
+      SUPABASE_ANON_KEY.length > 10 &&
+      !SUPABASE_ANON_KEY.includes('YOUR_ANON');
+    let supabaseClient = null;
+    let supabaseSession = null;
 
     // SAFE deep clone helper
     function deepClone(obj) {
@@ -917,6 +977,178 @@
     function saveState() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       updateKPIsAndCharts();
+      if (isSupabaseReady()) {
+        syncStateToSupabase().catch(err => console.error('Supabase sync failed', err));
+      }
+    }
+
+    function isSupabaseReady() {
+      return !!(supabaseClient && supabaseSession);
+    }
+
+    async function syncStateToSupabase() {
+      const uid = supabaseSession?.user?.id;
+      if (!uid) return;
+
+      // prepare rows with user_id
+      const students = state.students.map(s => ({
+        id: s.id,
+        user_id: uid,
+        name: s.name,
+        grade_level: s.gradeLevel,
+        rate: s.rate,
+        subjects: s.subjects,
+        notes: s.notes,
+        created_at: s.createdAt
+      }));
+      await upsertAndPrune('students', students, 'id');
+
+      const sessions = state.sessions.map(sess => {
+        const { studentIds, ...rest } = sess;
+        return {
+          id: sess.id,
+          user_id: uid,
+          date: sess.date,
+          start_time: sess.startTime,
+          duration_hours: sess.durationHours,
+          subject: sess.subject,
+          topic: sess.topic,
+          notes: sess.notes,
+          completed: sess.completed
+        };
+      });
+      await upsertAndPrune('sessions', sessions, 'id');
+
+      const sessionStudents = state.sessions.flatMap(sess =>
+        (sess.studentIds || []).map(stuId => ({
+          session_id: sess.id,
+          student_id: stuId,
+          user_id: uid
+        }))
+      );
+      // replace join table entirely for simplicity
+      await supabaseClient.from('session_students').delete().eq('user_id', uid);
+      if (sessionStudents.length) {
+        const { error } = await supabaseClient.from('session_students').insert(sessionStudents);
+        if (error) throw error;
+      }
+
+      const resources = state.resources.map(r => ({
+        id: r.id,
+        user_id: uid,
+        title: r.title,
+        subject: r.subject,
+        level: r.level,
+        tags: r.tags,
+        description: r.description,
+        created_at: r.createdAt,
+        favorite: r.favorite
+      }));
+      await upsertAndPrune('resources', resources, 'id');
+
+      const homework = state.homework.map(h => ({
+        id: h.id,
+        user_id: uid,
+        student_id: h.studentId,
+        resource_id: h.resourceId,
+        status: h.status,
+        due_date: h.dueDate,
+        assigned_date: h.assignedDate
+      }));
+      await upsertAndPrune('homework', homework, 'id');
+
+      const documents = state.documents.map(d => ({
+        id: d.id,
+        user_id: uid,
+        student_id: d.studentId,
+        title: d.title,
+        status: d.status,
+        date: d.date,
+        notes: d.notes,
+        created_at: d.createdAt
+      }));
+      await upsertAndPrune('documents', documents, 'id');
+
+      const contracts = state.contracts.map(c => ({
+        id: c.id,
+        user_id: uid,
+        student_id: c.studentId,
+        file_name: c.fileName,
+        storage_path: c.storage_path,
+        status: c.status,
+        notes: c.notes,
+        uploaded_at: c.uploadedAt
+      }));
+      await upsertAndPrune('contracts', contracts, 'id');
+
+      const invoices = state.invoices.map(inv => ({
+        id: inv.id,
+        user_id: uid,
+        student_id: inv.studentId,
+        issue_date: inv.issueDate,
+        due_date: inv.dueDate,
+        base_amount: inv.baseAmount,
+        total: inv.total,
+        late_fee_percent: inv.lateFeePercent,
+        short_notice_percent: inv.shortNoticePercent,
+        late_applied: inv.lateApplied,
+        short_applied: inv.shortApplied,
+        paid: inv.paid,
+        notes: inv.notes
+      }));
+      await upsertAndPrune('invoices', invoices, 'id');
+
+      const todos = state.studentTodos.map(t => ({
+        id: t.id,
+        user_id: uid,
+        student_id: t.studentId,
+        text: t.text,
+        due_date: t.dueDate,
+        done: t.done,
+        created_at: t.createdAt
+      }));
+      await upsertAndPrune('student_todos', todos, 'id');
+
+      const checkins = state.studentCheckins.map(c => ({
+        id: c.id,
+        user_id: uid,
+        student_id: c.studentId,
+        text: c.text,
+        date: c.date,
+        created_at: c.createdAt
+      }));
+      await upsertAndPrune('student_checkins', checkins, 'id');
+    }
+
+    async function upsertAndPrune(table, rows, pk) {
+      if (!supabaseClient) return;
+      const uid = supabaseSession?.user?.id;
+      if (!uid) return;
+      // Upsert rows
+      if (rows.length) {
+        const { error } = await supabaseClient.from(table).upsert(rows);
+        if (error) throw error;
+      }
+      // Delete rows not present locally (per user)
+      const ids =
+        Array.isArray(pk)
+          ? rows.map(r => pk.map(k => r[k]).join('|'))
+          : rows.map(r => r[pk]);
+      if (Array.isArray(pk)) {
+        // delete all for user then re-upsert already done; skip prune to avoid complexity
+        return;
+      }
+      if (ids.length) {
+        const { error } = await supabaseClient
+          .from(table)
+          .delete()
+          .eq('user_id', uid)
+          .not('id', 'in', `(${ids.map(i => `'${i}'`).join(',')})`);
+        if (error) throw error;
+      } else {
+        const { error } = await supabaseClient.from(table).delete().eq('user_id', uid);
+        if (error) throw error;
+      }
     }
 
     function generateId(prefix) {
@@ -926,11 +1158,15 @@
     /****************
      * INITIAL SETUP *
      ****************/
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
+      await initSupabaseAuth();
       setupNav();
       setupTopbar();
       applySettingsToUI();
-      renderAllViews();
+      if (!supabaseAvailable || supabaseSession) {
+        await tryLoadRemoteThenLocal();
+        renderAllViews();
+      }
 
       // expose functions for inline onclick handlers
       window.openSessionModal = openSessionModal;
@@ -971,6 +1207,11 @@
 
     function switchView(viewName) {
       document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+      // block switching if Supabase is configured but not signed in
+      if (supabaseAvailable && !supabaseSession) {
+        toggleAuthOverlay(true);
+        return;
+      }
       document.getElementById('view-' + viewName).classList.remove('hidden');
       if (viewName === 'dashboard') updateKPIsAndCharts();
       if (viewName === 'students') renderStudentsView();
@@ -985,6 +1226,16 @@
       document.getElementById('quickAddStudentBtn').addEventListener('click', () => openStudentModal());
       document.getElementById('quickAddSessionBtn').addEventListener('click', () => openSessionModal());
       document.getElementById('globalSearchInput').addEventListener('input', handleGlobalSearch);
+      const signOutBtn = document.getElementById('signOutBtn');
+      if (signOutBtn) {
+        signOutBtn.onclick = async () => {
+          if (supabaseClient) {
+            await supabaseClient.auth.signOut();
+          }
+          supabaseSession = null;
+          toggleAuthOverlay(true);
+        };
+      }
 
       // Settings bindings
       document.getElementById('settingsThemeSelect').addEventListener('change', e => {
@@ -1046,6 +1297,241 @@
       document.getElementById('settingsDefaultDuration').value = state.settings.defaultSessionDuration ?? 1.5;
       applyTheme();
       applyDensity();
+    }
+
+    /***********************
+     * SUPABASE AUTH
+     ***********************/
+    async function initSupabaseAuth() {
+      if (!supabaseAvailable) {
+        toggleAuthOverlay(false);
+        return;
+      }
+      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const { data: sessionData } = await supabaseClient.auth.getSession();
+      supabaseSession = sessionData.session;
+      toggleAuthOverlay(!supabaseSession);
+      if (supabaseSession) {
+        document.getElementById('signOutBtn')?.classList.remove('hidden');
+      }
+      const main = document.querySelector('main#viewsContainer');
+      if (main && supabaseAvailable && !supabaseSession) {
+        main.classList.add('pointer-events-none', 'opacity-50');
+      }
+      supabaseClient.auth.onAuthStateChange((event, session) => {
+        supabaseSession = session;
+        toggleAuthOverlay(!session);
+        if (session) {
+          document.getElementById('signOutBtn')?.classList.remove('hidden');
+          const main = document.querySelector('main#viewsContainer');
+          if (main) main.classList.remove('pointer-events-none', 'opacity-50');
+          tryLoadRemoteThenLocal().then(renderAllViews);
+        } else {
+          document.getElementById('signOutBtn')?.classList.add('hidden');
+          const main = document.querySelector('main#viewsContainer');
+          if (main) main.classList.add('pointer-events-none', 'opacity-50');
+          state = deepClone(defaultState);
+        }
+      });
+
+      const authForm = document.getElementById('authForm');
+      const authMsg = document.getElementById('authMessage');
+      if (authForm) {
+        authForm.onsubmit = async (e) => {
+          e.preventDefault();
+          const action = e.submitter?.dataset?.action || 'signin';
+          const email = authForm.email.value.trim();
+          const password = authForm.password.value.trim();
+          authMsg.textContent = '';
+          try {
+            if (action === 'signup') {
+              const { error } = await supabaseClient.auth.signUp({ email, password });
+              if (error) throw error;
+              authMsg.textContent = 'Check your email to confirm, then sign in.';
+            } else {
+              const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+              if (error) throw error;
+            }
+          } catch (err) {
+            authMsg.textContent = err.message || 'Auth error';
+          }
+        };
+      }
+    }
+
+    function toggleAuthOverlay(show) {
+      const overlay = document.getElementById('authOverlay');
+      if (!overlay) return;
+      const mustShow = supabaseAvailable ? show : show;
+      overlay.classList.toggle('show', !!mustShow);
+      if (mustShow) {
+        document.body.classList.add('overflow-hidden');
+      } else {
+        document.body.classList.remove('overflow-hidden');
+      }
+    }
+
+    async function tryLoadRemoteThenLocal() {
+      if (isSupabaseReady()) {
+        try {
+          state = await loadStateFromSupabase();
+          saveState(); // persist locally as cache
+          return;
+        } catch (e) {
+          console.error('Failed to load from Supabase, falling back to local', e);
+        }
+      }
+      state = loadState();
+    }
+
+    async function loadStateFromSupabase() {
+      const uid = supabaseSession?.user?.id;
+      if (!uid) return loadState();
+      const [
+        studentsRes,
+        sessionsRes,
+        sessionStudentsRes,
+        resourcesRes,
+        homeworkRes,
+        documentsRes,
+        contractsRes,
+        invoicesRes,
+        todosRes,
+        checkinsRes
+      ] = await Promise.all([
+        supabaseClient.from('students').select('*').eq('user_id', uid),
+        supabaseClient.from('sessions').select('*').eq('user_id', uid),
+        supabaseClient.from('session_students').select('*').eq('user_id', uid),
+        supabaseClient.from('resources').select('*').eq('user_id', uid),
+        supabaseClient.from('homework').select('*').eq('user_id', uid),
+        supabaseClient.from('documents').select('*').eq('user_id', uid),
+        supabaseClient.from('contracts').select('*').eq('user_id', uid),
+        supabaseClient.from('invoices').select('*').eq('user_id', uid),
+        supabaseClient.from('student_todos').select('*').eq('user_id', uid),
+        supabaseClient.from('student_checkins').select('*').eq('user_id', uid)
+      ]);
+
+      [studentsRes, sessionsRes, sessionStudentsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes].forEach(res => {
+        if (res.error) throw res.error;
+      });
+
+      const sessions = (sessionsRes.data || []).map(sess => {
+        const studentIds = (sessionStudentsRes.data || [])
+          .filter(ss => ss.session_id === sess.id)
+          .map(ss => ss.student_id);
+        return {
+          id: sess.id,
+          date: sess.date,
+          startTime: sess.start_time,
+          durationHours: sess.duration_hours,
+          subject: sess.subject,
+          topic: sess.topic,
+          notes: sess.notes,
+          completed: sess.completed,
+          studentIds
+        };
+      });
+
+      // Fetch signed URLs for contracts if storage_path exists
+      const contracts = await Promise.all(
+        (contractsRes.data || []).map(async c => {
+          if (c.storage_path && supabaseClient.storage) {
+            const { data, error } = await supabaseClient.storage.from('contracts').createSignedUrl(c.storage_path, 60 * 60 * 24);
+            if (!error && data?.signedUrl) {
+              return {
+                id: c.id,
+                studentId: c.student_id,
+                fileName: c.file_name,
+                storage_path: c.storage_path,
+                status: c.status,
+                notes: c.notes,
+                uploadedAt: c.uploaded_at,
+                signedUrl: data.signedUrl
+              };
+            }
+          }
+          return {
+            id: c.id,
+            studentId: c.student_id,
+            fileName: c.file_name,
+            storage_path: c.storage_path,
+            status: c.status,
+            notes: c.notes,
+            uploadedAt: c.uploaded_at
+          };
+        })
+      );
+
+      const merged = deepClone(defaultState);
+      merged.students = (studentsRes.data || []).map(s => ({
+        id: s.id,
+        name: s.name,
+        gradeLevel: s.grade_level ?? s.gradeLevel,
+        rate: s.rate,
+        subjects: s.subjects,
+        notes: s.notes,
+        createdAt: s.created_at
+      }));
+      merged.sessions = sessions;
+      merged.resources = (resourcesRes.data || []).map(r => ({
+        id: r.id,
+        title: r.title,
+        subject: r.subject,
+        level: r.level,
+        tags: r.tags,
+        description: r.description,
+        createdAt: r.created_at,
+        favorite: r.favorite
+      }));
+      merged.homework = (homeworkRes.data || []).map(h => ({
+        id: h.id,
+        studentId: h.student_id,
+        resourceId: h.resource_id,
+        status: h.status,
+        dueDate: h.due_date,
+        assignedDate: h.assigned_date
+      }));
+      merged.documents = (documentsRes.data || []).map(d => ({
+        id: d.id,
+        studentId: d.student_id,
+        title: d.title,
+        status: d.status,
+        date: d.date,
+        notes: d.notes,
+        createdAt: d.created_at
+      }));
+      merged.contracts = contracts;
+      merged.invoices = (invoicesRes.data || []).map(inv => ({
+        id: inv.id,
+        studentId: inv.student_id,
+        issueDate: inv.issue_date,
+        dueDate: inv.due_date,
+        baseAmount: inv.base_amount,
+        total: inv.total,
+        lateFeePercent: inv.late_fee_percent,
+        shortNoticePercent: inv.short_notice_percent,
+        lateApplied: inv.late_applied,
+        shortApplied: inv.short_applied,
+        paid: inv.paid,
+        notes: inv.notes
+      }));
+      merged.studentTodos = (todosRes.data || []).map(t => ({
+        id: t.id,
+        studentId: t.student_id,
+        text: t.text,
+        dueDate: t.due_date,
+        done: t.done,
+        createdAt: t.created_at
+      }));
+      merged.studentCheckins = (checkinsRes.data || []).map(c => ({
+        id: c.id,
+        studentId: c.student_id,
+        text: c.text,
+        date: c.date,
+        createdAt: c.created_at
+      }));
+      merged.settings = loadState().settings; // keep local settings
+      return merged;
     }
 
     function applyTheme() {
@@ -1811,6 +2297,7 @@
             <div class="text-[10px] text-slate-500">Uploaded ${c.uploadedAt || ''}</div>
           </div>
           <div class="flex gap-1">
+            ${c.signedUrl ? `<a class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" href="${c.signedUrl}" target="_blank">Open</a>` : ''}
             ${c.dataUrl ? `<a class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" href="${c.dataUrl}" download="${c.fileName || 'contract'}" target="_blank">Open</a>` : ''}
             <button class="text-[10px] px-2 py-0.5 rounded-lg border border-emerald-300 text-emerald-700"
                     onclick="markContractStatus('${c.id}', '${c.status === 'Signed' ? 'Pending' : 'Signed'}')">
@@ -1862,7 +2349,7 @@
           </div>
           <button type="submit" class="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium">Upload</button>
         </form>
-        <p class="hint mt-2">Files are stored locally in your browser via base64; keep scans small to avoid storage limits.</p>
+        <p class="hint mt-2">If signed in, files go to Supabase Storage; otherwise they stay local (base64).</p>
       `;
       openModal(html, () => {
         const form = document.getElementById('contractForm');
@@ -1875,25 +2362,61 @@
             alert('Select a PDF or image file.');
             return;
           }
-          const reader = new FileReader();
-          reader.onload = () => {
-            state.contracts.push({
-              id: generateId('contract'),
-              studentId,
-              fileName: file.name,
-              dataUrl: reader.result,
-              status,
-              notes,
-              uploadedAt: new Date().toISOString().slice(0,10)
-            });
-            saveState();
-            closeModal();
-            renderStudentContracts(studentId);
-            renderStudentTimeline(studentId);
-          };
-          reader.readAsDataURL(file);
+          if (isSupabaseReady()) {
+            uploadContractToSupabase(studentId, file, status, notes)
+              .then(() => {
+                closeModal();
+                renderStudentContracts(studentId);
+                renderStudentTimeline(studentId);
+              })
+              .catch(err => {
+                console.error(err);
+                alert('Upload failed. See console for details.');
+              });
+          } else {
+            const reader = new FileReader();
+            reader.onload = () => {
+              state.contracts.push({
+                id: generateId('contract'),
+                studentId,
+                fileName: file.name,
+                dataUrl: reader.result,
+                status,
+                notes,
+                uploadedAt: new Date().toISOString().slice(0,10)
+              });
+              saveState();
+              closeModal();
+              renderStudentContracts(studentId);
+              renderStudentTimeline(studentId);
+            };
+            reader.readAsDataURL(file);
+          }
         };
       });
+    }
+
+    async function uploadContractToSupabase(studentId, file, status, notes) {
+      const uid = supabaseSession?.user?.id;
+      if (!uid) throw new Error('No session');
+      const ext = file.name.includes('.') ? file.name.split('.').pop() : 'bin';
+      const path = `contracts/${uid}/${generateId('file')}.${ext}`;
+      const { error: uploadErr } = await supabaseClient.storage.from('contracts').upload(path, file, { upsert: false });
+      if (uploadErr) throw uploadErr;
+      const { data: signed } = await supabaseClient.storage.from('contracts').createSignedUrl(path, 60 * 60 * 24);
+      const contract = {
+        id: generateId('contract'),
+        studentId,
+        user_id: uid,
+        fileName: file.name,
+        storage_path: path,
+        status,
+        notes,
+        uploadedAt: new Date().toISOString().slice(0,10),
+        signedUrl: signed?.signedUrl
+      };
+      state.contracts.push(contract);
+      saveState();
     }
 
     function markContractStatus(contractId, status) {
