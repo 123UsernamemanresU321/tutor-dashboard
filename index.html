@@ -991,14 +991,13 @@
       }
     }
 
-    function isUuid(val) {
-      return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val || '');
+    function cleanId(val) {
+      return String(val || '').trim().replace(/['"]/g, '');
     }
 
-    function cleanId(val) {
-      if (!val) return '';
-      const trimmed = String(val).trim().replace(/^'+|'+$/g, '').replace(/^"+|"+$/g, '');
-      return trimmed;
+    function isUuid(val) {
+      const cleaned = cleanId(val);
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(cleaned);
     }
 
     function sanitizeState(st) {
@@ -1017,6 +1016,23 @@
       st.invoices.forEach(i => { i.id = cleanId(i.id); i.studentId = cleanId(i.studentId); });
       st.studentTodos.forEach(t => { t.id = cleanId(t.id); t.studentId = cleanId(t.studentId); });
       st.studentCheckins.forEach(c => { c.id = cleanId(c.id); c.studentId = cleanId(c.studentId); });
+    }
+
+    function forceUuid(val) {
+      const cleaned = cleanId(val);
+      return isUuid(cleaned) ? cleaned : (crypto?.randomUUID ? crypto.randomUUID() : cleaned);
+    }
+
+    function enforceUuidFields() {
+      state.students.forEach(s => { s.id = forceUuid(s.id); });
+      state.sessions.forEach(sess => { sess.id = forceUuid(sess.id); sess.studentIds = (sess.studentIds || []).map(forceUuid); });
+      state.resources.forEach(r => { r.id = forceUuid(r.id); });
+      state.homework.forEach(hw => { hw.id = forceUuid(hw.id); hw.studentId = forceUuid(hw.studentId); hw.resourceId = forceUuid(hw.resourceId); });
+      state.documents.forEach(d => { d.id = forceUuid(d.id); d.studentId = forceUuid(d.studentId); });
+      state.contracts.forEach(c => { c.id = forceUuid(c.id); c.studentId = forceUuid(c.studentId); });
+      state.invoices.forEach(inv => { inv.id = forceUuid(inv.id); inv.studentId = forceUuid(inv.studentId); });
+      state.studentTodos.forEach(t => { t.id = forceUuid(t.id); t.studentId = forceUuid(t.studentId); });
+      state.studentCheckins.forEach(c => { c.id = forceUuid(c.id); c.studentId = forceUuid(c.studentId); });
     }
 
     function normalizeIdsToUuid() {
@@ -1094,6 +1110,7 @@
         return;
       }
       normalizeIdsToUuid();
+      enforceUuidFields();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       updateKPIsAndCharts();
       if (isSupabaseReady()) {
@@ -1108,6 +1125,7 @@
     async function syncStateToSupabase() {
       if (readOnlyMode) return;
       normalizeIdsToUuid();
+      enforceUuidFields();
       const uid = supabaseSession?.user?.id;
       if (!uid) return;
 
