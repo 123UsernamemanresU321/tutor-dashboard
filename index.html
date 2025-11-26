@@ -992,6 +992,8 @@
     const SUPABASE_URL = 'https://wdsqnbebutuhwckjpwqf.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkc3FuYmVidXR1aHdja2pwd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxMDE1NzcsImV4cCI6MjA3OTY3NzU3N30.pJglpTaZouSQFUVCbQONHK1UsB9CgWewKQCIV13NOEM';
     const OWNER_EMAIL = 'erichuang.shangjing@outlook.com';
+    // If true, try Supabase Storage uploads; if false, always fall back to local data URL to avoid 400/RLS spam until backend is fixed.
+    const ALLOW_STORAGE_UPLOADS = true;
     const supabaseAvailable =
       typeof supabase !== 'undefined' &&
       SUPABASE_URL.startsWith('https://') &&
@@ -3665,6 +3667,8 @@ Best regards,
       });
     }
 
+    let storageBlocked = false;
+
     async function uploadResourceFile(file) {
       // Fallback-friendly upload: try Supabase storage; if blocked by RLS/bucket issues, fall back to data URL so the user can still attach the file.
       const readAsDataUrl = (blob) => new Promise((resolve, reject) => {
@@ -3675,8 +3679,8 @@ Best regards,
       });
 
       const uid = supabaseSession?.user?.id;
-      // If not signed in, store locally as data URL
-      if (!uid || !supabaseClient?.storage) {
+      // If storage uploads are disabled or blocked, or not signed in, store locally as data URL
+      if (!ALLOW_STORAGE_UPLOADS || storageBlocked || !uid || !supabaseClient?.storage) {
         const dataUrl = await readAsDataUrl(file);
         return { dataUrl, fileName: file.name, storage_path: '', signedUrl: '' };
       }
@@ -3687,6 +3691,7 @@ Best regards,
       if (uploadErr) {
         const msg = (uploadErr?.message || '').toLowerCase();
         if (msg.includes('bucket') || msg.includes('policy') || msg.includes('row-level')) {
+          storageBlocked = true;
           console.warn('Storage upload blocked, using local data URL fallback', uploadErr);
           const dataUrl = await readAsDataUrl(file);
           return { dataUrl, fileName: file.name, storage_path: '', signedUrl: '' };
