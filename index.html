@@ -2389,7 +2389,8 @@
       invs.forEach(inv => {
         if (!inv.paid) balance += Number(inv.total || 0);
       });
-      document.getElementById('studentBalance').textContent = 'Outstanding balance: R ' + balance.toFixed(2);
+      const balanceLabel = balance > 0 ? 'Outstanding balance' : 'Balance';
+      document.getElementById('studentBalance').textContent = `${balanceLabel}: R ${balance.toFixed(2)}`;
       if (!invs.length) {
         ul.innerHTML = '<li class="text-slate-500">No invoices yet.</li>';
         return;
