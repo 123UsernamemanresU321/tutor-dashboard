@@ -1091,10 +1091,18 @@
 
       // remap references
       state.sessions.forEach(sess => {
-        sess.studentIds = (sess.studentIds || []).map(id => {
-          const cleaned = cleanId(id);
-          return maps.students.get(cleaned) || cleaned;
-        });
+        const seen = new Set();
+        sess.studentIds = (sess.studentIds || [])
+          .map(id => {
+            const cleaned = cleanId(id);
+            return maps.students.get(cleaned) || cleaned;
+          })
+          .filter(id => {
+            if (!id) return false;
+            if (seen.has(id)) return false;
+            seen.add(id);
+            return true;
+          });
       });
       state.homework.forEach(hw => {
         const sid = cleanId(hw.studentId);
@@ -1568,12 +1576,13 @@
 
       const fetchTable = (table, cols = '*') => {
         const base = supabaseClient.from(table).select(cols);
-        return isOwnerUser ? base : base; // rely on RLS for students
+        return isOwnerUser ? base.eq('user_id', uid) : base; // owner: scoped; students: rely on RLS
       };
 
       const [
         studentsRes,
         sessionsRes,
+        sessionStudentsRes,
         resourcesRes,
         homeworkRes,
         documentsRes,
@@ -1583,7 +1592,8 @@
         checkinsRes
       ] = await Promise.all([
         fetchTable('students'),
-        supabaseClient.from('sessions').select('*, session_students(session_id, student_id)'),
+        fetchTable('sessions'),
+        fetchTable('session_students'),
         fetchTable('resources'),
         fetchTable('homework'),
         fetchTable('documents'),
@@ -1593,12 +1603,15 @@
         fetchTable('student_checkins')
       ]);
 
-      [studentsRes, sessionsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes].forEach(res => {
+      [studentsRes, sessionsRes, sessionStudentsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes].forEach(res => {
         if (res.error) throw res.error;
       });
 
       const sessions = (sessionsRes.data || []).map(sess => {
-        const studentIds = (sess.session_students || []).map(ss => ss.student_id);
+        const studentIds = (sessionStudentsRes.data || [])
+          .filter(ss => ss.session_id === sess.id)
+          .map(ss => cleanId(ss.student_id))
+          .filter(Boolean);
         return {
           id: sess.id,
           date: sess.date,
@@ -2655,7 +2668,7 @@
         const dayName = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i];
         grid.innerHTML += `
           <div class="calendar-day" data-date="${isoDate}">
-            <div class="flex justify-between items-center mb-1">
+            <div class="flex flex-col mb-1">
               <span class="font-semibold">${dayName}</span>
               <span class="text-[10px] text-slate-500 whitespace-nowrap">${isoDate}</span>
             </div>
