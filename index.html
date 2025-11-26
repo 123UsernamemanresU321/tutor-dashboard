@@ -1054,6 +1054,15 @@
       return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(cleaned);
     }
 
+    function stripBucketPrefix(path, bucket) {
+      if (!path) return '';
+      const trimmed = cleanId(path);
+      if (trimmed.startsWith(bucket + '/')) {
+        return trimmed.slice(bucket.length + 1);
+      }
+      return trimmed;
+    }
+
     function sanitizeState(st) {
       ['students','sessions','resources','homework','documents','contracts','invoices','studentTodos','studentCheckins'].forEach(key => {
         if (!Array.isArray(st[key])) st[key] = [];
@@ -1063,10 +1072,18 @@
         s.id = cleanId(s.id);
         s.studentIds = (s.studentIds || []).map(cleanId);
       });
-      st.resources.forEach(r => { r.id = cleanId(r.id); r.storage_path = cleanId(r.storage_path); r.fileName = r.fileName || r.file_name || ''; });
+      st.resources.forEach(r => {
+        r.id = cleanId(r.id);
+        r.storage_path = stripBucketPrefix(r.storage_path, 'resources');
+        r.fileName = r.fileName || r.file_name || '';
+      });
       st.homework.forEach(h => { h.id = cleanId(h.id); h.studentId = cleanId(h.studentId); h.resourceId = cleanId(h.resourceId); });
       st.documents.forEach(d => { d.id = cleanId(d.id); d.studentId = cleanId(d.studentId); });
-      st.contracts.forEach(c => { c.id = cleanId(c.id); c.studentId = cleanId(c.studentId); });
+      st.contracts.forEach(c => {
+        c.id = cleanId(c.id);
+        c.studentId = cleanId(c.studentId);
+        c.storage_path = stripBucketPrefix(c.storage_path, 'contracts');
+      });
       st.invoices.forEach(i => { i.id = cleanId(i.id); i.studentId = cleanId(i.studentId); });
       st.studentTodos.forEach(t => { t.id = cleanId(t.id); t.studentId = cleanId(t.studentId); });
       st.studentCheckins.forEach(c => { c.id = cleanId(c.id); c.studentId = cleanId(c.studentId); });
@@ -2672,10 +2689,10 @@
       const uid = supabaseSession?.user?.id;
       if (!uid) throw new Error('No session');
       const ext = file.name.includes('.') ? file.name.split('.').pop() : 'bin';
-      const path = `contracts/${uid}/${generateId('file')}.${ext}`;
+      // Object key must NOT include bucket name; folder prefix is the user id for RLS.
+      const path = `${uid}/${generateId('file')}.${ext}`;
       const { error: uploadErr } = await supabaseClient.storage.from('contracts').upload(path, file, { upsert: false });
       if (uploadErr) throw uploadErr;
-      const { data: signed } = await supabaseClient.storage.from('contracts').createSignedUrl(path, 60 * 60 * 24);
       const contract = {
         id: generateId('contract'),
         studentId,
@@ -3686,8 +3703,9 @@ Best regards,
       }
 
       const ext = file.name.includes('.') ? file.name.split('.').pop() : 'bin';
-      const path = `resources/${uid}/${generateId('file')}.${ext}`;
       const { error: uploadErr } = await supabaseClient.storage.from('resources').upload(path, file, { upsert: false });
+      // Object key must NOT include bucket name; folder prefix is the user id for RLS.
+      const path = `${uid}/${generateId('file')}.${ext}`;
       if (uploadErr) {
         const msg = (uploadErr?.message || '').toLowerCase();
         if (msg.includes('bucket') || msg.includes('policy') || msg.includes('row-level')) {
