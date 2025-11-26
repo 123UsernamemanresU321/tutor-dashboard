@@ -995,7 +995,32 @@
       return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val || '');
     }
 
+    function cleanId(val) {
+      if (!val) return '';
+      const trimmed = String(val).trim().replace(/^'+|'+$/g, '').replace(/^"+|"+$/g, '');
+      return trimmed;
+    }
+
+    function sanitizeState(st) {
+      ['students','sessions','resources','homework','documents','contracts','invoices','studentTodos','studentCheckins'].forEach(key => {
+        if (!Array.isArray(st[key])) st[key] = [];
+      });
+      st.students.forEach(s => { s.id = cleanId(s.id); });
+      st.sessions.forEach(s => {
+        s.id = cleanId(s.id);
+        s.studentIds = (s.studentIds || []).map(cleanId);
+      });
+      st.resources.forEach(r => { r.id = cleanId(r.id); });
+      st.homework.forEach(h => { h.id = cleanId(h.id); h.studentId = cleanId(h.studentId); h.resourceId = cleanId(h.resourceId); });
+      st.documents.forEach(d => { d.id = cleanId(d.id); d.studentId = cleanId(d.studentId); });
+      st.contracts.forEach(c => { c.id = cleanId(c.id); c.studentId = cleanId(c.studentId); });
+      st.invoices.forEach(i => { i.id = cleanId(i.id); i.studentId = cleanId(i.studentId); });
+      st.studentTodos.forEach(t => { t.id = cleanId(t.id); t.studentId = cleanId(t.studentId); });
+      st.studentCheckins.forEach(c => { c.id = cleanId(c.id); c.studentId = cleanId(c.studentId); });
+    }
+
     function normalizeIdsToUuid() {
+      sanitizeState(state);
       const maps = {
         students: new Map(),
         sessions: new Map(),
@@ -1007,6 +1032,7 @@
         studentCheckins: new Map()
       };
       function ensureId(entity, key, map) {
+        entity.id = cleanId(entity.id);
         if (isUuid(entity.id)) return entity.id;
         const existing = map.get(entity.id);
         if (existing) {
@@ -1029,26 +1055,36 @@
 
       // remap references
       state.sessions.forEach(sess => {
-        sess.studentIds = (sess.studentIds || []).map(id => maps.students.get(id) || id);
+        sess.studentIds = (sess.studentIds || []).map(id => {
+          const cleaned = cleanId(id);
+          return maps.students.get(cleaned) || cleaned;
+        });
       });
       state.homework.forEach(hw => {
-        hw.studentId = maps.students.get(hw.studentId) || hw.studentId;
-        hw.resourceId = maps.resources.get(hw.resourceId) || hw.resourceId;
+        const sid = cleanId(hw.studentId);
+        const rid = cleanId(hw.resourceId);
+        hw.studentId = maps.students.get(sid) || sid;
+        hw.resourceId = maps.resources.get(rid) || rid;
       });
       state.documents.forEach(d => {
-        d.studentId = maps.students.get(d.studentId) || d.studentId;
+        const sid = cleanId(d.studentId);
+        d.studentId = maps.students.get(sid) || sid;
       });
       state.contracts.forEach(c => {
-        c.studentId = maps.students.get(c.studentId) || c.studentId;
+        const sid = cleanId(c.studentId);
+        c.studentId = maps.students.get(sid) || sid;
       });
       state.invoices.forEach(inv => {
-        inv.studentId = maps.students.get(inv.studentId) || inv.studentId;
+        const sid = cleanId(inv.studentId);
+        inv.studentId = maps.students.get(sid) || sid;
       });
       state.studentTodos.forEach(t => {
-        t.studentId = maps.students.get(t.studentId) || t.studentId;
+        const sid = cleanId(t.studentId);
+        t.studentId = maps.students.get(sid) || sid;
       });
       state.studentCheckins.forEach(c => {
-        c.studentId = maps.students.get(c.studentId) || c.studentId;
+        const sid = cleanId(c.studentId);
+        c.studentId = maps.students.get(sid) || sid;
       });
     }
 
@@ -1077,7 +1113,7 @@
 
       // prepare rows with user_id
       const students = state.students.map(s => ({
-        id: s.id,
+        id: cleanId(s.id),
         user_id: uid,
         name: s.name,
         grade_level: s.gradeLevel,
@@ -1091,7 +1127,7 @@
       const sessions = state.sessions.map(sess => {
         const { studentIds, ...rest } = sess;
         return {
-          id: sess.id,
+          id: cleanId(sess.id),
           user_id: uid,
           date: sess.date,
           start_time: sess.startTime,
@@ -1119,7 +1155,7 @@
       }
 
       const resources = state.resources.map(r => ({
-        id: r.id,
+        id: cleanId(r.id),
         user_id: uid,
         title: r.title,
         subject: r.subject,
@@ -1132,10 +1168,10 @@
       await upsertAndPrune('resources', resources, 'id');
 
       const homework = state.homework.map(h => ({
-        id: h.id,
+        id: cleanId(h.id),
         user_id: uid,
-        student_id: h.studentId,
-        resource_id: h.resourceId,
+        student_id: cleanId(h.studentId),
+        resource_id: cleanId(h.resourceId),
         status: h.status,
         due_date: h.dueDate,
         assigned_date: h.assignedDate
@@ -1143,9 +1179,9 @@
       await upsertAndPrune('homework', homework, 'id');
 
       const documents = state.documents.map(d => ({
-        id: d.id,
+        id: cleanId(d.id),
         user_id: uid,
-        student_id: d.studentId,
+        student_id: cleanId(d.studentId),
         title: d.title,
         status: d.status,
         date: d.date,
@@ -1155,9 +1191,9 @@
       await upsertAndPrune('documents', documents, 'id');
 
       const contracts = state.contracts.map(c => ({
-        id: c.id,
+        id: cleanId(c.id),
         user_id: uid,
-        student_id: c.studentId,
+        student_id: cleanId(c.studentId),
         file_name: c.fileName,
         storage_path: c.storage_path,
         status: c.status,
@@ -1167,9 +1203,9 @@
       await upsertAndPrune('contracts', contracts, 'id');
 
       const invoices = state.invoices.map(inv => ({
-        id: inv.id,
+        id: cleanId(inv.id),
         user_id: uid,
-        student_id: inv.studentId,
+        student_id: cleanId(inv.studentId),
         issue_date: inv.issueDate,
         due_date: inv.dueDate,
         base_amount: inv.baseAmount,
@@ -1184,9 +1220,9 @@
       await upsertAndPrune('invoices', invoices, 'id');
 
       const todos = state.studentTodos.map(t => ({
-        id: t.id,
+        id: cleanId(t.id),
         user_id: uid,
-        student_id: t.studentId,
+        student_id: cleanId(t.studentId),
         text: t.text,
         due_date: t.dueDate,
         done: t.done,
@@ -1195,9 +1231,9 @@
       await upsertAndPrune('student_todos', todos, 'id');
 
       const checkins = state.studentCheckins.map(c => ({
-        id: c.id,
+        id: cleanId(c.id),
         user_id: uid,
-        student_id: c.studentId,
+        student_id: cleanId(c.studentId),
         text: c.text,
         date: c.date,
         created_at: c.createdAt
@@ -1648,6 +1684,8 @@
         createdAt: c.created_at
       }));
       merged.settings = loadState().settings; // keep local settings
+      sanitizeState(merged);
+      normalizeIdsToUuid();
       return merged;
     }
 
