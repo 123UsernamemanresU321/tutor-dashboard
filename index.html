@@ -10,7 +10,7 @@
   <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- hCaptcha -->
-  <script src="https://js.hcaptcha.com/1/api.js?render=explicit" async defer></script>
+  <script src="https://js.hcaptcha.com/1/api.js?onload=hcaptchaOnLoad&render=explicit" async defer></script>
 
   <!-- Google Font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1553,11 +1553,15 @@
       if (!HCAPTCHA_ENABLED || !HCAPTCHA_SITEKEY || HCAPTCHA_SITEKEY.includes('YOUR_HCAPTCHA')) return;
       const existing = document.querySelector('script[src*="js.hcaptcha.com/1/api.js"]');
       if (existing) {
-        if (window.hcaptcha) hcaptchaOnLoad();
+        if (window.hcaptcha) {
+          hcaptchaOnLoad();
+        } else {
+          existing.addEventListener('load', hcaptchaOnLoad, { once: true });
+        }
         return;
       }
       const script = document.createElement('script');
-      script.src = 'https://js.hcaptcha.com/1/api.js?render=explicit';
+      script.src = 'https://js.hcaptcha.com/1/api.js?onload=hcaptchaOnLoad&render=explicit';
       script.async = true;
       script.onload = hcaptchaOnLoad;
       document.head.appendChild(script);
