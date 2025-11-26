@@ -28,16 +28,18 @@
     body {
       font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
       background:
-        radial-gradient(circle at 0% 0%, #e0f2fe 0, rgba(224,242,254,0) 40%),
-        radial-gradient(circle at 100% 0%, #fef3c7 0, rgba(254,243,199,0) 45%),
-        linear-gradient(to bottom, #f9fafb, #e5e7eb);
+        radial-gradient(circle at 12% 20%, rgba(79,70,229,0.12), transparent 45%),
+        radial-gradient(circle at 88% 18%, rgba(14,165,233,0.14), transparent 46%),
+        linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #f1f5f9 100%);
+      background-attachment: fixed;
       color: var(--text-light);
     }
     body.dark {
       background:
-        radial-gradient(circle at 0% 0%, #1e293b 0, rgba(15,23,42,0) 35%),
-        radial-gradient(circle at 100% 0%, #0f172a 0, rgba(15,23,42,0) 45%),
-        linear-gradient(to bottom, #020617, #020617);
+        radial-gradient(circle at 12% 20%, rgba(59,130,246,0.18), transparent 42%),
+        radial-gradient(circle at 85% 25%, rgba(34,211,238,0.12), transparent 50%),
+        linear-gradient(135deg, #020617 0%, #0b1221 45%, #0b1324 100%);
+      background-attachment: fixed;
       color: var(--text-dark);
     }
     body.dark .sidebar,
@@ -51,26 +53,26 @@
     }
     .card {
       background-color: var(--card-light);
-      border: 1px solid #e5e7eb;
-      border-radius: 0.9rem;
+      border: 1px solid rgba(148,163,184,0.25);
+      border-radius: 1.1rem;
       box-shadow:
-        0 18px 45px -28px rgba(15,23,42,0.65),
-        0 0 0 1px rgba(148,163,184,0.08);
-      transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+        0 20px 60px -34px rgba(15,23,42,0.7),
+        0 0 0 1px rgba(148,163,184,0.12);
+      transition: background 0.25s ease, border-color 0.2s ease, box-shadow 0.25s ease, transform 0.18s ease;
     }
     .card:hover {
-      transform: translateY(-1px);
+      transform: translateY(-2px);
       box-shadow:
-        0 20px 55px -30px rgba(15,23,42,0.75),
-        0 0 0 1px rgba(148,163,184,0.14);
+        0 26px 70px -36px rgba(15,23,42,0.85),
+        0 0 0 1px rgba(148,163,184,0.2);
     }
     body.dark .card {
-      background: radial-gradient(circle at 0% 0%, #1e293b 0, #020617 48%);
+      background: radial-gradient(circle at 0% 0%, #111827 0, #0b1221 48%);
       border-color: var(--border-dark);
       color: var(--text-dark);
       box-shadow:
-        0 18px 50px -28px rgba(15,23,42,0.9),
-        0 0 0 1px rgba(15,23,42,0.9);
+        0 20px 60px -30px rgba(15,23,42,0.9),
+        0 0 0 1px rgba(15,23,42,0.85);
     }
     .sidebar {
       background: radial-gradient(circle at 0% 0%, #0f172a 0, #020617 70%);
@@ -78,12 +80,14 @@
       box-shadow: 6px 0 24px -20px rgba(15,23,42,0.9);
     }
     .topbar {
-      background: rgba(255,255,255,0.96);
+      background: rgba(255,255,255,0.9);
       backdrop-filter: blur(18px);
-      border-bottom: 1px solid rgba(148,163,184,0.35);
+      border-bottom: 1px solid rgba(148,163,184,0.25);
     }
     body.dark .topbar {
       color: var(--text-dark);
+      border-color: rgba(51,65,85,0.75);
+      background: rgba(8,15,27,0.92);
     }
     .scrollbar-thin::-webkit-scrollbar {
       width: 6px;
@@ -225,6 +229,55 @@
       padding-top: 0.25rem;
       padding-bottom: 0.25rem;
     }
+
+    /* Light utility chips */
+    .chip-btn {
+      border: 1px solid rgba(148,163,184,0.6);
+      border-radius: 999px;
+      padding: 0.25rem 0.65rem;
+      font-size: 0.75rem;
+      transition: all 0.15s ease;
+    }
+    .chip-btn.active {
+      background: linear-gradient(135deg, #4f46e5, #22d3ee);
+      color: #f8fafc;
+      border-color: transparent;
+      box-shadow: 0 10px 30px -20px rgba(79,70,229,0.8);
+    }
+
+    .progress-track {
+      height: 0.55rem;
+      border-radius: 999px;
+      background: rgba(148,163,184,0.25);
+      overflow: hidden;
+    }
+    .progress-thumb {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #6366f1, #22c55e);
+      transition: width 0.2s ease;
+    }
+    body.dark .progress-track {
+      background: rgba(51,65,85,0.9);
+    }
+
+    .hint {
+      font-size: 0.7rem;
+      color: #94a3b8;
+    }
+
+    /* Section breathing */
+    .section-shell {
+      background: linear-gradient(135deg, rgba(255,255,255,0.72), rgba(255,255,255,0.6));
+      border: 1px solid rgba(148,163,184,0.22);
+      border-radius: 1.3rem;
+      padding: 1.25rem;
+      box-shadow: 0 24px 70px -48px rgba(15,23,42,0.55);
+    }
+    body.dark .section-shell {
+      background: linear-gradient(135deg, rgba(15,23,42,0.75), rgba(15,23,42,0.65));
+      border-color: rgba(51,65,85,0.8);
+    }
   </style>
 </head>
 <body>
@@ -298,74 +351,169 @@
       </header>
 
       <!-- Views container -->
-      <main id="viewsContainer" class="flex-1 overflow-y-auto bg-transparent p-6 space-y-4 max-w-6xl mx-auto w-full">
+      <main id="viewsContainer" class="flex-1 overflow-y-auto bg-transparent px-8 py-8 space-y-8 max-w-7xl mx-auto w-full">
         <!-- Dashboard -->
         <section id="view-dashboard" class="view">
-          <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
-            <!-- KPI cards -->
-            <div class="card p-4 col-span-1">
-              <div class="flex items-center justify-between mb-1">
-                <h3 class="text-xs font-medium text-slate-500">Active students</h3>
+          <div class="section-shell space-y-6">
+            <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+              <div class="card p-5 col-span-8 space-y-3">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-[10px] uppercase tracking-wide text-slate-500">Weekly direction</p>
+                    <h3 class="text-sm font-semibold">Focus & reflection</h3>
+                  </div>
+                  <span class="hint">Set in Settings</span>
+                </div>
+                <div id="reflectionText" class="text-sm text-slate-700 leading-relaxed">
+                  Add a short note in settings to keep this week intentional.
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                  <div class="border border-slate-200 rounded-lg p-3 bg-white/70">
+                    <div class="text-[10px] text-slate-500">Next session</div>
+                    <div id="focusNextSession" class="font-semibold">No sessions planned</div>
+                    <div id="focusNextSessionMeta" class="text-[10px] text-slate-500"></div>
+                  </div>
+                  <div class="border border-slate-200 rounded-lg p-3 bg-white/70">
+                    <div class="text-[10px] text-slate-500">Homework due soon</div>
+                    <div id="focusHomework" class="font-semibold">0</div>
+                    <div class="text-[10px] text-slate-500">Due within 5 days</div>
+                  </div>
+                    <div class="border border-slate-200 rounded-lg p-3 bg-white/70">
+                    <div class="text-[10px] text-slate-500">Overdue invoices</div>
+                    <div id="focusInvoices" class="font-semibold text-rose-600">0</div>
+                    <div class="text-[10px] text-slate-500">Follow up today</div>
+                  </div>
+                </div>
               </div>
-              <div id="kpiStudents" class="text-2xl font-semibold text-slate-900">0</div>
-              <p class="text-[11px] text-slate-500 mt-1">Students with at least one session in the last 30 days.</p>
+              <div class="card p-5 col-span-4 space-y-4">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-sm font-semibold">Goals</h3>
+                  <span class="hint">Live progress</span>
+                </div>
+                <div>
+                  <div class="flex items-center justify-between text-[11px] mb-1">
+                    <span>Hours this week</span>
+                    <span id="goalHoursLabel">0 / 0h</span>
+                  </div>
+                  <div class="progress-track">
+                    <div id="goalHoursProgress" class="progress-thumb" style="width:0%"></div>
+                  </div>
+                </div>
+                <div>
+                  <div class="flex items-center justify-between text-[11px] mb-1">
+                    <span>Income this month</span>
+                    <span id="goalIncomeLabel">R 0 / R 0</span>
+                  </div>
+                  <div class="progress-track">
+                    <div id="goalIncomeProgress" class="progress-thumb" style="width:0%"></div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="card p-4 col-span-1">
-              <h3 class="text-xs font-medium text-slate-500 mb-1">Hours this week</h3>
-              <div id="kpiHoursWeek" class="text-2xl font-semibold text-slate-900">0</div>
-              <p class="text-[11px] text-slate-500 mt-1">Sum of completed sessions.</p>
-            </div>
-            <div class="card p-4 col-span-1">
-              <h3 class="text-xs font-medium text-slate-500 mb-1">Expected income (month)</h3>
-              <div id="kpiExpectedIncome" class="text-2xl font-semibold text-slate-900">0</div>
-              <p class="text-[11px] text-slate-500 mt-1">From issued & upcoming sessions.</p>
-            </div>
-            <div class="card p-4 col-span-1">
-              <h3 class="text-xs font-medium text-slate-500 mb-1">Overdue invoices</h3>
-              <div id="kpiOverdue" class="text-2xl font-semibold text-rose-600">0</div>
-              <p class="text-[11px] text-slate-500 mt-1">Count of unpaid invoices past due date.</p>
-            </div>
-          </div>
 
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div class="card p-4 col-span-2">
-              <div class="flex items-center justify-between mb-2">
-                <h3 class="text-sm font-semibold">Subject mix (hours)</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+              <div class="card p-5 col-span-1">
+                <div class="flex items-center justify-between mb-1">
+                  <h3 class="text-xs font-medium text-slate-500">Active students</h3>
+                </div>
+                <div id="kpiStudents" class="text-2xl font-semibold text-slate-900">0</div>
+                <p class="text-[11px] text-slate-500 mt-1">Students with at least one session in the last 30 days.</p>
               </div>
-              <canvas id="subjectMixChart" class="w-full h-64"></canvas>
+              <div class="card p-5 col-span-1">
+                <h3 class="text-xs font-medium text-slate-500 mb-1">Hours this week</h3>
+                <div id="kpiHoursWeek" class="text-2xl font-semibold text-slate-900">0</div>
+                <p class="text-[11px] text-slate-500 mt-1">Sum of completed sessions.</p>
+              </div>
+              <div class="card p-5 col-span-1">
+                <h3 class="text-xs font-medium text-slate-500 mb-1">Expected income (month)</h3>
+                <div id="kpiExpectedIncome" class="text-2xl font-semibold text-slate-900">0</div>
+                <p class="text-[11px] text-slate-500 mt-1">From issued & upcoming sessions.</p>
+              </div>
+              <div class="card p-5 col-span-1">
+                <h3 class="text-xs font-medium text-slate-500 mb-1">Overdue invoices</h3>
+                <div id="kpiOverdue" class="text-2xl font-semibold text-rose-600">0</div>
+                <p class="text-[11px] text-slate-500 mt-1">Count of unpaid invoices past due date.</p>
+              </div>
             </div>
-            <div class="card p-4 col-span-1">
-              <div class="flex items-center justify-between mb-2">
-                <h3 class="text-sm font-semibold">Upcoming sessions (next 7 days)</h3>
+
+            <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+              <div class="card p-5 col-span-7">
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="text-sm font-semibold">Subject mix (hours)</h3>
+                </div>
+                <canvas id="subjectMixChart" class="w-full h-64"></canvas>
               </div>
-              <ul id="upcomingSessionsList" class="text-xs space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+              <div class="card p-5 col-span-5">
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="text-sm font-semibold">Upcoming sessions (next 7 days)</h3>
+                </div>
+                <ul id="upcomingSessionsList" class="text-xs space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+              <div class="card p-5 col-span-4">
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="text-sm font-semibold">At-risk students</h3>
+                  <span class="hint">No session in 21+ days</span>
+                </div>
+                <ul id="atRiskList" class="text-xs space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+              <div class="card p-5 col-span-4">
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="text-sm font-semibold">Homework due soon</h3>
+                  <span class="hint">Next 5 days</span>
+                </div>
+                <ul id="dueHomeworkList" class="text-xs space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+              <div class="card p-5 col-span-4">
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="text-sm font-semibold">Prep queue (next 3)</h3>
+                  <span class="hint">Click to open</span>
+                </div>
+                <ul id="prepQueueList" class="text-xs space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+              </div>
             </div>
           </div>
         </section>
 
         <!-- Students -->
         <section id="view-students" class="view hidden">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h2 class="text-lg font-semibold">Students</h2>
-              <p class="text-xs text-slate-500">Manage profiles, 360° timelines and subject mix.</p>
-            </div>
-            <button id="addStudentBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 shadow-sm">
-              ＋ Add student
-            </button>
-          </div>
-
-          <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <!-- Student list -->
-            <div class="card p-3 col-span-1 max-h-[75vh] overflow-y-auto scrollbar-thin">
-              <div class="flex items-center justify-between mb-2">
-                <h3 class="text-sm font-semibold">All students</h3>
+          <div class="section-shell space-y-4">
+            <div class="flex items-center justify-between mb-1">
+              <div>
+                <h2 class="text-lg font-semibold">Students</h2>
+                <p class="text-xs text-slate-500">Manage profiles, 360° timelines and subject mix.</p>
               </div>
-              <ul id="studentsList" class="space-y-2 text-xs"></ul>
+              <button id="addStudentBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 shadow-sm">
+                ＋ Add student
+              </button>
             </div>
 
-            <!-- Student detail -->
-            <div class="card p-3 col-span-2 max-h-[75vh] overflow-y-auto scrollbar-thin">
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <!-- Student list -->
+              <div class="card p-4 col-span-1 max-h-[75vh] overflow-y-auto scrollbar-thin">
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="text-sm font-semibold">All students</h3>
+                </div>
+                <div class="flex flex-wrap gap-2 mb-2 text-[11px]">
+                  <select id="studentSubjectFilter" class="border border-slate-300 rounded-xl px-2 py-1 text-xs">
+                    <option value="">All subjects</option>
+                    <option value="Physics">Physics</option>
+                    <option value="Chemistry">Chemistry</option>
+                    <option value="Maths">Maths</option>
+                  </select>
+                  <select id="studentActivityFilter" class="border border-slate-300 rounded-xl px-2 py-1 text-xs">
+                    <option value="">All activity</option>
+                    <option value="active">Active (&lt;14 days)</option>
+                    <option value="quiet">Quiet (14+ days)</option>
+                  </select>
+                </div>
+                <ul id="studentsList" class="space-y-2 text-xs"></ul>
+              </div>
+
+              <!-- Student detail -->
+              <div class="card p-4 col-span-2 max-h-[75vh] overflow-y-auto scrollbar-thin">
               <div id="studentDetailEmpty" class="text-xs text-slate-500">
                 Select a student on the left to view their 360° panel.
               </div>
@@ -390,6 +538,61 @@
                   </div>
                   <div class="flex justify-between mt-1 text-[10px] text-slate-500">
                     <span>Physics</span><span>Chemistry</span><span>Maths</span>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <div class="border border-slate-200 rounded-lg p-2 bg-white/70">
+                    <div class="text-[10px] text-slate-500">Hours (last 30 days)</div>
+                    <div id="engagementHours" class="text-lg font-semibold">0</div>
+                  </div>
+                  <div class="border border-slate-200 rounded-lg p-2 bg-white/70">
+                    <div class="text-[10px] text-slate-500">Streak (weeks)</div>
+                    <div id="engagementStreak" class="text-lg font-semibold">0</div>
+                    <div class="text-[10px] text-slate-500" id="engagementNextGap"></div>
+                  </div>
+                  <div class="border border-slate-200 rounded-lg p-2 bg-white/70">
+                    <div class="text-[10px] text-slate-500">Homework completion</div>
+                    <div class="flex items-center justify-between">
+                      <div id="engagementHomework" class="text-lg font-semibold">0%</div>
+                      <div class="progress-track w-24">
+                        <div id="engagementHomeworkProgress" class="progress-thumb" style="width:0%"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div class="border border-slate-200 rounded-lg p-2 bg-white/70">
+                    <div class="flex items-center justify-between mb-1">
+                      <h4 class="text-[11px] font-semibold">Follow-ups</h4>
+                      <span class="hint">Personal tasks</span>
+                    </div>
+                    <ul id="studentTodosList" class="space-y-1 text-[11px]"></ul>
+                    <form id="studentTodoForm" class="mt-2 grid grid-cols-3 gap-1 text-[11px]">
+                      <input name="todoText" placeholder="Email parent…" class="col-span-2 border border-slate-300 rounded-lg px-2 py-1">
+                      <input name="todoDue" type="date" class="border border-slate-300 rounded-lg px-2 py-1">
+                      <button class="col-span-3 bg-slate-900 text-white rounded-lg py-1">Add follow-up</button>
+                    </form>
+                  </div>
+                  <div class="border border-slate-200 rounded-lg p-2 bg-white/70">
+                    <div class="flex items-center justify-between mb-1">
+                      <h4 class="text-[11px] font-semibold">Check-ins</h4>
+                      <span class="hint">Timestamped notes</span>
+                    </div>
+                    <ul id="studentCheckinsList" class="space-y-1 text-[11px] max-h-32 overflow-y-auto scrollbar-thin"></ul>
+                    <form id="studentCheckinForm" class="mt-2 space-y-1 text-[11px]">
+                      <textarea name="checkinText" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-1" placeholder="Short note..."></textarea>
+                      <button class="w-full bg-indigo-600 text-white rounded-lg py-1">Add check-in</button>
+                    </form>
+                  </div>
+                  <div class="border border-slate-200 rounded-lg p-2 bg-white/70">
+                    <div class="flex items-center justify-between mb-1">
+                      <h4 class="text-[11px] font-semibold">Lesson contracts</h4>
+                      <button id="uploadContractBtn" class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50">Upload scan</button>
+                    </div>
+                    <ul id="studentContractsList" class="space-y-1 text-[11px] max-h-32 overflow-y-auto scrollbar-thin"></ul>
+                    <p class="hint mt-1">PDF or image stored locally; attach one per agreement.</p>
                   </div>
                 </div>
 
@@ -441,19 +644,20 @@
 
         <!-- Schedule -->
         <section id="view-schedule" class="view hidden">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h2 class="text-lg font-semibold">Schedule</h2>
-              <p class="text-xs text-slate-500">Calendar-style overview & clash detection.</p>
+          <div class="section-shell space-y-4">
+            <div class="flex items-center justify-between mb-1">
+              <div>
+                <h2 class="text-lg font-semibold">Schedule</h2>
+                <p class="text-xs text-slate-500">Calendar-style overview & clash detection.</p>
+              </div>
+              <button id="addSessionBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 shadow-sm">
+                ＋ Add session
+              </button>
             </div>
-            <button id="addSessionBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 shadow-sm">
-              ＋ Add session
-            </button>
-          </div>
 
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Calendar -->
-            <div class="card p-3 col-span-2">
+            <div class="card p-5 col-span-2">
               <div class="flex items-center justify-between mb-2 text-xs">
                 <div class="flex items-center gap-2">
                   <button id="schedulePrevWeek" class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50">◀</button>
@@ -462,6 +666,7 @@
                 </div>
                 <div id="scheduleWeekLabel" class="font-medium"></div>
               </div>
+              <div id="dayLoadRow" class="grid grid-cols-7 gap-1 text-[10px] mb-2"></div>
               <div class="calendar-grid text-[11px]" id="scheduleCalendarGrid">
                 <!-- days injected here -->
               </div>
@@ -469,7 +674,7 @@
             </div>
 
             <!-- Today & clash info -->
-            <div class="card p-3 col-span-1 space-y-3 text-xs">
+            <div class="card p-5 col-span-1 space-y-3 text-xs">
               <div>
                 <h3 class="text-sm font-semibold mb-1">Today's sessions</h3>
                 <ul id="todaySessionsList" class="space-y-1 max-h-40 overflow-y-auto scrollbar-thin"></ul>
@@ -479,24 +684,30 @@
                 <ul id="clashList" class="space-y-1 max-h-40 overflow-y-auto scrollbar-thin text-[11px]"></ul>
                 <p class="text-[10px] text-slate-500 mt-1">Clashes are detected when sessions overlap in time for the same tutor or student.</p>
               </div>
+              <div>
+                <h3 class="text-sm font-semibold mb-1">Tight transitions</h3>
+                <ul id="tightTransitionsList" class="space-y-1 max-h-32 overflow-y-auto scrollbar-thin text-[11px]"></ul>
+                <p class="text-[10px] text-slate-500 mt-1">Under 20 minutes between any sessions.</p>
+              </div>
             </div>
           </div>
         </section>
 
         <!-- Resources -->
         <section id="view-resources" class="view hidden">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h2 class="text-lg font-semibold">Resources</h2>
-              <p class="text-xs text-slate-500">Worksheets, lectures, and homework tracking.</p>
+          <div class="section-shell space-y-4">
+            <div class="flex items-center justify-between mb-1">
+              <div>
+                <h2 class="text-lg font-semibold">Resources</h2>
+                <p class="text-xs text-slate-500">Worksheets, lectures, and homework tracking.</p>
+              </div>
+              <button id="addResourceBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 shadow-sm">
+                ＋ Add resource
+              </button>
             </div>
-            <button id="addResourceBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 shadow-sm">
-              ＋ Add resource
-            </button>
-          </div>
 
-          <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <div class="card p-3 col-span-2 max-h-[75vh] overflow-y-auto scrollbar-thin">
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <div class="card p-4 col-span-2 max-h-[75vh] overflow-y-auto scrollbar-thin">
               <div class="flex items-center justify-between mb-2 text-xs">
                 <div class="flex gap-2">
                   <select id="resourceSubjectFilter" class="border border-slate-300 rounded-xl px-2 py-1 text-xs">
@@ -509,11 +720,12 @@
                          class="border border-slate-300 rounded-xl px-2 py-1 text-xs w-40">
                 </div>
               </div>
+              <div id="resourceTagFilters" class="flex flex-wrap gap-2 mb-3 text-[10px]"></div>
               <ul id="resourcesList" class="space-y-2 text-xs"></ul>
             </div>
 
             <!-- Homework board -->
-            <div class="card p-3 col-span-1 max-h-[75vh] overflow-y-auto scrollbar-thin text-xs">
+            <div class="card p-4 col-span-1 max-h-[75vh] overflow-y-auto scrollbar-thin text-xs">
               <h3 class="text-sm font-semibold mb-2">Homework board</h3>
               <div class="grid grid-cols-3 gap-2 text-[11px]">
                 <div>
@@ -531,23 +743,25 @@
               </div>
               <p class="mt-2 text-[10px] text-slate-500">Change status using the dropdown on each card.</p>
             </div>
+            </div>
           </div>
         </section>
 
         <!-- Finance -->
         <section id="view-finance" class="view hidden">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h2 class="text-lg font-semibold">Finance</h2>
-              <p class="text-xs text-slate-500">Invoices, balances & overdue reminders.</p>
+          <div class="section-shell space-y-4">
+            <div class="flex items-center justify-between mb-1">
+              <div>
+                <h2 class="text-lg font-semibold">Finance</h2>
+                <p class="text-xs text-slate-500">Invoices, balances & overdue reminders.</p>
+              </div>
+              <button id="addInvoiceBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 shadow-sm">
+                ＋ Create invoice
+              </button>
             </div>
-            <button id="addInvoiceBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 shadow-sm">
-              ＋ Create invoice
-            </button>
-          </div>
 
-          <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 text-xs">
-            <div class="card p-3 col-span-2 max-h-[75vh] overflow-y-auto scrollbar-thin">
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 text-xs">
+              <div class="card p-4 col-span-2 max-h-[75vh] overflow-y-auto scrollbar-thin">
               <h3 class="text-sm font-semibold mb-2">Student balances</h3>
               <table class="w-full text-[11px]">
                 <thead>
@@ -560,25 +774,39 @@
                 <tbody id="financeStudentTable"></tbody>
               </table>
             </div>
-            <div class="card p-3 col-span-1 max-h-[75vh] overflow-y-auto scrollbar-thin">
+            <div class="card p-4 col-span-1 max-h-[75vh] overflow-y-auto scrollbar-thin">
               <h3 class="text-sm font-semibold mb-2">Overdue invoices</h3>
               <ul id="overdueInvoicesList" class="space-y-2 text-[11px]"></ul>
               <p class="mt-2 text-[10px] text-slate-500">Click “Reminder text” to generate a polite message you can paste into email or chat.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 text-xs mt-4">
+            <div class="card p-4 col-span-2">
+              <h3 class="text-sm font-semibold mb-2">Unbilled hours</h3>
+              <ul id="unbilledList" class="space-y-2 text-[11px]"></ul>
+              <p class="mt-2 text-[10px] text-slate-500">Calculated from sessions since the last invoice per student (using their rate).</p>
+            </div>
+            <div class="card p-4 col-span-1">
+              <h3 class="text-sm font-semibold mb-2">Cashflow forecast (14 days)</h3>
+              <div id="forecastSummary" class="text-sm font-semibold"></div>
+              <ul id="forecastList" class="space-y-1 text-[11px] mt-2"></ul>
             </div>
           </div>
         </section>
 
         <!-- Settings -->
         <section id="view-settings" class="view hidden">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h2 class="text-lg font-semibold">Settings</h2>
-              <p class="text-xs text-slate-500">Theme, layout & data backup.</p>
+          <div class="section-shell space-y-4">
+            <div class="flex items-center justify-between mb-1">
+              <div>
+                <h2 class="text-lg font-semibold">Settings</h2>
+                <p class="text-xs text-slate-500">Theme, layout & data backup.</p>
+              </div>
             </div>
-          </div>
 
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div class="card p-4 text-xs space-y-3">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div class="card p-5 text-xs space-y-3">
               <h3 class="text-sm font-semibold mb-1">Appearance</h3>
               <div class="flex items-center justify-between">
                 <span>Theme</span>
@@ -596,7 +824,27 @@
               </div>
             </div>
 
-            <div class="card p-4 text-xs space-y-3">
+            <div class="card p-5 text-xs space-y-3">
+              <h3 class="text-sm font-semibold mb-1">Goals & defaults</h3>
+              <div class="flex items-center justify-between gap-2">
+                <span>Weekly hours goal</span>
+                <input id="settingsWeeklyGoal" type="number" step="0.5" class="border border-slate-300 rounded-xl px-2 py-1 text-xs w-24">
+              </div>
+              <div class="flex items-center justify-between gap-2">
+                <span>Monthly income goal (R)</span>
+                <input id="settingsMonthlyGoal" type="number" step="100" class="border border-slate-300 rounded-xl px-2 py-1 text-xs w-24">
+              </div>
+              <div class="flex items-center justify-between gap-2">
+                <span>Default session duration (h)</span>
+                <input id="settingsDefaultDuration" type="number" step="0.25" class="border border-slate-300 rounded-xl px-2 py-1 text-xs w-24">
+              </div>
+              <div>
+                <label class="block text-[11px] mb-1">Weekly reflection note</label>
+                <textarea id="settingsReflection" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]" placeholder="What matters this week?"></textarea>
+              </div>
+            </div>
+
+            <div class="card p-5 text-xs space-y-3">
               <h3 class="text-sm font-semibold mb-1">Data backup</h3>
               <p>Export your dashboard data as JSON and paste it somewhere safe. You can import it later.</p>
               <div class="flex gap-2">
@@ -637,9 +885,16 @@
       invoices: [],
       documents: [],
       homework: [],
+      studentTodos: [],
+      studentCheckins: [],
+      contracts: [],
       settings: {
         theme: 'light',
-        density: 'comfortable'
+        density: 'comfortable',
+        weeklyGoalHours: 10,
+        monthlyIncomeGoal: 0,
+        reflection: '',
+        defaultSessionDuration: 1.5
       }
     };
 
@@ -650,7 +905,9 @@
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return deepClone(defaultState);
         const parsed = JSON.parse(raw);
-        return Object.assign(deepClone(defaultState), parsed);
+        const merged = Object.assign(deepClone(defaultState), parsed);
+        merged.settings = Object.assign(deepClone(defaultState.settings), parsed.settings || {});
+        return merged;
       } catch (e) {
         console.error('Failed to load state', e);
         return deepClone(defaultState);
@@ -690,6 +947,11 @@
       window.markInvoicePaid = markInvoicePaid;
       window.generateReminder = generateReminder;
       window.selectStudent = selectStudent;
+      window.toggleResourceFavorite = toggleResourceFavorite;
+      window.toggleTodoStatus = toggleTodoStatus;
+      window.deleteTodo = deleteTodo;
+      window.openContractUpload = openContractUpload;
+      window.markContractStatus = markContractStatus;
     });
 
     function setupNav() {
@@ -735,6 +997,22 @@
         applyDensity();
         saveState();
       });
+      document.getElementById('settingsWeeklyGoal').addEventListener('input', e => {
+        state.settings.weeklyGoalHours = Number(e.target.value || 0);
+        saveState();
+      });
+      document.getElementById('settingsMonthlyGoal').addEventListener('input', e => {
+        state.settings.monthlyIncomeGoal = Number(e.target.value || 0);
+        saveState();
+      });
+      document.getElementById('settingsReflection').addEventListener('input', e => {
+        state.settings.reflection = e.target.value;
+        saveState();
+      });
+      document.getElementById('settingsDefaultDuration').addEventListener('input', e => {
+        state.settings.defaultSessionDuration = Number(e.target.value || 1);
+        saveState();
+      });
       document.getElementById('exportDataBtn').addEventListener('click', () => {
         document.getElementById('backupTextarea').value = JSON.stringify(state, null, 2);
       });
@@ -762,6 +1040,10 @@
     function applySettingsToUI() {
       document.getElementById('settingsThemeSelect').value = state.settings.theme;
       document.getElementById('settingsDensitySelect').value = state.settings.density;
+      document.getElementById('settingsWeeklyGoal').value = state.settings.weeklyGoalHours ?? '';
+      document.getElementById('settingsMonthlyGoal').value = state.settings.monthlyIncomeGoal ?? '';
+      document.getElementById('settingsReflection').value = state.settings.reflection || '';
+      document.getElementById('settingsDefaultDuration').value = state.settings.defaultSessionDuration ?? 1.5;
       applyTheme();
       applyDensity();
     }
@@ -782,8 +1064,8 @@
     function applyDensity() {
       const compact = state.settings.density === 'compact';
       const container = document.getElementById('viewsContainer');
-      container.classList.toggle('py-4', !compact);
-      container.classList.toggle('py-3', compact);
+      container.classList.toggle('py-8', !compact);
+      container.classList.toggle('py-5', compact);
       container.classList.toggle('dense-mode', compact);
     }
 
@@ -882,6 +1164,7 @@
     function updateKPIsAndCharts() {
       const now = new Date();
       const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const today = new Date();
 
       const activeStudentIds = new Set(
         state.sessions
@@ -914,9 +1197,45 @@
       });
       document.getElementById('kpiExpectedIncome').textContent = 'R ' + expected.toFixed(2);
 
-      const today = new Date();
       const overdueCount = state.invoices.filter(inv => !inv.paid && inv.dueDate && new Date(inv.dueDate) < today).length;
       document.getElementById('kpiOverdue').textContent = overdueCount;
+
+      // Goals & focus
+      const weeklyGoal = Number(state.settings.weeklyGoalHours || 0);
+      const weeklyPct = weeklyGoal ? Math.min(100, (hoursThisWeek / weeklyGoal) * 100) : 0;
+      document.getElementById('goalHoursLabel').textContent = `${hoursThisWeek.toFixed(1)} / ${weeklyGoal || 0}h`;
+      document.getElementById('goalHoursProgress').style.width = `${weeklyPct}%`;
+
+      const monthlyGoal = Number(state.settings.monthlyIncomeGoal || 0);
+      const monthlyPct = monthlyGoal ? Math.min(100, (expected / monthlyGoal) * 100) : 0;
+      document.getElementById('goalIncomeLabel').textContent = `R ${expected.toFixed(0)} / R ${monthlyGoal || 0}`;
+      document.getElementById('goalIncomeProgress').style.width = `${monthlyPct}%`;
+
+      const reflection = (state.settings.reflection || '').trim();
+      document.getElementById('reflectionText').textContent = reflection || 'Add a short intention in Settings to keep this week focused.';
+
+      const upcomingSoon = [...state.sessions]
+        .filter(s => new Date(s.date + 'T' + (s.startTime || '00:00')) >= now)
+        .sort((a, b) => new Date(a.date + 'T' + (a.startTime || '00:00')) - new Date(b.date + 'T' + (b.startTime || '00:00')));
+      if (upcomingSoon.length) {
+        const next = upcomingSoon[0];
+        const names = next.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+        document.getElementById('focusNextSession').textContent = names;
+        document.getElementById('focusNextSessionMeta').textContent = `${next.subject} • ${next.date} ${next.startTime || ''}`;
+      } else {
+        document.getElementById('focusNextSession').textContent = 'No sessions planned';
+        document.getElementById('focusNextSessionMeta').textContent = '';
+      }
+
+      const homeworkDueSoon = state.homework.filter(hw => {
+        if (hw.status === 'Completed') return false;
+        if (!hw.dueDate) return false;
+        const due = new Date(hw.dueDate);
+        const fiveDays = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
+        return due >= today && due <= fiveDays;
+      });
+      document.getElementById('focusHomework').textContent = homeworkDueSoon.length;
+      document.getElementById('focusInvoices').textContent = overdueCount;
 
       const hours = { Physics: 0, Chemistry: 0, Maths: 0 };
       state.sessions.forEach(s => {
@@ -969,6 +1288,60 @@
             </li>`;
         }).join('');
       }
+
+      const atRiskList = document.getElementById('atRiskList');
+      const atRisk = state.students
+        .map(s => {
+          const last = getLastSessionDate(s.id);
+          const daysSince = last ? Math.floor((now - last) / (1000 * 60 * 60 * 24)) : 999;
+          return { student: s, daysSince };
+        })
+        .filter(item => item.daysSince >= 21)
+        .sort((a, b) => b.daysSince - a.daysSince)
+        .slice(0, 6);
+      if (!atRisk.length) {
+        atRiskList.innerHTML = '<li class="text-slate-500">All students taught in the last 21 days.</li>';
+      } else {
+        atRiskList.innerHTML = atRisk.map(item => `
+          <li class="border border-amber-200 bg-amber-50 rounded-lg px-2 py-1">
+            <div class="font-medium">${item.student.name}</div>
+            <div class="text-[10px] text-slate-600">${item.daysSince} days since last session</div>
+          </li>
+        `).join('');
+      }
+
+      const dueList = document.getElementById('dueHomeworkList');
+      if (!homeworkDueSoon.length) {
+        dueList.innerHTML = '<li class="text-slate-500">Nothing due soon.</li>';
+      } else {
+        dueList.innerHTML = homeworkDueSoon.slice(0, 6).map(hw => {
+          const res = getResourceById(hw.resourceId);
+          const stu = getStudentById(hw.studentId);
+          return `<li class="border border-slate-200 bg-white/80 rounded-lg px-2 py-1">
+            <div class="font-medium">${res?.title || 'Homework'}</div>
+            <div class="text-[10px] text-slate-500">${stu?.name || ''} • Due ${hw.dueDate}</div>
+          </li>`;
+        }).join('');
+      }
+
+      const prepQueue = document.getElementById('prepQueueList');
+      const prepItems = upcomingSoon.slice(0, 3);
+      if (!prepItems.length) {
+        prepQueue.innerHTML = '<li class="text-slate-500">No prep needed right now.</li>';
+      } else {
+        prepQueue.innerHTML = prepItems.map(sess => {
+          const names = sess.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+          return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80 flex justify-between items-center">
+            <div>
+              <div class="font-medium">${names}</div>
+              <div class="text-[10px] text-slate-500">${sess.date} • ${sess.startTime || ''} • ${sess.subject}</div>
+              <div class="text-[10px]">${sess.topic || 'Lesson focus'}</div>
+            </div>
+            <button class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
+                    onclick="openSessionQuickActions('${sess.id}')">Open</button>
+          </li>`;
+        }).join('');
+      }
     }
 
     /****************
@@ -978,15 +1351,37 @@
 
     function renderStudentsView() {
       const list = document.getElementById('studentsList');
-      if (!state.students.length) {
-        list.innerHTML = '<li class="text-slate-500 text-xs">No students yet. Click “Add student” to get started.</li>';
+      const subjectSelect = document.getElementById('studentSubjectFilter');
+      const activitySelect = document.getElementById('studentActivityFilter');
+      if (subjectSelect) subjectSelect.onchange = renderStudentsView;
+      if (activitySelect) activitySelect.onchange = renderStudentsView;
+
+      const subjectFilter = subjectSelect?.value || '';
+      const activityFilter = activitySelect?.value || '';
+      const now = new Date();
+
+      const filtered = state.students.filter(s => {
+        if (subjectFilter && !(s.subjects || []).includes(subjectFilter)) return false;
+        const last = getLastSessionDate(s.id);
+        const daysSince = last ? (now - last) / (1000 * 60 * 60 * 24) : Infinity;
+        if (activityFilter === 'active' && daysSince > 14) return false;
+        if (activityFilter === 'quiet' && daysSince <= 14) return false;
+        return true;
+      });
+
+      if (!filtered.length) {
+        list.innerHTML = '<li class="text-slate-500 text-xs">No students match this filter.</li>';
       } else {
-        list.innerHTML = state.students.map(s => {
+        list.innerHTML = filtered.map(s => {
           const hours = getStudentSubjectHours(s.id);
           const total = hours.Physics + hours.Chemistry + hours.Maths || 1;
           const pPhysics = (hours.Physics / total * 100).toFixed(0);
           const pChem = (hours.Chemistry / total * 100).toFixed(0);
           const pMath = (hours.Maths / total * 100).toFixed(0);
+          const last = getLastSessionDate(s.id);
+          const daysSince = last ? Math.floor((now - last) / (1000 * 60 * 60 * 24)) : null;
+          const next = getNextSessionForStudent(s.id);
+          const nextLabel = next ? `${next.date} ${next.startTime || ''}` : 'Unscheduled';
           return `<li class="border border-slate-200 bg-white/85 rounded-xl px-3 py-2 cursor-pointer hover:bg-slate-50 flex flex-col gap-1"
                      data-student-id="${s.id}">
               <div class="flex items-center justify-between">
@@ -995,6 +1390,10 @@
                   <div class="text-[10px] text-slate-500">${s.gradeLevel || ''}</div>
                 </div>
                 <div class="text-[11px] text-slate-600 text-right">${s.subjects?.join(', ') || ''}</div>
+              </div>
+              <div class="flex items-center justify-between text-[10px] text-slate-500">
+                <span>${daysSince != null ? `${daysSince}d since last` : 'No sessions yet'}</span>
+                <span>${nextLabel}</span>
               </div>
               <div class="mt-1 w-full h-1.5 rounded-full bg-slate-100 overflow-hidden flex">
                 <div style="width:${pPhysics}%" class="bg-indigo-500"></div>
@@ -1039,6 +1438,51 @@
       return res;
     }
 
+    function getLastSessionDate(studentId) {
+      const sessions = state.sessions
+        .filter(sess => sess.studentIds.includes(studentId))
+        .map(sess => new Date(sess.date))
+        .sort((a, b) => b - a);
+      return sessions[0] || null;
+    }
+
+    function getNextSessionForStudent(studentId) {
+      const now = new Date();
+      const sessions = state.sessions
+        .filter(sess => sess.studentIds.includes(studentId))
+        .sort((a, b) => new Date(a.date + 'T' + (a.startTime || '00:00')) - new Date(b.date + 'T' + (b.startTime || '00:00')));
+      return sessions.find(sess => new Date(sess.date + 'T' + (sess.startTime || '00:00')) >= now) || null;
+    }
+
+    function getStudentHomeworkStats(studentId) {
+      const items = state.homework.filter(hw => hw.studentId === studentId);
+      const total = items.length;
+      const completed = items.filter(hw => hw.status === 'Completed').length;
+      return { total, completed, rate: total ? Math.round((completed / total) * 100) : 0 };
+    }
+
+    function getWeeklyStreak(studentId) {
+      let streak = 0;
+      const today = new Date();
+      let cursor = getMonday(today);
+      while (true) {
+        const end = new Date(cursor);
+        end.setDate(end.getDate() + 7);
+        const hasSession = state.sessions.some(sess => {
+          if (!sess.studentIds.includes(studentId)) return false;
+          const d = new Date(sess.date);
+          return d >= cursor && d < end;
+        });
+        if (hasSession) {
+          streak++;
+          cursor.setDate(cursor.getDate() - 7);
+        } else {
+          break;
+        }
+      }
+      return streak;
+    }
+
     function selectStudent(id) {
       selectedStudentId = id;
       showStudentDetail(id);
@@ -1070,10 +1514,25 @@
       chemEl.textContent = pChem > 15 ? pChem + '%' : '';
       mathEl.textContent = pMath > 15 ? pMath + '%' : '';
 
+      const totalHours = (hours.Physics + hours.Chemistry + hours.Maths).toFixed(1);
+      document.getElementById('engagementHours').textContent = totalHours + 'h';
+      const streak = getWeeklyStreak(id);
+      document.getElementById('engagementStreak').textContent = streak;
+      const last = getLastSessionDate(id);
+      document.getElementById('engagementNextGap').textContent = last
+        ? `${Math.floor((new Date() - last) / (1000 * 60 * 60 * 24))} days since last`
+        : 'No sessions yet';
+      const hwStats = getStudentHomeworkStats(id);
+      document.getElementById('engagementHomework').textContent = `${hwStats.rate}%`;
+      document.getElementById('engagementHomeworkProgress').style.width = `${hwStats.rate}%`;
+
       renderStudentTimeline(id);
       renderStudentSessions(id);
       renderStudentDocuments(id);
       renderStudentFinance(id);
+      renderStudentTodos(id);
+      renderStudentCheckins(id);
+      renderStudentContracts(id);
 
       document.getElementById('editStudentBtn').onclick = () => openStudentModal(s);
       document.getElementById('studentCreateInvoiceBtn').onclick = () => openInvoiceModal(null);
@@ -1103,6 +1562,47 @@
       });
 
       document.getElementById('addDocumentForStudentBtn').onclick = () => openDocumentModal(null, s.id);
+      const todoForm = document.getElementById('studentTodoForm');
+      if (todoForm) {
+        todoForm.onsubmit = (e) => {
+          e.preventDefault();
+          const text = todoForm.todoText.value.trim();
+          const dueDate = todoForm.todoDue.value;
+          if (!text) return;
+          state.studentTodos.push({
+            id: generateId('todo'),
+            studentId: id,
+            text,
+            dueDate,
+            done: false
+          });
+          saveState();
+          renderStudentTodos(id);
+          todoForm.reset();
+        };
+      }
+      const checkinForm = document.getElementById('studentCheckinForm');
+      if (checkinForm) {
+        checkinForm.onsubmit = (e) => {
+          e.preventDefault();
+          const text = checkinForm.checkinText.value.trim();
+          if (!text) return;
+          state.studentCheckins.push({
+            id: generateId('note'),
+            studentId: id,
+            text,
+            date: new Date().toISOString().slice(0, 10)
+          });
+          saveState();
+          renderStudentCheckins(id);
+          renderStudentTimeline(id);
+          checkinForm.reset();
+        };
+      }
+      const contractBtn = document.getElementById('uploadContractBtn');
+      if (contractBtn) {
+        contractBtn.onclick = () => openContractUpload(id);
+      }
     }
 
     function renderStudentTimeline(studentId) {
@@ -1140,6 +1640,22 @@
           date: doc.date || doc.createdAt || new Date().toISOString().slice(0,10),
           type: 'Document',
           description: `${doc.title} [${doc.status}]`
+        });
+      });
+
+      state.studentCheckins.filter(note => note.studentId === studentId).forEach(note => {
+        events.push({
+          date: note.date || new Date().toISOString().slice(0,10),
+          type: 'Check-in',
+          description: note.text
+        });
+      });
+
+      state.contracts.filter(c => c.studentId === studentId).forEach(c => {
+        events.push({
+          date: c.uploadedAt || new Date().toISOString().slice(0,10),
+          type: 'Contract',
+          description: `${c.fileName || 'Contract'} [${c.status || 'Pending'}]`
         });
       });
 
@@ -1228,6 +1744,8 @@
               Issued ${inv.issueDate} • Due ${inv.dueDate || '—'}
               • Total R ${Number(inv.total || 0).toFixed(2)}
               • ${inv.paid ? 'Paid' : 'Unpaid'}
+              ${inv.lateApplied && inv.lateFeePercent ? ` • Late fee ${inv.lateFeePercent}%` : ''}
+              ${inv.shortApplied && inv.shortNoticePercent ? ` • Short notice ${inv.shortNoticePercent}%` : ''}
             </div>
           </div>
           <button class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
@@ -1236,6 +1754,157 @@
           </button>
         </li>
       `).join('');
+    }
+
+    function renderStudentTodos(studentId) {
+      const list = document.getElementById('studentTodosList');
+      if (!list) return;
+      const todos = state.studentTodos.filter(t => t.studentId === studentId);
+      if (!todos.length) {
+        list.innerHTML = '<li class="text-slate-500">No follow-ups yet.</li>';
+        return;
+      }
+      list.innerHTML = todos.map(t => `
+        <li class="border border-slate-200 rounded-lg px-2 py-1 flex justify-between items-center bg-white/80">
+          <div>
+            <div class="${t.done ? 'line-through text-slate-400' : ''}">${t.text}</div>
+            <div class="text-[10px] text-slate-500">${t.dueDate ? 'Due ' + t.dueDate : 'No due date'}</div>
+          </div>
+          <div class="flex gap-1">
+            <button class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300"
+                    onclick="toggleTodoStatus('${t.id}')">${t.done ? 'Undo' : 'Done'}</button>
+            <button class="text-[10px] px-2 py-0.5 rounded-lg border border-rose-200 text-rose-600"
+                    onclick="deleteTodo('${t.id}')">✕</button>
+          </div>
+        </li>
+      `).join('');
+    }
+
+    function toggleTodoStatus(todoId) {
+      const todo = state.studentTodos.find(t => t.id === todoId);
+      if (!todo) return;
+      todo.done = !todo.done;
+      saveState();
+      if (selectedStudentId) renderStudentTodos(selectedStudentId);
+    }
+
+    function deleteTodo(todoId) {
+      state.studentTodos = state.studentTodos.filter(t => t.id !== todoId);
+      saveState();
+      if (selectedStudentId) renderStudentTodos(selectedStudentId);
+    }
+
+    function renderStudentContracts(studentId) {
+      const list = document.getElementById('studentContractsList');
+      if (!list) return;
+      const contracts = state.contracts
+        .filter(c => c.studentId === studentId)
+        .sort((a, b) => new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0));
+      if (!contracts.length) {
+        list.innerHTML = '<li class="text-slate-500">No contracts uploaded yet.</li>';
+        return;
+      }
+      list.innerHTML = contracts.map(c => `
+        <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80 flex justify-between items-center">
+          <div>
+            <div class="font-medium flex items-center gap-1">${c.fileName || 'Contract'} <span class="text-[10px] px-2 py-0.5 rounded-full ${c.status === 'Signed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${c.status || 'Pending'}</span></div>
+            <div class="text-[10px] text-slate-500">Uploaded ${c.uploadedAt || ''}</div>
+          </div>
+          <div class="flex gap-1">
+            ${c.dataUrl ? `<a class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" href="${c.dataUrl}" download="${c.fileName || 'contract'}" target="_blank">Open</a>` : ''}
+            <button class="text-[10px] px-2 py-0.5 rounded-lg border border-emerald-300 text-emerald-700"
+                    onclick="markContractStatus('${c.id}', '${c.status === 'Signed' ? 'Pending' : 'Signed'}')">
+              ${c.status === 'Signed' ? 'Mark pending' : 'Mark signed'}
+            </button>
+          </div>
+        </li>
+      `).join('');
+    }
+
+    function renderStudentCheckins(studentId) {
+      const list = document.getElementById('studentCheckinsList');
+      if (!list) return;
+      const notes = state.studentCheckins
+        .filter(n => n.studentId === studentId)
+        .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+      if (!notes.length) {
+        list.innerHTML = '<li class="text-slate-500">No check-ins yet.</li>';
+        return;
+      }
+      list.innerHTML = notes.map(n => `
+        <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
+          <div class="text-[10px] text-slate-500">${n.date}</div>
+          <div>${n.text}</div>
+        </li>
+      `).join('');
+    }
+
+    function openContractUpload(studentId) {
+      const student = getStudentById(studentId);
+      if (!student) return;
+      const html = `
+        <h2 class="text-sm font-semibold mb-3">Upload contract for ${student.name}</h2>
+        <form id="contractForm" class="space-y-2">
+          <div>
+            <label class="block text-[11px] mb-1">Contract file (PDF or image)</label>
+            <input type="file" name="file" accept=".pdf,image/*" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Status</label>
+            <select name="status" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+              <option value="Pending">Pending</option>
+              <option value="Signed">Signed</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Notes</label>
+            <textarea name="notes" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]" placeholder="Optional notes"></textarea>
+          </div>
+          <button type="submit" class="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium">Upload</button>
+        </form>
+        <p class="hint mt-2">Files are stored locally in your browser via base64; keep scans small to avoid storage limits.</p>
+      `;
+      openModal(html, () => {
+        const form = document.getElementById('contractForm');
+        form.onsubmit = (e) => {
+          e.preventDefault();
+          const file = form.file.files[0];
+          const status = form.status.value;
+          const notes = form.notes.value.trim();
+          if (!file) {
+            alert('Select a PDF or image file.');
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = () => {
+            state.contracts.push({
+              id: generateId('contract'),
+              studentId,
+              fileName: file.name,
+              dataUrl: reader.result,
+              status,
+              notes,
+              uploadedAt: new Date().toISOString().slice(0,10)
+            });
+            saveState();
+            closeModal();
+            renderStudentContracts(studentId);
+            renderStudentTimeline(studentId);
+          };
+          reader.readAsDataURL(file);
+        };
+      });
+    }
+
+    function markContractStatus(contractId, status) {
+      const c = state.contracts.find(ct => ct.id === contractId);
+      if (!c) return;
+      c.status = status;
+      saveState();
+      if (selectedStudentId) {
+        renderStudentContracts(selectedStudentId);
+        renderStudentTimeline(selectedStudentId);
+      }
     }
 
     /**************
@@ -1259,12 +1928,16 @@
       label.textContent = `${currentWeekStart.toISOString().slice(0,10)} – ${end.toISOString().slice(0,10)}`;
 
       const grid = document.getElementById('scheduleCalendarGrid');
+      const dayLoadRow = document.getElementById('dayLoadRow');
+      const dayLoads = [];
       grid.innerHTML = '';
       for (let i = 0; i < 7; i++) {
         const day = new Date(currentWeekStart);
         day.setDate(day.getDate() + i);
         const isoDate = day.toISOString().slice(0,10);
         const sessions = state.sessions.filter(s => s.date === isoDate);
+        const totalHours = sessions.reduce((acc, s) => acc + Number(s.durationHours || 0), 0);
+        dayLoads.push({ totalHours, dayName: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i] });
         const dayName = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i];
         grid.innerHTML += `
           <div class="calendar-day" data-date="${isoDate}">
@@ -1290,6 +1963,19 @@
             </div>
           </div>
         `;
+      }
+      if (dayLoadRow) {
+        const maxLoad = Math.max(...dayLoads.map(d => d.totalHours), 1);
+        dayLoadRow.innerHTML = dayLoads.map(dl => {
+          const pct = maxLoad ? Math.min(100, (dl.totalHours / maxLoad) * 100) : 0;
+          return `<div class="flex flex-col gap-1">
+            <div class="text-[10px] font-semibold">${dl.dayName}</div>
+            <div class="w-full bg-slate-100 rounded-full h-2">
+              <div class="h-2 rounded-full bg-indigo-500" style="width:${pct}%"></div>
+            </div>
+            <div class="text-[10px] text-slate-500">${dl.totalHours.toFixed(1)}h</div>
+          </div>`;
+        }).join('');
       }
 
       document.getElementById('schedulePrevWeek').onclick = () => {
@@ -1328,6 +2014,7 @@
       }
 
       renderClashes();
+      renderTightTransitions();
     }
 
     function renderClashes() {
@@ -1362,6 +2049,39 @@
             ${c.a.subject} – ${c.a.topic || 'Lesson'} <br>
             ${c.b.subject} – ${c.b.topic || 'Lesson'}
           </div>
+        </li>`;
+      }).join('');
+    }
+
+    function renderTightTransitions() {
+      const list = document.getElementById('tightTransitionsList');
+      const byDate = {};
+      state.sessions.forEach(s => {
+        if (!byDate[s.date]) byDate[s.date] = [];
+        byDate[s.date].push(s);
+      });
+      const tight = [];
+      Object.keys(byDate).forEach(date => {
+        const sessions = byDate[date].sort((a, b) => (a.startTime || '00:00').localeCompare(b.startTime || '00:00'));
+        for (let i = 0; i < sessions.length - 1; i++) {
+          const currentEnd = timeToMinutes(sessions[i].startTime || '00:00') + Number(sessions[i].durationHours || 1) * 60;
+          const nextStart = timeToMinutes(sessions[i+1].startTime || '00:00');
+          const gap = nextStart - currentEnd;
+          if (gap >= 0 && gap < 20) {
+            tight.push({ a: sessions[i], b: sessions[i+1], gap, date });
+          }
+        }
+      });
+      if (!tight.length) {
+        list.innerHTML = '<li class="text-slate-500">No tight transitions.</li>';
+        return;
+      }
+      list.innerHTML = tight.slice(0, 6).map(item => {
+        const aNames = item.a.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+        const bNames = item.b.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+        return `<li class="border border-amber-200 bg-amber-50 rounded-lg px-2 py-1">
+          <div class="font-medium">${item.gap} min gap</div>
+          <div class="text-[10px]">${item.date}: ${item.a.startTime || ''} ${aNames} → ${item.b.startTime || ''} ${bNames}</div>
         </li>`;
       }).join('');
     }
@@ -1414,33 +2134,68 @@
       const list = document.getElementById('resourcesList');
       const subjectFilter = document.getElementById('resourceSubjectFilter').value;
       const searchTerm = document.getElementById('resourceSearchInput').value.trim().toLowerCase();
+      const tagFiltersEl = document.getElementById('resourceTagFilters');
+      const activeTag = tagFiltersEl?.dataset.active || '';
+
+      const tagCounts = {};
+      state.resources.forEach(r => {
+        (r.tags || []).forEach(tag => {
+          const key = tag.trim();
+          if (!key) return;
+          tagCounts[key] = (tagCounts[key] || 0) + 1;
+        });
+      });
+      const topTags = Object.entries(tagCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8);
+      if (tagFiltersEl) {
+        tagFiltersEl.innerHTML = (topTags.length ? topTags.map(([tag, count]) => `
+          <button class="chip-btn ${activeTag === tag.toLowerCase() ? 'active' : ''}" data-tag="${tag}">#${tag} (${count})</button>
+        `).join('') : '<span class="text-slate-500">Tags will appear after you add resources.</span>')
+          + (activeTag ? ' <button class="chip-btn" data-tag="">Clear</button>' : '');
+        tagFiltersEl.querySelectorAll('button[data-tag]').forEach(btn => {
+          btn.onclick = () => {
+            tagFiltersEl.dataset.active = (btn.dataset.tag || '').toLowerCase();
+            renderResourcesView();
+          };
+        });
+      }
+
       const filtered = state.resources.filter(r => {
         if (subjectFilter && r.subject !== subjectFilter) return false;
         if (searchTerm && !r.title.toLowerCase().includes(searchTerm) && !(r.tags || []).some(t => t.toLowerCase().includes(searchTerm))) {
           return false;
         }
+        if (activeTag && !(r.tags || []).some(t => t.toLowerCase() === activeTag)) return false;
         return true;
-      });
+      }).sort((a, b) => (b.favorite === true) - (a.favorite === true));
       if (!filtered.length) {
         list.innerHTML = '<li class="text-slate-500 text-xs">No resources yet. Add worksheets, lectures, or notes.</li>';
       } else {
         list.innerHTML = filtered.map(r => `
           <li class="border border-slate-200 rounded-xl px-3 py-2 bg-white/85">
-            <div class="flex justify-between items-center">
+            <div class="flex justify-between items-start gap-2">
               <div>
                 <div class="font-semibold">${r.title}</div>
                 <div class="text-[10px] text-slate-500">${r.subject} • ${r.level || ''}</div>
               </div>
-              <button class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
-                      onclick="openResourceModal(getResourceById('${r.id}'))">
-                Edit
-              </button>
+              <div class="flex items-center gap-1">
+                <button class="text-[12px]" title="Favorite"
+                        onclick="toggleResourceFavorite('${r.id}')">${r.favorite ? '⭐' : '☆'}</button>
+                <button class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
+                        onclick="openResourceModal(getResourceById('${r.id}'))">
+                  Edit
+                </button>
+              </div>
             </div>
             <div class="mt-1 text-[10px]">${r.description || ''}</div>
             <div class="mt-1 flex flex-wrap">
               ${(r.tags || []).map(tag => `<span class="tag-pill">#${tag}</span>`).join('')}
             </div>
-            <div class="mt-2 flex gap-2 text-[11px]">
+            <div class="mt-1 text-[10px] text-slate-500">
+              ${getResourceUsageText(r.id)}
+            </div>
+            <div class="mt-2 flex gap-2 text-[11px] flex-wrap">
               <button class="px-2 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
                       onclick="openAssignResourceModal('${r.id}')">
                 Assign to student(s)
@@ -1458,6 +2213,24 @@
 
     function getResourceById(id) {
       return state.resources.find(r => r.id === id);
+    }
+
+    function getResourceUsageText(resourceId) {
+      const assignments = state.homework.filter(hw => hw.resourceId === resourceId);
+      if (!assignments.length) return 'Not assigned yet.';
+      const last = assignments
+        .map(a => a.dueDate || a.assignedDate)
+        .filter(Boolean)
+        .sort((a, b) => new Date(b) - new Date(a))[0];
+      return `Assigned ${assignments.length}× • Last due ${last || 'n/a'}`;
+    }
+
+    function toggleResourceFavorite(resourceId) {
+      const res = getResourceById(resourceId);
+      if (!res) return;
+      res.favorite = !res.favorite;
+      saveState();
+      renderResourcesView();
     }
 
     function renderHomeworkBoard() {
@@ -1560,6 +2333,7 @@
               <div>
                 <div class="font-medium">${studentName}</div>
                 <div class="text-[10px]">Invoice ${inv.id} • Due ${inv.dueDate} • R ${Number(inv.total || 0).toFixed(2)}</div>
+                ${(inv.lateApplied && inv.lateFeePercent) || (inv.shortApplied && inv.shortNoticePercent) ? `<div class="text-[10px]">Fees: ${inv.lateApplied && inv.lateFeePercent ? 'Late ' + inv.lateFeePercent + '%' : ''} ${inv.shortApplied && inv.shortNoticePercent ? 'Short ' + inv.shortNoticePercent + '%' : ''}</div>` : ''}
               </div>
               <div class="flex flex-col gap-1">
                 <button class="text-[10px] px-2 py-0.5 rounded-lg border border-rose-300 bg-rose-100"
@@ -1574,6 +2348,63 @@
             </div>
           </li>`;
         }).join('');
+      }
+
+      const unbilledList = document.getElementById('unbilledList');
+      if (unbilledList) {
+        const unbilled = state.students.map(s => {
+          const invs = state.invoices.filter(inv => inv.studentId === s.id);
+          const lastInvoiceDate = invs.length
+            ? new Date(Math.max(...invs.map(inv => new Date(inv.issueDate || inv.dueDate || 0))))
+            : new Date(0);
+          const sessionsAfter = state.sessions.filter(sess => sess.studentIds.includes(s.id) && new Date(sess.date) > lastInvoiceDate);
+          const hours = sessionsAfter.reduce((acc, sess) => acc + Number(sess.durationHours || 0), 0);
+          const amount = hours * (Number(s.rate) || 0);
+          return { student: s, hours, amount, lastInvoiceDate: lastInvoiceDate.getFullYear() > 1970 ? lastInvoiceDate.toISOString().slice(0,10) : 'No invoices yet' };
+        }).filter(item => item.hours > 0.01)
+          .sort((a, b) => b.amount - a.amount)
+          .slice(0, 6);
+        if (!unbilled.length) {
+          unbilledList.innerHTML = '<li class="text-slate-500">No unbilled sessions detected.</li>';
+        } else {
+          unbilledList.innerHTML = unbilled.map(item => `
+            <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80 flex justify-between items-center">
+              <div>
+                <div class="font-medium">${item.student.name}</div>
+                <div class="text-[10px] text-slate-500">${item.hours.toFixed(1)}h since ${item.lastInvoiceDate}</div>
+              </div>
+              <div class="text-right text-[11px] font-semibold">R ${item.amount.toFixed(0)}</div>
+            </li>
+          `).join('');
+        }
+      }
+
+      const forecastList = document.getElementById('forecastList');
+      const forecastSummary = document.getElementById('forecastSummary');
+      if (forecastList && forecastSummary) {
+        const soonCutoff = new Date();
+        soonCutoff.setDate(soonCutoff.getDate() + 14);
+        const overdueInvoices = state.invoices.filter(inv => !inv.paid && inv.dueDate && new Date(inv.dueDate) < today);
+        const dueSoon = state.invoices
+          .filter(inv => !inv.paid && inv.dueDate && new Date(inv.dueDate) >= today && new Date(inv.dueDate) <= soonCutoff)
+          .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+        const overdueTotal = overdueInvoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
+        const dueSoonTotal = dueSoon.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
+        forecastSummary.textContent = `R ${dueSoonTotal.toFixed(0)} due in 14 days • R ${overdueTotal.toFixed(0)} overdue`;
+        if (!dueSoon.length) {
+          forecastList.innerHTML = '<li class="text-slate-500">No invoices due in the next 14 days.</li>';
+        } else {
+          forecastList.innerHTML = dueSoon.map(inv => {
+            const s = getStudentById(inv.studentId);
+            return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80 flex justify-between items-center">
+              <div>
+                <div class="font-medium">${s?.name || 'Unknown'}</div>
+                <div class="text-[10px] text-slate-500">Invoice ${inv.id} • Due ${inv.dueDate}</div>
+              </div>
+              <div class="text-right text-[11px] font-semibold">R ${Number(inv.total || 0).toFixed(0)}</div>
+            </li>`;
+          }).join('');
+        }
       }
     }
 
@@ -1760,7 +2591,7 @@ Best regards,
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-[11px] mb-1">Duration (hours)</label>
-              <input type="number" step="0.25" name="durationHours" value="${session?.durationHours || 1}"
+              <input type="number" step="0.25" name="durationHours" value="${(session?.durationHours ?? state.settings.defaultSessionDuration) || 1}"
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
             </div>
             <div>
@@ -2174,9 +3005,45 @@ Best regards,
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
             </div>
             <div>
+              <label class="block text-[11px] mb-1">Base amount (R)</label>
+              <input type="number" step="0.01" name="baseAmount" value="${inv?.baseAmount ?? inv?.total ?? ''}"
+                     class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] mb-1">Late fee %</label>
+              <div class="flex items-center gap-2">
+                <select name="lateFeePercent" class="flex-1 border border-slate-300 rounded-lg px-2 py-1 text-xs">
+                  ${[0,5,10,15,20].map(p => `<option value="${p}" ${inv?.lateFeePercent === p ? 'selected' : ''}>${p}%</option>`).join('')}
+                </select>
+                <label class="flex items-center gap-1 text-[10px]">
+                  <input type="checkbox" name="applyLate" ${inv?.lateApplied ? 'checked' : ''}>
+                  <span>Apply</span>
+                </label>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[11px] mb-1">Short notice %</label>
+              <div class="flex items-center gap-2">
+                <select name="shortNoticePercent" class="flex-1 border border-slate-300 rounded-lg px-2 py-1 text-xs">
+                  ${[0,5,10,15].map(p => `<option value="${p}" ${inv?.shortNoticePercent === p ? 'selected' : ''}>${p}%</option>`).join('')}
+                </select>
+                <label class="flex items-center gap-1 text-[10px]">
+                  <input type="checkbox" name="applyShort" ${inv?.shortApplied ? 'checked' : ''}>
+                  <span>Apply</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
               <label class="block text-[11px] mb-1">Total amount (R)</label>
               <input type="number" step="0.01" name="total" value="${inv?.total || ''}"
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            </div>
+            <div class="flex items-end">
+              <div class="text-[10px] text-slate-500">Computed with fees: <span id="computedTotal">R 0.00</span></div>
             </div>
           </div>
           <div class="flex items-center gap-1 mt-1">
@@ -2188,7 +3055,7 @@ Best regards,
             <textarea name="notes" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${inv?.notes || ''}</textarea>
           </div>
           <p class="text-[10px] text-slate-500">
-            Tip: you can calculate total by multiplying hours × rate for all sessions since last invoice.
+            Tip: set a base amount, tick “Apply” on late/short notice fees, and we’ll recalc the total automatically.
           </p>
           <div class="flex justify-between items-center mt-3">
             <button type="submit" class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-medium">
@@ -2204,6 +3071,29 @@ Best regards,
       `;
       openModal(html, () => {
         const form = document.getElementById('invoiceForm');
+
+        function computeTotalFromFees() {
+          const base = Number(form.baseAmount.value || form.total.value || 0);
+          const latePct = form.applyLate.checked ? Number(form.lateFeePercent.value || 0) : 0;
+          const shortPct = form.applyShort.checked ? Number(form.shortNoticePercent.value || 0) : 0;
+          const total = base * (1 + latePct/100 + shortPct/100);
+          if (base > 0) {
+            form.total.value = total.toFixed(2);
+            const display = document.getElementById('computedTotal');
+            if (display) display.textContent = 'R ' + total.toFixed(2);
+          }
+        }
+
+        ['baseAmount','lateFeePercent','shortNoticePercent'].forEach(name => {
+          const el = form[name];
+          if (el) el.addEventListener('input', computeTotalFromFees);
+        });
+        ['applyLate','applyShort'].forEach(name => {
+          const el = form[name];
+          if (el) el.addEventListener('change', computeTotalFromFees);
+        });
+        computeTotalFromFees();
+
         form.onsubmit = (e) => {
           e.preventDefault();
           const newInv = {
@@ -2212,6 +3102,11 @@ Best regards,
             issueDate: form.issueDate.value,
             dueDate: form.dueDate.value,
             total: Number(form.total.value || 0),
+            baseAmount: Number(form.baseAmount.value || 0),
+            lateFeePercent: Number(form.lateFeePercent.value || 0),
+            shortNoticePercent: Number(form.shortNoticePercent.value || 0),
+            lateApplied: form.applyLate.checked,
+            shortApplied: form.applyShort.checked,
             paid: form.paid.checked,
             notes: form.notes.value.trim()
           };
