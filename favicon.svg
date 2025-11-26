@@ -1,11 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0%" stop-color="#4f46e5"/>
-      <stop offset="100%" stop-color="#0ea5e9"/>
-    </linearGradient>
-  </defs>
-  <rect x="2" y="2" width="60" height="60" rx="12" fill="#f8fafc" stroke="#3b82f6" stroke-width="3"/>
-  <path d="M18 18h28v6H34v22h-6V24H18z" fill="url(#g)"/>
-  <circle cx="46" cy="42" r="6" fill="#f97316"/>
+<svg width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Tutoring dashboard icon" xmlns="http://www.w3.org/2000/svg">
+  <!-- Soft colored rounded-square background -->
+  <rect x="6" y="6" width="52" height="52" rx="18" fill="#E0F2FE"/>
+
+  <!-- Inner white card (dashboard panel) -->
+  <rect x="14" y="16" width="36" height="32" rx="12" fill="#FFFFFF" stroke="#BFDBFE" stroke-width="2"/>
+
+  <!-- Small progress badge -->
+  <circle cx="22" cy="24" r="4.2" fill="#ECFDF5" stroke="#6EE7B7" stroke-width="1.4"/>
+  <path d="M20.8 24 L21.9 25.3 L23.5 22.8"
+        fill="none"
+        stroke="#10B981"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <!-- Baseline -->
+  <rect x="24" y="38" width="22" height="2.4" rx="1.2" fill="#E5E7EB"/>
+
+  <!-- Three bars -->
+  <rect x="25.5" y="31" width="5" height="7" rx="2.5" fill="#3B82F6"/>
+  <rect x="31.5" y="28" width="5" height="10" rx="2.5" fill="#2563EB"/>
+  <rect x="37.5" y="24" width="5" height="14" rx="2.5" fill="#1D4ED8"/>
 </svg>
