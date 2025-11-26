@@ -1508,9 +1508,10 @@
         }
         el.classList.toggle('owner-locked', readOnlyMode);
       });
-      // If student mode and only one student in state, auto-select it
-      if (readOnlyMode && state.students.length === 1) {
-        selectStudent(state.students[0].id);
+      // In student mode, auto-select the first available student so they land on their profile
+      if (readOnlyMode && state.students.length) {
+        const first = state.students[0];
+        selectStudent(first.id);
       }
     }
 
