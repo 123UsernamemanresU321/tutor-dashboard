@@ -1219,18 +1219,33 @@
       });
       await upsertAndPrune('sessions', sessions, 'id');
 
-      const sessionStudents = state.sessions.flatMap(sess =>
-        (sess.studentIds || []).map(stuId => ({
-          session_id: cleanId(sess.id),
-          student_id: cleanId(stuId),
-          user_id: uid
-        }))
-      );
-      // replace join table entirely for simplicity
-      await supabaseClient.from('session_students').delete().eq('user_id', uid);
-      if (sessionStudents.length) {
-        const { error } = await supabaseClient.from('session_students').insert(sessionStudents);
-        if (error) throw error;
+      const sessionStudents = [];
+      const pairSeen = new Set();
+      state.sessions.forEach(sess => {
+        const sId = cleanId(sess.id);
+        if (!sId || !(sess.studentIds || []).length) return;
+        (sess.studentIds || []).forEach(stuId => {
+          const stuClean = cleanId(stuId);
+          if (!stuClean) return;
+          const key = `${sId}|${stuClean}`;
+          if (pairSeen.has(key)) return; // prevent duplicate PK conflicts
+          pairSeen.add(key);
+          sessionStudents.push({
+            session_id: sId,
+            student_id: stuClean,
+            user_id: uid
+          });
+        });
+      });
+      // replace join table entirely for simplicity; swallow conflicts so the rest of the sync still runs
+      try {
+        await supabaseClient.from('session_students').delete().eq('user_id', uid);
+        if (sessionStudents.length) {
+          const { error } = await supabaseClient.from('session_students').insert(sessionStudents);
+          if (error) console.error('session_students insert failed', error);
+        }
+      } catch (err) {
+        console.error('session_students sync failed', err);
       }
 
       const resources = state.resources.map(r => ({
@@ -1653,6 +1668,7 @@
           studentIds
         };
       });
+      const sessionsWithStudents = sessions.filter(s => (s.studentIds || []).length > 0);
 
       // Fetch signed URLs for contracts if storage_path exists
       const contracts = await Promise.all(
@@ -1695,7 +1711,7 @@
         studentEmail: s.student_email || '',
         createdAt: s.created_at
       }));
-      merged.sessions = sessions;
+      merged.sessions = sessionsWithStudents;
       const resources = await Promise.all(
         (resourcesRes.data || []).map(async r => {
           let signedUrl = '';
@@ -3643,7 +3659,13 @@ Best regards,
       const ext = file.name.includes('.') ? file.name.split('.').pop() : 'bin';
       const path = `resources/${uid}/${generateId('file')}.${ext}`;
       const { error: uploadErr } = await supabaseClient.storage.from('resources').upload(path, file, { upsert: false });
-      if (uploadErr) throw uploadErr;
+      if (uploadErr) {
+        const msg = uploadErr?.message || '';
+        if (msg.toLowerCase().includes('bucket')) {
+          throw new Error('Supabase bucket "resources" is missing. Create a private bucket named "resources" in Storage and retry.');
+        }
+        throw uploadErr;
+      }
       const { data: signed } = await supabaseClient.storage.from('resources').createSignedUrl(path, 60 * 60 * 24);
       return {
         storage_path: path,
