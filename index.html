@@ -1666,7 +1666,6 @@
       }
       const uid = supabaseSession.user.id;
       try {
-        if (statusEl) statusEl.textContent = 'Deleting your data...';
         if (statusEl) statusEl.textContent = 'Deleting your data & account...';
         const { data, error } = await supabaseClient.functions.invoke('delete-account', {
           // auth header is added automatically by supabase-js with the current session
@@ -3565,6 +3564,7 @@ Best regards,
     function openStudentModal(student) {
       if (!guardEdit()) return;
       const isEdit = !!student;
+      const emailOptions = getAvailableStudentEmails().map(e => `<option value="${e}"></option>`).join('');
       const html = `
         <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit student' : 'Add student'}</h2>
         <form id="studentForm" class="space-y-2">
@@ -3575,9 +3575,10 @@ Best regards,
           </div>
           <div>
             <label class="block text-[11px] mb-1">Student email (for login)</label>
-            <input name="studentEmail" type="email" value="${student?.studentEmail || ''}"
+            <input list="studentEmailOptions" name="studentEmail" type="email" value="${student?.studentEmail || ''}"
                    class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" ${readOnlyMode ? 'disabled' : ''}>
-            <p class="text-[10px] text-slate-500 mt-1">Set to the student's login email. They will only see their own profile.</p>
+            <datalist id="studentEmailOptions">${emailOptions}</datalist>
+            <p class="text-[10px] text-slate-500 mt-1">Choose an existing user email; each email can be used for only one student.</p>
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
@@ -3629,6 +3630,13 @@ Best regards,
             alert('Name is required.');
             return;
           }
+          if (newStudent.studentEmail) {
+            const taken = state.students.some(s => s.studentEmail === newStudent.studentEmail && s.id !== newStudent.id);
+            if (taken) {
+              alert('That email is already linked to another student.');
+              return;
+            }
+          }
           if (isEdit) {
             const idx = state.students.findIndex(s => s.id === student.id);
             state.students[idx] = newStudent;
@@ -3642,11 +3650,14 @@ Best regards,
         if (isEdit) {
           document.getElementById('deleteStudentBtn').onclick = () => {
             if (!confirm('Delete this student? This will not delete existing sessions/invoices but will orphan them.')) return;
-            state.students = state.students.filter(s => s.id !== student.id);
-            saveState();
-            closeModal();
-            selectedStudentId = null;
-            renderStudentsView();
+            deleteStudentAndDependencies(student.id).then(() => {
+              closeModal();
+              selectedStudentId = null;
+              renderStudentsView();
+            }).catch(err => {
+              console.error(err);
+              alert('Delete failed.');
+            });
           };
         }
       });
