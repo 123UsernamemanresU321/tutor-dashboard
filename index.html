@@ -1624,9 +1624,35 @@
       // Upsert rows
       if (rows.length) {
         const { error } = await supabaseClient.from(table).upsert(rows);
-        if (error) throw error;
+      if (error) throw error;
       }
       // Prune skipped to avoid accidental deletions; Supabase is source of truth.
+    }
+
+    async function upsertInvoiceRemote(inv) {
+      if (!isSupabaseReady()) return;
+      const { error } = await supabaseClient.from('invoices').upsert({
+        id: cleanId(inv.id),
+        user_id: supabaseSession.user.id,
+        student_id: cleanId(inv.studentId),
+        issue_date: inv.issueDate,
+        due_date: inv.dueDate,
+        base_amount: inv.baseAmount,
+        total: inv.total,
+        late_fee_percent: inv.lateFeePercent,
+        short_notice_percent: inv.shortNoticePercent,
+        late_applied: inv.lateApplied,
+        short_applied: inv.shortApplied,
+        paid: inv.paid,
+        notes: inv.notes
+      });
+      if (error) throw error;
+    }
+
+    async function deleteInvoiceRemote(id) {
+      if (!isSupabaseReady()) return;
+      const { error } = await supabaseClient.from('invoices').delete().eq('id', cleanId(id));
+      if (error) throw error;
     }
 
     function generateId(prefix) {
@@ -4984,7 +5010,7 @@ Best regards,
         });
         computeTotalFromFees();
 
-        form.onsubmit = (e) => {
+        form.onsubmit = async (e) => {
           e.preventDefault();
           const newInv = {
             id: form.id.value.trim(),
@@ -5008,30 +5034,60 @@ Best regards,
             alert('Invoice ID is required.');
             return;
           }
-          if (isEdit) {
-            const idx = state.invoices.findIndex(i => i.id === inv.id);
-            state.invoices[idx] = newInv;
-            logActivity('Updated invoice', newInv.id);
-          } else {
-            const idx = state.invoices.findIndex(i => i.id === newInv.id);
-            if (idx >= 0) state.invoices[idx] = newInv;
-            else state.invoices.push(newInv);
-            logActivity('Created invoice', newInv.id);
-          }
-          saveState();
-          closeModal();
-          renderFinanceView();
-          if (selectedStudentId) renderStudentFinance(selectedStudentId);
-        };
-
-        if (isEdit) {
-          document.getElementById('deleteInvoiceBtn').onclick = () => {
-            if (!confirm('Delete this invoice?')) return;
-            state.invoices = state.invoices.filter(i => i.id !== inv.id);
+          try {
+            if (isSupabaseReady()) {
+              await upsertInvoiceRemote(newInv);
+            }
+            if (isEdit) {
+              const idx = state.invoices.findIndex(i => i.id === inv.id);
+              state.invoices[idx] = newInv;
+              logActivity('Updated invoice', newInv.id);
+            } else {
+              const idx = state.invoices.findIndex(i => i.id === newInv.id);
+              if (idx >= 0) state.invoices[idx] = newInv;
+              else state.invoices.push(newInv);
+              logActivity('Created invoice', newInv.id);
+            }
             saveState();
             closeModal();
             renderFinanceView();
             if (selectedStudentId) renderStudentFinance(selectedStudentId);
+          } catch (err) {
+            console.error('Invoice sync failed', err);
+            alert('Saved locally but Supabase sync failed: ' + (err?.message || err));
+            // still update local state so UI stays consistent
+            if (isEdit) {
+              const idx = state.invoices.findIndex(i => i.id === inv.id);
+              state.invoices[idx] = newInv;
+              logActivity('Updated invoice (local only)', newInv.id);
+            } else {
+              const idx = state.invoices.findIndex(i => i.id === newInv.id);
+              if (idx >= 0) state.invoices[idx] = newInv;
+              else state.invoices.push(newInv);
+              logActivity('Created invoice (local only)', newInv.id);
+            }
+            saveState();
+          }
+        };
+
+        if (isEdit) {
+          document.getElementById('deleteInvoiceBtn').onclick = async () => {
+            if (!confirm('Delete this invoice?')) return;
+            try {
+              if (isSupabaseReady()) {
+                await deleteInvoiceRemote(inv.id);
+              }
+              state.invoices = state.invoices.filter(i => i.id !== inv.id);
+              saveState();
+              closeModal();
+              renderFinanceView();
+              if (selectedStudentId) renderStudentFinance(selectedStudentId);
+            } catch (err) {
+              console.error('Invoice delete sync failed', err);
+              alert('Deleted locally but Supabase delete failed: ' + (err?.message || err));
+              state.invoices = state.invoices.filter(i => i.id !== inv.id);
+              saveState();
+            }
           };
         }
       });
