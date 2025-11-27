@@ -1448,16 +1448,25 @@
      ****************/
     // Catch errors to avoid Safari “output” ReferenceErrors
     window.onerror = (msg, src, line, col, err) => {
+      if (String(msg).toLowerCase().includes('output')) return true;
       console.error('Global error', msg, err);
       return true;
     };
     // Catch any unhandled promise rejections so Safari doesn’t throw “output” ReferenceErrors
     window.addEventListener('unhandledrejection', (event) => {
+      if (String(event.reason || '').toLowerCase().includes('output')) {
+        event.preventDefault();
+        return true;
+      }
       console.error('Unhandled promise rejection', event.reason);
       event.preventDefault();
       return true;
     });
     window.onunhandledrejection = (event) => {
+      if (String(event.reason || '').toLowerCase().includes('output')) {
+        if (event.preventDefault) event.preventDefault();
+        return true;
+      }
       console.error('Unhandled promise rejection (onunhandledrejection)', event.reason);
       if (event.preventDefault) event.preventDefault();
       return true;
@@ -1730,7 +1739,13 @@
       if (!hcaptchaToken) {
         throw new Error('Please complete hCaptcha.');
       }
-      return hcaptchaToken;
+      const token = hcaptchaToken;
+      // reset after consuming to avoid re-use / expiry errors
+      if (window.hcaptcha && hcaptchaWidgetId != null) {
+        hcaptcha.reset(hcaptchaWidgetId);
+      }
+      hcaptchaToken = '';
+      return token;
     }
 
     async function initSupabaseAuth() {
