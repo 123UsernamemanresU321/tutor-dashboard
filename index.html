@@ -1446,6 +1446,11 @@
     /****************
      * INITIAL SETUP *
      ****************/
+    // Catch errors to avoid Safari “output” ReferenceErrors
+    window.onerror = (msg, src, line, col, err) => {
+      console.error('Global error', msg, err);
+      return true;
+    };
     // Catch any unhandled promise rejections so Safari doesn’t throw “output” ReferenceErrors
     window.addEventListener('unhandledrejection', (event) => {
       console.error('Unhandled promise rejection', event.reason);
@@ -1696,6 +1701,7 @@
 
     function hcaptchaOnLoad() {
       if (!HCAPTCHA_ENABLED || !window.hcaptcha) return;
+      if (hcaptchaWidgetId !== null) return; // already rendered
       const container = document.getElementById('hcaptchaContainer');
       if (!container) return;
       hcaptchaWidgetId = hcaptcha.render(container, {
