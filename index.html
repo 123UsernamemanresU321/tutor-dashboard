@@ -1653,54 +1653,23 @@
       const uid = supabaseSession.user.id;
       try {
         if (statusEl) statusEl.textContent = 'Deleting your data...';
-        await deleteUserData(uid);
-        if (statusEl) statusEl.textContent = 'Deleting account...';
-        // To securely delete auth user, you need a server-side function using the service role.
-        // We attempt to call it if available; otherwise we stop after data deletion.
-        try {
-          const { error: fnError } = await supabaseClient.functions.invoke('delete-account', {
-            body: { userId: uid }
-          });
-          if (fnError) {
-            console.warn('delete-account function error', fnError);
-            if (statusEl) statusEl.textContent = 'Data deleted. Ask the admin to remove your auth account.';
-          } else if (statusEl) {
-            statusEl.textContent = 'Account deleted.';
-          }
-        } catch (err) {
-          console.warn('delete-account function missing', err);
-          if (statusEl) statusEl.textContent = 'Data deleted. Ask the admin to remove your auth account.';
+        if (statusEl) statusEl.textContent = 'Deleting your data & account...';
+        const { data, error } = await supabaseClient.functions.invoke('delete-account', {
+          // auth header is added automatically by supabase-js with the current session
+        });
+        if (error || !data?.success) {
+          throw error || new Error(data?.error || 'Deletion failed');
         }
         // Clear local state and sign out
         localStorage.removeItem(STORAGE_KEY);
         state = deepClone(defaultState);
         await supabaseClient.auth.signOut();
-        alert('Your data has been deleted locally. If the delete-account function is configured, your account is removed; otherwise contact the admin.');
+        alert('Your account has been deleted.');
         window.location.reload();
       } catch (err) {
         console.error(err);
         if (statusEl) statusEl.textContent = 'Delete failed. Please try again.';
         alert('Delete failed. See console for details.');
-      }
-    }
-
-    async function deleteUserData(uid) {
-      // Delete per-table with RLS (user_id scoped)
-      const tables = [
-        'session_students',
-        'sessions',
-        'resources',
-        'homework',
-        'documents',
-        'contracts',
-        'invoices',
-        'student_todos',
-        'student_checkins',
-        'students'
-      ];
-      for (const table of tables) {
-        const { error } = await supabaseClient.from(table).delete().eq('user_id', uid);
-        if (error) throw error;
       }
     }
 
