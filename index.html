@@ -1695,6 +1695,7 @@
       window.deleteTodo = deleteTodo;
       window.openContractUpload = openContractUpload;
       window.markContractStatus = markContractStatus;
+      setupRealtime();
     });
 
     function setupNav() {
@@ -1711,6 +1712,27 @@
       switchView(defaultView);
       const activeBtn = document.querySelector(`.nav-btn[data-view="${defaultView}"]`);
       if (activeBtn) activeBtn.classList.add('bg-slate-800', 'active');
+    }
+
+    /***********************
+     * REALTIME UPDATES
+     ***********************/
+    function setupRealtime() {
+      if (!supabaseClient || !supabaseSession) return;
+      const tables = ['students','sessions','homework','invoices','messages','resources','documents','contracts','student_todos','student_checkins'];
+      tables.forEach(table => {
+        supabaseClient
+          .channel(`${table}-changes`)
+          .on('postgres_changes', { event: '*', schema: 'public', table }, async () => {
+            try {
+              await tryLoadRemoteThenLocal();
+              renderAllViews();
+            } catch (err) {
+              console.error('Realtime refresh failed', err);
+            }
+          })
+          .subscribe();
+      });
     }
 
     function switchView(viewName) {
@@ -2181,10 +2203,10 @@
     }
 
     async function initSupabaseAuth() {
-    if (!supabaseAvailable) {
-      toggleAuthOverlay(false);
-      return;
-    }
+      if (!supabaseAvailable) {
+        toggleAuthOverlay(false);
+        return;
+      }
     if (HCAPTCHA_ENABLED) {
       loadHCaptcha();
     }
@@ -2201,7 +2223,10 @@
         toggleAuthOverlay(!session);
         if (session) {
           document.getElementById('signOutBtn')?.classList.remove('hidden');
-          tryLoadRemoteThenLocal().then(renderAllViews);
+          tryLoadRemoteThenLocal().then(() => {
+            renderAllViews();
+            setupRealtime();
+          });
         } else {
           document.getElementById('signOutBtn')?.classList.add('hidden');
           state = deepClone(defaultState);
