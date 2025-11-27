@@ -438,6 +438,9 @@
           <button id="quickAddSessionBtn" data-owner-only class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 shadow-sm">
             ＋ Session
           </button>
+          <button id="refreshBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl border border-slate-300 text-xs font-medium hover:bg-slate-50">
+            ⟳ Refresh
+          </button>
           <button id="signOutBtn" class="hidden inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl border border-slate-300 text-xs font-medium hover:bg-slate-50">
             ⏏ Sign out
           </button>
@@ -1807,6 +1810,18 @@
       document.getElementById('addSessionBtn').addEventListener('click', () => { if (guardEdit()) openSessionModal(); });
       document.getElementById('addResourceBtn').addEventListener('click', () => { if (guardEdit()) openResourceModal(); });
       document.getElementById('addInvoiceBtn').addEventListener('click', () => { if (guardEdit()) openInvoiceModal(); });
+      const refreshBtn = document.getElementById('refreshBtn');
+      if (refreshBtn) {
+        refreshBtn.onclick = async () => {
+          if (supabaseAvailable) {
+            await tryLoadRemoteThenLocal();
+            renderAllViews();
+          } else {
+            state = loadState();
+            renderAllViews();
+          }
+        };
+      }
       const deleteBtn = document.getElementById('deleteAccountBtn');
       if (deleteBtn) deleteBtn.onclick = deleteAccountFlow;
 
