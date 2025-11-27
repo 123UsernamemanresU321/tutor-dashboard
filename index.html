@@ -1021,6 +1021,16 @@
                 <div id="profileEmail" class="text-sm font-semibold">—</div>
                 <div class="grid grid-cols-2 gap-3 mt-2">
                   <div>
+                    <div class="text-[11px] text-slate-500">Role</div>
+                    <div id="profileRole" class="text-[11px] font-semibold">—</div>
+                  </div>
+                  <div>
+                    <div class="text-[11px] text-slate-500">User ID</div>
+                    <div id="profileUid" class="text-[11px] font-semibold truncate">—</div>
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mt-2">
+                  <div>
                     <div class="text-[11px] text-slate-500">Created</div>
                     <div id="profileCreated" class="text-[11px] font-semibold">—</div>
                   </div>
@@ -1029,6 +1039,7 @@
                     <div id="profileLastSignIn" class="text-[11px] font-semibold">—</div>
                   </div>
                 </div>
+                <div class="text-[10px] text-slate-500 mt-2" id="profileSessionMeta"></div>
               </div>
 
               <div class="card p-5 space-y-3 border border-rose-200 bg-rose-50">
@@ -1817,6 +1828,15 @@
       setVal('notifySessionsDays', state.settings.notifySessionsDays ?? 3);
       setVal('notifyHomeworkDays', state.settings.notifyHomeworkDays ?? 3);
       setVal('notifyInvoicesDays', state.settings.notifyInvoicesDays ?? 3);
+      // lock settings for students
+      const lockIds = [
+        'settingsWeeklyGoal','settingsMonthlyGoal','settingsDefaultDuration',
+        'settingsReflection','notifySessionsDays','notifyHomeworkDays','notifyInvoicesDays'
+      ];
+      lockIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = studentMode;
+      });
       applyTheme();
       applyDensity();
     }
@@ -1865,6 +1885,9 @@
       const createdEl = document.getElementById('profileCreated');
       const lastEl = document.getElementById('profileLastSignIn');
       const badge = document.getElementById('profileEmailVerified');
+      const roleEl = document.getElementById('profileRole');
+      const uidEl = document.getElementById('profileUid');
+      const sessMeta = document.getElementById('profileSessionMeta');
       if (!user) {
         if (emailEl) emailEl.textContent = 'Not signed in';
         if (createdEl) createdEl.textContent = '—';
@@ -1873,6 +1896,9 @@
           badge.textContent = 'Not signed in';
           badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700';
         }
+        if (roleEl) roleEl.textContent = '—';
+        if (uidEl) uidEl.textContent = '—';
+        if (sessMeta) sessMeta.textContent = '';
         return;
       }
       if (emailEl) emailEl.textContent = user.email || '—';
@@ -1881,6 +1907,12 @@
       const lastSignIn = user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString() : '—';
       if (createdEl) createdEl.textContent = created;
       if (lastEl) lastEl.textContent = lastSignIn;
+      if (roleEl) roleEl.textContent = isOwner() ? 'Owner' : 'Student';
+      if (uidEl) uidEl.textContent = user.id || '—';
+      if (sessMeta && supabaseSession?.expires_at) {
+        const exp = new Date(supabaseSession.expires_at * 1000).toLocaleString();
+        sessMeta.textContent = `Session expires: ${exp}`;
+      }
       const verified = metadata.email_verified || user.email_confirmed_at;
       if (badge) {
         if (verified) {
