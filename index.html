@@ -1715,19 +1715,23 @@
         toggleAuthOverlay(true);
         return;
       }
-      if (studentMode && (viewName === 'finance' || viewName === 'reports')) {
-        viewName = 'portal';
+      let targetView = viewName;
+      if (studentMode && ['finance','reports','dashboard'].includes(targetView)) {
+        targetView = 'portal';
       }
-      document.getElementById('view-' + viewName).classList.remove('hidden');
-      if (viewName === 'dashboard') updateKPIsAndCharts();
-      if (viewName === 'students') renderStudentsView();
-      if (viewName === 'schedule') renderScheduleView();
-      if (viewName === 'resources') renderResourcesView();
-      if (viewName === 'finance') renderFinanceView();
-      if (viewName === 'settings') applySettingsToUI();
-      if (viewName === 'profile') renderProfileView();
-      if (viewName === 'portal') renderStudentPortal();
-      if (viewName === 'reports') renderReportsView();
+      document.getElementById('view-' + targetView).classList.remove('hidden');
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('bg-slate-800', 'active'));
+      const activeBtn = document.querySelector(`.nav-btn[data-view="${targetView}"]`);
+      if (activeBtn) activeBtn.classList.add('bg-slate-800','active');
+      if (targetView === 'dashboard') updateKPIsAndCharts();
+      if (targetView === 'students') renderStudentsView();
+      if (targetView === 'schedule') renderScheduleView();
+      if (targetView === 'resources') renderResourcesView();
+      if (targetView === 'finance') renderFinanceView();
+      if (targetView === 'settings') applySettingsToUI();
+      if (targetView === 'profile') renderProfileView();
+      if (targetView === 'portal') renderStudentPortal();
+      if (targetView === 'reports') renderReportsView();
     }
 
     function setupTopbar() {
