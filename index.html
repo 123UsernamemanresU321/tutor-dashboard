@@ -291,6 +291,26 @@
       color: #e5e7eb;
       box-shadow: 0 6px 20px -8px rgba(59,130,246,0.9);
     }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    .sr-only:focus {
+      position: static;
+      width: auto;
+      height: auto;
+      margin: 0;
+      overflow: visible;
+      clip: auto;
+      white-space: normal;
+    }
 
     /* TIGHTEN TABLES IN COMPACT MODE (density) – class is toggled on #viewsContainer */
     .dense-mode table td,
@@ -350,9 +370,10 @@
   </style>
 </head>
 <body>
+  <a href="#mainContent" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 bg-indigo-600 text-white px-3 py-2 rounded-lg">Skip to main content</a>
   <div class="min-h-screen flex">
     <!-- Sidebar -->
-    <aside class="sidebar w-64 text-slate-200 flex flex-col border-r border-slate-900">
+    <aside class="sidebar w-64 text-slate-200 flex flex-col border-r border-slate-900" role="navigation" aria-label="Primary">
       <div class="px-4 py-4 flex items-center gap-2 border-b border-slate-800">
         <div class="h-9 w-9 rounded-2xl bg-indigo-500 flex items-center justify-center text-white font-bold text-lg">
           T
@@ -382,15 +403,21 @@
         <button data-view="settings" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
           <span>⚙️</span><span>Settings</span>
         </button>
+        <button data-view="reports" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
+          <span>📊</span><span>Reports</span>
+        </button>
         <button data-view="profile" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
           <span>👤</span><span>Profile</span>
+        </button>
+        <button data-view="portal" id="navPortalBtn" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition hidden">
+          <span>📂</span><span>My portal</span>
         </button>
       </nav>
 
     </aside>
 
     <!-- Main content -->
-    <div class="flex-1 flex flex-col">
+    <div class="flex-1 flex flex-col" id="mainContent" role="main">
       <!-- Top bar -->
       <header class="topbar h-16 flex items-center justify-between px-6 gap-4">
         <!-- Search -->
@@ -672,20 +699,23 @@
                 </div>
 
                 <!-- Tabs for detail -->
-                <div class="border-b border-slate-200 flex gap-4 text-[11px]" id="studentDetailTabs">
-                  <button data-student-tab="timeline" class="student-tab border-b-2 border-indigo-500 pb-1 font-medium">
-                    Timeline
-                  </button>
-                  <button data-student-tab="sessions" class="student-tab pb-1 text-slate-500">
-                    Sessions
-                  </button>
-                  <button data-student-tab="documents" class="student-tab pb-1 text-slate-500">
-                    Documents
-                  </button>
-                  <button data-student-tab="finance" class="student-tab pb-1 text-slate-500">
-                    Finance
-                  </button>
-                </div>
+        <div class="border-b border-slate-200 flex gap-4 text-[11px]" id="studentDetailTabs">
+          <button data-student-tab="timeline" class="student-tab border-b-2 border-indigo-500 pb-1 font-medium">
+            Timeline
+          </button>
+          <button data-student-tab="sessions" class="student-tab pb-1 text-slate-500">
+            Sessions
+          </button>
+          <button data-student-tab="documents" class="student-tab pb-1 text-slate-500">
+            Documents
+          </button>
+          <button data-student-tab="finance" class="student-tab pb-1 text-slate-500">
+            Finance
+          </button>
+          <button data-student-tab="messages" class="student-tab pb-1 text-slate-500">
+            Messages
+          </button>
+        </div>
 
                 <div id="studentTab-timeline" class="student-tab-pane space-y-2 mt-2">
                   <ul id="studentTimeline" class="space-y-2 text-[11px]"></ul>
@@ -702,17 +732,28 @@
                   </div>
                   <ul id="studentDocumentsList" class="space-y-2 text-[11px]"></ul>
                 </div>
-                <div id="studentTab-finance" class="student-tab-pane hidden mt-2">
-                  <div class="flex items-center justify-between mb-1">
-                    <h4 class="text-[11px] font-semibold">Invoices & balance</h4>
-                    <button id="studentCreateInvoiceBtn" data-owner-only class="px-2 py-1 rounded-lg border border-emerald-500 text-emerald-600 text-[10px] hover:bg-emerald-50">
-                      ＋ Invoice for this student
-                    </button>
-                  </div>
-                  <div id="studentBalance" class="text-xs mb-1"></div>
-                  <ul id="studentInvoicesList" class="space-y-1 text-[11px]"></ul>
-                </div>
-              </div>
+        <div id="studentTab-finance" class="student-tab-pane hidden mt-2">
+          <div class="flex items-center justify-between mb-1">
+            <h4 class="text-[11px] font-semibold">Invoices & balance</h4>
+            <button id="studentCreateInvoiceBtn" data-owner-only class="px-2 py-1 rounded-lg border border-emerald-500 text-emerald-600 text-[10px] hover:bg-emerald-50">
+              ＋ Invoice for this student
+            </button>
+          </div>
+          <div id="studentBalance" class="text-xs mb-1"></div>
+          <ul id="studentInvoicesList" class="space-y-1 text-[11px]"></ul>
+        </div>
+        <div id="studentTab-messages" class="student-tab-pane hidden mt-2">
+          <div class="flex items-center justify-between mb-1">
+            <h4 class="text-[11px] font-semibold">Messages</h4>
+            <span class="hint">Owner & student thread</span>
+          </div>
+          <ul id="studentMessagesList" class="space-y-1 text-[11px] max-h-64 overflow-y-auto scrollbar-thin"></ul>
+          <form id="studentMessageForm" class="mt-2 space-y-1 text-[11px]">
+            <textarea name="messageText" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-1" placeholder="Write a note to this student"></textarea>
+            <button class="w-full bg-slate-900 text-white rounded-lg py-1">Send</button>
+          </form>
+        </div>
+      </div>
             </div>
           </div>
         </section>
@@ -745,7 +786,10 @@
                     <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-700"><span class="h-2 w-2 rounded-full bg-emerald-500"></span> Chemistry</span>
                     <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-700"><span class="h-2 w-2 rounded-full bg-rose-500"></span> Maths</span>
                   </div>
-                  <div id="scheduleWeekLabel" class="font-medium text-slate-700"></div>
+                  <div class="flex items-center gap-2">
+                    <button id="exportIcsBtn" class="px-2 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50">Export ICS</button>
+                    <div id="scheduleWeekLabel" class="font-medium text-slate-700"></div>
+                  </div>
                 </div>
                 <div id="dayLoadRow" class="grid grid-cols-7 gap-2 text-[11px]"></div>
                 <div class="calendar-grid text-[11px] min-h-[520px]" id="scheduleCalendarGrid">
@@ -1003,6 +1047,97 @@
             </div>
           </div>
         </section>
+
+        <!-- Student portal (student-mode only) -->
+        <section id="view-portal" class="view hidden">
+          <div class="section-shell space-y-4">
+            <div class="flex items-center justify-between mb-1">
+              <div>
+                <h2 class="text-lg font-semibold">My portal</h2>
+                <p class="text-xs text-slate-500">Your schedule, homework, invoices, and resources.</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
+              <div class="card p-4 space-y-2">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-sm font-semibold">Upcoming sessions</h3>
+                  <span class="hint">Next 14 days</span>
+                </div>
+                <ul id="portalSessions" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+              <div class="card p-4 space-y-2">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-sm font-semibold">Homework</h3>
+                  <span class="hint">Open items</span>
+                </div>
+                <ul id="portalHomework" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+              <div class="card p-4 space-y-2">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-sm font-semibold">Invoices</h3>
+                  <span class="hint">Unpaid first</span>
+                </div>
+                <ul id="portalInvoices" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+        <div class="card p-4 space-y-2">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold">Resources</h3>
+            <span class="hint">Assigned to you</span>
+          </div>
+          <ul id="portalResources" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+        </div>
+        <div class="card p-4 space-y-2">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold">Messages</h3>
+            <span class="hint">Tutor ↔ Student</span>
+          </div>
+          <ul id="portalMessages" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+        <!-- Reports -->
+        <section id="view-reports" class="view hidden">
+          <div class="section-shell space-y-4">
+            <div class="flex items-center justify-between mb-1">
+              <div>
+                <h2 class="text-lg font-semibold">Reports</h2>
+                <p class="text-xs text-slate-500">Earnings, attendance, subject mix, and homework completion.</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div class="card p-4">
+                <div class="text-[11px] text-slate-500">This month earnings</div>
+                <div id="repEarningsMonth" class="text-2xl font-semibold">R 0</div>
+                <div class="text-[10px] text-slate-500" id="repEarningsCount"></div>
+              </div>
+              <div class="card p-4">
+                <div class="text-[11px] text-slate-500">Attendance</div>
+                <div id="repAttendance" class="text-2xl font-semibold">0%</div>
+                <div class="text-[10px] text-slate-500" id="repAttendanceMeta"></div>
+              </div>
+              <div class="card p-4">
+                <div class="text-[11px] text-slate-500">Homework completion</div>
+                <div id="repHomework" class="text-2xl font-semibold">0%</div>
+                <div class="text-[10px] text-slate-500" id="repHomeworkMeta"></div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div class="card p-4">
+                <h3 class="text-sm font-semibold mb-2">Subject hours (total)</h3>
+                <ul id="repSubjectMix" class="space-y-1"></ul>
+              </div>
+              <div class="card p-4">
+                <h3 class="text-sm font-semibold mb-2">Unpaid invoices</h3>
+                <ul id="repUnpaidList" class="space-y-1 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   </div>
@@ -1089,6 +1224,7 @@
       studentTodos: [],
       studentCheckins: [],
       contracts: [],
+      messages: [],
       activityLog: [],
       settings: {
         theme: 'light',
@@ -1135,7 +1271,7 @@
     }
 
     function sanitizeState(st) {
-      ['students','sessions','resources','homework','documents','contracts','invoices','studentTodos','studentCheckins'].forEach(key => {
+      ['students','sessions','resources','homework','documents','contracts','invoices','studentTodos','studentCheckins','messages'].forEach(key => {
         if (!Array.isArray(st[key])) st[key] = [];
       });
       if (!Array.isArray(st.activityLog)) st.activityLog = [];
@@ -1160,6 +1296,8 @@
       st.studentTodos.forEach(t => { t.id = cleanId(t.id); t.studentId = cleanId(t.studentId); });
       st.studentCheckins.forEach(c => { c.id = cleanId(c.id); c.studentId = cleanId(c.studentId); });
       st.activityLog.forEach(a => { a.id = cleanId(a.id); });
+      st.messages.forEach(m => { m.id = cleanId(m.id); m.studentId = cleanId(m.studentId); m.sender = (m.sender || '').trim(); });
+      st.messages.forEach(m => { m.id = cleanId(m.id); m.studentId = cleanId(m.studentId); });
     }
 
     function forceUuid(val) {
@@ -1178,6 +1316,8 @@
       state.studentTodos.forEach(t => { t.id = forceUuid(t.id); t.studentId = forceUuid(t.studentId); });
       state.studentCheckins.forEach(c => { c.id = forceUuid(c.id); c.studentId = forceUuid(c.studentId); });
       state.activityLog.forEach(l => { l.id = forceUuid(l.id); });
+      state.messages.forEach(m => { m.id = forceUuid(m.id); m.studentId = forceUuid(m.studentId); });
+      state.messages.forEach(m => { m.id = forceUuid(m.id); m.studentId = forceUuid(m.studentId); });
     }
 
     function normalizeIdsToUuid() {
@@ -1190,7 +1330,8 @@
         documents: new Map(),
         contracts: new Map(),
         studentTodos: new Map(),
-        studentCheckins: new Map()
+        studentCheckins: new Map(),
+        messages: new Map()
       };
       function ensureId(entity, key, map) {
         entity.id = cleanId(entity.id);
@@ -1213,6 +1354,8 @@
       state.contracts.forEach(c => ensureId(c, 'contracts', maps.contracts));
       state.studentTodos.forEach(t => ensureId(t, 'studentTodos', maps.studentTodos));
       state.studentCheckins.forEach(c => ensureId(c, 'studentCheckins', maps.studentCheckins));
+      state.messages.forEach(m => ensureId(m, 'messages', maps.messages));
+      state.messages.forEach(m => ensureId(m, 'messages', maps.messages));
 
       // remap references
       state.sessions.forEach(sess => {
@@ -1445,6 +1588,20 @@
         created_at: c.createdAt
       }));
       await upsertAndPrune('student_checkins', checkins, 'id');
+
+      const messages = state.messages.map(m => ({
+        id: cleanId(m.id),
+        user_id: uid,
+        student_id: cleanId(m.studentId),
+        text: m.text,
+        sender: m.sender,
+        created_at: m.created_at
+      }));
+      try {
+        await upsertAndPrune('messages', messages, 'id');
+      } catch (err) {
+        console.warn('Messages sync skipped', err);
+      }
     }
 
     async function upsertAndPrune(table, rows, pk) {
@@ -1555,6 +1712,8 @@
       if (viewName === 'finance') renderFinanceView();
       if (viewName === 'settings') applySettingsToUI();
       if (viewName === 'profile') renderProfileView();
+      if (viewName === 'portal') renderStudentPortal();
+      if (viewName === 'reports') renderReportsView();
     }
 
     function setupTopbar() {
@@ -1600,6 +1759,12 @@
         state.settings.defaultSessionDuration = Number(e.target.value || 1);
         saveState();
       });
+      const ns = document.getElementById('notifySessionsDays');
+      const nh = document.getElementById('notifyHomeworkDays');
+      const ni = document.getElementById('notifyInvoicesDays');
+      if (ns) ns.addEventListener('input', e => { state.settings.notifySessionsDays = Number(e.target.value || 0); saveState(); });
+      if (nh) nh.addEventListener('input', e => { state.settings.notifyHomeworkDays = Number(e.target.value || 0); saveState(); });
+      if (ni) ni.addEventListener('input', e => { state.settings.notifyInvoicesDays = Number(e.target.value || 0); saveState(); });
       document.getElementById('exportDataBtn').addEventListener('click', () => {
         document.getElementById('backupTextarea').value = JSON.stringify(state, null, 2);
       });
@@ -1624,15 +1789,34 @@
       document.getElementById('addInvoiceBtn').addEventListener('click', () => { if (guardEdit()) openInvoiceModal(); });
       const deleteBtn = document.getElementById('deleteAccountBtn');
       if (deleteBtn) deleteBtn.onclick = deleteAccountFlow;
+
+      // Show portal nav only for student mode
+      const navPortal = document.getElementById('navPortalBtn');
+      if (navPortal) {
+        navPortal.classList.toggle('hidden', !studentMode);
+        if (studentMode) navPortal.classList.add('bg-slate-800', 'active');
+      }
+
+      const exportIcsBtn = document.getElementById('exportIcsBtn');
+      if (exportIcsBtn) {
+        exportIcsBtn.onclick = downloadIcsFile;
+      }
     }
 
     function applySettingsToUI() {
-      document.getElementById('settingsThemeSelect').value = state.settings.theme;
-      document.getElementById('settingsDensitySelect').value = state.settings.density;
-      document.getElementById('settingsWeeklyGoal').value = state.settings.weeklyGoalHours ?? '';
-      document.getElementById('settingsMonthlyGoal').value = state.settings.monthlyIncomeGoal ?? '';
-      document.getElementById('settingsReflection').value = state.settings.reflection || '';
-      document.getElementById('settingsDefaultDuration').value = state.settings.defaultSessionDuration ?? 1.5;
+      const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val ?? '';
+      };
+      setVal('settingsThemeSelect', state.settings.theme);
+      setVal('settingsDensitySelect', state.settings.density);
+      setVal('settingsWeeklyGoal', state.settings.weeklyGoalHours);
+      setVal('settingsMonthlyGoal', state.settings.monthlyIncomeGoal);
+      setVal('settingsReflection', state.settings.reflection || '');
+      setVal('settingsDefaultDuration', state.settings.defaultSessionDuration ?? 1.5);
+      setVal('notifySessionsDays', state.settings.notifySessionsDays ?? 3);
+      setVal('notifyHomeworkDays', state.settings.notifyHomeworkDays ?? 3);
+      setVal('notifyInvoicesDays', state.settings.notifyInvoicesDays ?? 3);
       applyTheme();
       applyDensity();
     }
@@ -1706,6 +1890,91 @@
           badge.textContent = 'Unverified';
           badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700';
         }
+      }
+    }
+
+    function renderStudentPortal() {
+      const email = supabaseSession?.user?.email;
+      const student = state.students.find(s => s.studentEmail === email);
+      const sessionsUl = document.getElementById('portalSessions');
+      const hwUl = document.getElementById('portalHomework');
+      const invUl = document.getElementById('portalInvoices');
+      const resUl = document.getElementById('portalResources');
+      if (!student) {
+        const msg = '<li class="text-slate-500 text-xs">No student profile linked to this account.</li>';
+        if (sessionsUl) sessionsUl.innerHTML = msg;
+        if (hwUl) hwUl.innerHTML = msg;
+        if (invUl) invUl.innerHTML = msg;
+        if (resUl) resUl.innerHTML = msg;
+        return;
+      }
+      const now = new Date();
+      const soon = new Date(now.getTime() + 14*24*60*60*1000);
+      const mySessions = state.sessions.filter(s => s.studentIds.includes(student.id))
+        .filter(s => {
+          const d = new Date(s.date + 'T' + (s.startTime || '00:00'));
+          return d >= now && d <= soon;
+        })
+        .sort((a,b) => new Date(a.date) - new Date(b.date));
+      if (sessionsUl) {
+        sessionsUl.innerHTML = mySessions.length ? mySessions.map(s => `
+          <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
+            <div class="font-medium">${s.subject} • ${s.topic || 'Lesson'}</div>
+            <div class="text-[10px] text-slate-500">${s.date} ${s.startTime || ''} • ${s.durationHours || 1}h</div>
+          </li>
+        `).join('') : '<li class="text-slate-500 text-xs">No sessions in the next 14 days.</li>';
+      }
+
+      const myHw = state.homework.filter(hw => hw.studentId === student.id && hw.status !== 'Completed');
+      if (hwUl) {
+        hwUl.innerHTML = myHw.length ? myHw.map(hw => {
+          const res = getResourceById(hw.resourceId);
+          return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
+            <div class="font-medium">${res?.title || 'Homework'}</div>
+            <div class="text-[10px] text-slate-500">Status: ${hw.status} • Due ${hw.dueDate || 'n/a'}</div>
+          </li>`;
+        }).join('') : '<li class="text-slate-500 text-xs">No open homework.</li>';
+      }
+
+      const myInv = state.invoices.filter(inv => inv.studentId === student.id)
+        .sort((a,b) => new Date(a.dueDate||0) - new Date(b.dueDate||0));
+      if (invUl) {
+        invUl.innerHTML = myInv.length ? myInv.map(inv => `
+          <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
+            <div class="font-medium">Invoice ${inv.id}</div>
+            <div class="text-[10px] text-slate-500">Issued ${inv.issueDate || 'n/a'} • Due ${inv.dueDate || 'n/a'} • R ${Number(inv.total||0).toFixed(2)} • ${inv.paid ? 'Paid' : 'Unpaid'}</div>
+          </li>
+        `).join('') : '<li class="text-slate-500 text-xs">No invoices yet.</li>';
+      }
+
+      // Resources assigned via homework
+      const resourceIds = new Set(myHw.map(hw => hw.resourceId));
+      const myRes = state.resources.filter(r => resourceIds.has(r.id));
+      if (resUl) {
+        resUl.innerHTML = myRes.length ? myRes.map(r => `
+          <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
+            <div class="font-medium">${r.title}</div>
+            <div class="text-[10px] text-slate-500">${r.subject} • ${r.level || ''}</div>
+            ${r.signedUrl ? `<a class="text-[10px] text-indigo-600" href="${r.signedUrl}" target="_blank">Download</a>` : ''}
+          </li>
+        `).join('') : '<li class="text-slate-500 text-xs">No resources assigned.</li>';
+      }
+
+      // Messages in portal
+      const msgsList = document.getElementById('portalMessages');
+      if (msgsList) {
+        const msgs = state.messages
+          .filter(m => m.studentId === student.id)
+          .sort((a,b) => new Date(a.created_at||0) - new Date(b.created_at||0));
+        msgsList.innerHTML = msgs.length ? msgs.map(m => `
+          <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
+            <div class="flex justify-between text-[10px] text-slate-500">
+              <span>${m.sender === 'owner' ? 'Tutor' : 'You'}</span>
+              <span>${m.created_at ? new Date(m.created_at).toLocaleString() : ''}</span>
+            </div>
+            <div>${m.text}</div>
+          </li>
+        `).join('') : '<li class="text-slate-500 text-xs">No messages yet.</li>';
       }
     }
 
@@ -2001,7 +2270,8 @@
         invoicesRes,
         todosRes,
         checkinsRes,
-        activityRes
+        activityRes,
+        messagesRes
       ] = await Promise.all([
         fetchTable('students'),
         fetchTable('sessions'),
@@ -2013,10 +2283,11 @@
         fetchTable('invoices'),
         fetchTable('student_todos'),
         fetchTable('student_checkins'),
-        fetchTable('activity_log')
+        fetchTable('activity_log'),
+        fetchTable('messages')
       ]);
 
-      [studentsRes, sessionsRes, sessionStudentsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes, activityRes].forEach(res => {
+      [studentsRes, sessionsRes, sessionStudentsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes, activityRes, messagesRes].forEach(res => {
         if (res.error) throw res.error;
       });
 
@@ -2159,6 +2430,13 @@
         date: c.date,
         createdAt: c.created_at
       }));
+      merged.messages = (messagesRes?.data || []).map(m => ({
+        id: m.id,
+        studentId: m.student_id,
+        text: m.text,
+        sender: m.sender,
+        created_at: m.created_at
+      }));
       merged.activityLog = (activityRes?.data || []).map(a => ({
         id: a.id,
         action: a.action,
@@ -2226,6 +2504,7 @@
       renderFinanceView();
       renderProfileView();
       renderActivityLog();
+      renderReportsView();
     }
 
     /******************
@@ -2685,6 +2964,7 @@
       renderStudentTodos(id);
       renderStudentCheckins(id);
       renderStudentContracts(id);
+      renderStudentMessages(id);
 
       document.getElementById('editStudentBtn').onclick = () => openStudentModal(s);
       document.getElementById('studentCreateInvoiceBtn').onclick = () => { if (guardEdit()) openInvoiceModal(null); };
@@ -2756,6 +3036,26 @@
       const contractBtn = document.getElementById('uploadContractBtn');
       if (contractBtn) {
         contractBtn.onclick = () => openContractUpload(id);
+      }
+      const msgForm = document.getElementById('studentMessageForm');
+      if (msgForm) {
+        msgForm.onsubmit = (e) => {
+          e.preventDefault();
+          const text = msgForm.messageText.value.trim();
+          if (!text) return;
+          const sender = isOwner() ? 'owner' : 'student';
+          state.messages.push({
+            id: generateId('msg'),
+            studentId: id,
+            text,
+            sender,
+            created_at: new Date().toISOString()
+          });
+          saveState();
+          renderStudentMessages(id);
+          logActivity('Message posted', text.slice(0,50));
+          msgForm.reset();
+        };
       }
     }
 
@@ -2996,6 +3296,27 @@
       `).join('');
     }
 
+    function renderStudentMessages(studentId) {
+      const list = document.getElementById('studentMessagesList');
+      if (!list) return;
+      const msgs = state.messages
+        .filter(m => m.studentId === studentId)
+        .sort((a,b) => new Date(a.created_at||0) - new Date(b.created_at||0));
+      if (!msgs.length) {
+        list.innerHTML = '<li class="text-slate-500">No messages yet.</li>';
+        return;
+      }
+      list.innerHTML = msgs.map(m => `
+        <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
+          <div class="flex items-center justify-between text-[10px] text-slate-500">
+            <span>${m.sender === 'owner' ? 'Tutor' : 'Student'}</span>
+            <span>${m.created_at ? new Date(m.created_at).toLocaleString() : ''}</span>
+          </div>
+          <div>${m.text}</div>
+        </li>
+      `).join('');
+    }
+
     function openContractUpload(studentId) {
       const student = getStudentById(studentId);
       if (!student) return;
@@ -3188,6 +3509,8 @@
         currentWeekStart = getMonday(new Date());
         renderScheduleView();
       };
+      const exportBtn = document.getElementById('exportIcsBtn');
+      if (exportBtn) exportBtn.onclick = downloadIcsFile;
 
       const todayIso = new Date().toISOString().slice(0,10);
       const todayList = document.getElementById('todaySessionsList');
@@ -3289,6 +3612,36 @@
     function timeToMinutes(t) {
       const [h, m] = t.split(':').map(Number);
       return h*60 + m;
+    }
+
+    function downloadIcsFile() {
+      const lines = [];
+      lines.push('BEGIN:VCALENDAR');
+      lines.push('VERSION:2.0');
+      lines.push('PRODID:-//Tutor Dashboard//ICS');
+      state.sessions.forEach(sess => {
+        const dtStart = new Date(sess.date + 'T' + (sess.startTime || '00:00'));
+        const durationMs = Number(sess.durationHours || 1) * 60 * 60 * 1000;
+        const dtEnd = new Date(dtStart.getTime() + durationMs);
+        const format = (d) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        const names = sess.studentIds.map(id => getStudentById(id)?.name || 'Student').join(', ');
+        lines.push('BEGIN:VEVENT');
+        lines.push('UID:' + sess.id + '@tutor-dashboard');
+        lines.push('DTSTAMP:' + format(new Date()));
+        lines.push('DTSTART:' + format(dtStart));
+        lines.push('DTEND:' + format(dtEnd));
+        lines.push('SUMMARY:' + (sess.subject || 'Session') + ' - ' + names);
+        lines.push('DESCRIPTION:' + (sess.topic || '') + ' ' + (sess.notes || ''));
+        lines.push('END:VEVENT');
+      });
+      lines.push('END:VCALENDAR');
+      const blob = new Blob([lines.join('\n')], { type: 'text/calendar' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'tutor-sessions.ics';
+      a.click();
+      URL.revokeObjectURL(url);
     }
 
     function getSessionById(id) {
@@ -3404,6 +3757,7 @@
               </button>
               ${r.signedUrl ? `<a class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50" href="${r.signedUrl}" target="_blank">Download file</a>` : ''}
               ${!r.signedUrl && r.dataUrl ? `<a class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50" href="${r.dataUrl}" download="${r.fileName || 'resource'}" target="_blank">Download local copy</a>` : ''}
+              ${r.signedUrl && r.fileName && (r.fileName.endsWith('.png') || r.fileName.endsWith('.jpg') || r.fileName.endsWith('.jpeg')) ? `<img src="${r.signedUrl}" alt="${r.title}" class="h-12 rounded border border-slate-200">` : ''}
             </div>
           </li>
         `).join('');
@@ -3609,6 +3963,67 @@
             </li>`;
           }).join('');
         }
+      }
+    }
+
+    function renderReportsView() {
+      // Earnings month
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const invs = state.invoices.filter(inv => {
+        const d = new Date(inv.issueDate || inv.dueDate || 0);
+        return d >= startOfMonth && d < endOfMonth;
+      });
+      const earnings = invs.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
+
+      // Attendance
+      const totalSessions = state.sessions.length;
+      const completedSessions = state.sessions.filter(s => s.completed).length;
+      const attendancePct = totalSessions ? Math.round((completedSessions / totalSessions) * 100) : 0;
+
+      // Homework completion
+      const hwTotal = state.homework.length;
+      const hwCompleted = state.homework.filter(h => h.status === 'Completed').length;
+      const hwPct = hwTotal ? Math.round((hwCompleted / hwTotal) * 100) : 0;
+
+      // Subject hours
+      const subjectHours = { Physics: 0, Chemistry: 0, Maths: 0 };
+      state.sessions.forEach(s => {
+        if (subjectHours[s.subject] != null) subjectHours[s.subject] += Number(s.durationHours || 0);
+      });
+
+      // Unpaid invoices
+      const unpaid = state.invoices.filter(inv => !inv.paid).sort((a,b) => new Date(a.dueDate||0) - new Date(b.dueDate||0));
+
+      const reportEarnings = document.getElementById('repEarningsMonth');
+      const reportEarningsCount = document.getElementById('repEarningsCount');
+      const reportAttendance = document.getElementById('repAttendance');
+      const reportAttendanceMeta = document.getElementById('repAttendanceMeta');
+      const reportHomework = document.getElementById('repHomework');
+      const reportHomeworkMeta = document.getElementById('repHomeworkMeta');
+      if (reportEarnings) reportEarnings.textContent = 'R ' + earnings.toFixed(2);
+      if (reportEarningsCount) reportEarningsCount.textContent = invs.length + ' invoices this month';
+      if (reportAttendance) reportAttendance.textContent = attendancePct + '%';
+      if (reportAttendanceMeta) reportAttendanceMeta.textContent = `${completedSessions}/${totalSessions} completed`;
+      if (reportHomework) reportHomework.textContent = hwPct + '%';
+      if (reportHomeworkMeta) reportHomeworkMeta.textContent = `${hwCompleted}/${hwTotal} completed`;
+
+      const mixUl = document.getElementById('repSubjectMix');
+      if (mixUl) {
+        mixUl.innerHTML = Object.entries(subjectHours).map(([k,v]) => `
+          <li class="flex justify-between"><span>${k}</span><span>${v.toFixed(1)}h</span></li>
+        `).join('');
+      }
+      const unpaidUl = document.getElementById('repUnpaidList');
+      if (unpaidUl) {
+        unpaidUl.innerHTML = unpaid.length ? unpaid.map(inv => {
+          const stu = getStudentById(inv.studentId)?.name || 'Student';
+          return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
+            <div class="font-medium">${stu}</div>
+            <div class="text-[10px] text-slate-500">Invoice ${inv.id} • Due ${inv.dueDate || 'n/a'} • R ${Number(inv.total||0).toFixed(2)}</div>
+          </li>`;
+        }).join('') : '<li class="text-slate-500 text-xs">No unpaid invoices.</li>';
       }
     }
 
@@ -3996,6 +4411,7 @@ Best regards,
               <button type="button" id="uploadResourceFileBtn" class="px-2 py-1 rounded-lg bg-slate-900 text-white text-[11px]">Upload</button>
               ${resource?.signedUrl ? `<a class="px-2 py-1 rounded-lg border border-slate-300 text-[11px]" href="${resource.signedUrl}" target="_blank">Download</a>` : ''}
             </div>
+            <div id="uploadResourceStatus" class="text-[10px] text-slate-500 mt-1"></div>
           </div>
           <div class="flex justify-between items-center mt-3">
             <button type="submit" class="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium">
@@ -4011,6 +4427,7 @@ Best regards,
       `;
       openModal(html, () => {
         const form = document.getElementById('resourceForm');
+        const statusEl = document.getElementById('uploadResourceStatus');
         form.onsubmit = (e) => {
           e.preventDefault();
           const newRes = {
@@ -4067,11 +4484,23 @@ Best regards,
               alert('Choose a file to upload.');
               return;
             }
+            const maxSize = 15 * 1024 * 1024;
+            const allowed = ['application/pdf','image/png','image/jpeg','image/jpg','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+            if (file.size > maxSize) {
+              alert('File too large (max 15MB).');
+              return;
+            }
+            if (!allowed.some(t => file.type === t)) {
+              alert('File type not allowed. Use PDF, PNG, JPEG, or DOC/DOCX.');
+              return;
+            }
             if (!isSupabaseReady()) {
               alert('Sign in to upload files.');
               return;
             }
             try {
+              if (statusEl) statusEl.textContent = 'Uploading...';
+              uploadBtn.disabled = true;
               const uploaded = await uploadResourceFile(file);
               resource = {
                 ...(resource || { id: generateId('res') }),
@@ -4080,10 +4509,12 @@ Best regards,
                 signedUrl: uploaded.signedUrl,
                 dataUrl: uploaded.dataUrl || ''
               };
-              alert(uploaded.storage_path ? 'File uploaded. Save the resource to keep the link.' : 'Stored file locally. Save to keep the link (Supabase storage was blocked).');
+              if (statusEl) statusEl.textContent = uploaded.storage_path ? 'Uploaded. Save to keep link.' : 'Stored locally. Save to keep link.';
             } catch (err) {
               console.error(err);
               alert('Upload failed. See console for details.');
+            } finally {
+              uploadBtn.disabled = false;
             }
           };
         }
