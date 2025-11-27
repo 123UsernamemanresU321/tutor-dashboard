@@ -382,6 +382,9 @@
         <button data-view="settings" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
           <span>⚙️</span><span>Settings</span>
         </button>
+        <button data-view="profile" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
+          <span>👤</span><span>Profile</span>
+        </button>
       </nav>
 
       <div class="px-4 py-3 border-t border-slate-800 text-[11px] text-slate-400">
@@ -950,6 +953,53 @@
             </div>
           </div>
         </section>
+
+        <!-- Profile -->
+        <section id="view-profile" class="view hidden">
+          <div class="section-shell space-y-4">
+            <div class="flex items-center justify-between mb-1">
+              <div>
+                <h2 class="text-lg font-semibold">Your profile</h2>
+                <p class="text-xs text-slate-500">Account details, security, and data controls.</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 text-xs">
+              <div class="card p-5 space-y-2">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-sm font-semibold">Account</h3>
+                  <span id="profileEmailVerified" class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Unverified</span>
+                </div>
+                <div class="text-[11px] text-slate-500">Email</div>
+                <div id="profileEmail" class="text-sm font-semibold">—</div>
+                <div class="grid grid-cols-2 gap-3 mt-2">
+                  <div>
+                    <div class="text-[11px] text-slate-500">Created</div>
+                    <div id="profileCreated" class="text-[11px] font-semibold">—</div>
+                  </div>
+                  <div>
+                    <div class="text-[11px] text-slate-500">Last sign-in</div>
+                    <div id="profileLastSignIn" class="text-[11px] font-semibold">—</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card p-5 space-y-3 border border-rose-200 bg-rose-50">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-sm font-semibold text-rose-700">Delete account</h3>
+                  <span class="text-[10px] text-rose-600">Irreversible</span>
+                </div>
+                <p class="text-[11px] text-rose-700">
+                  This deletes your account and all associated data (students, sessions, invoices, resources, notes). You’ll need to sign up again to use the dashboard.
+                </p>
+                <button id="deleteAccountBtn" class="px-3 py-1.5 rounded-xl border border-rose-400 bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700">
+                  Delete my account
+                </button>
+                <div id="deleteAccountStatus" class="text-[11px] text-rose-700"></div>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   </div>
@@ -982,6 +1032,10 @@
           <button type="submit" data-action="signin" class="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium">Sign in</button>
           <button type="submit" data-action="signup" class="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 text-xs">Sign up</button>
         </div>
+        <label class="flex items-start gap-2 text-[11px] text-slate-600 mt-2">
+          <input type="checkbox" name="consent" class="mt-0.5 h-3 w-3">
+          <span>I consent to receive account emails for access and updates related to this tutor dashboard.</span>
+        </label>
         <div id="hcaptchaContainer" class="mt-3"></div>
       </form>
       <div id="authMessage" class="text-[11px] text-rose-600"></div>
@@ -1466,6 +1520,7 @@
       if (viewName === 'resources') renderResourcesView();
       if (viewName === 'finance') renderFinanceView();
       if (viewName === 'settings') applySettingsToUI();
+      if (viewName === 'profile') renderProfileView();
     }
 
     function setupTopbar() {
@@ -1533,6 +1588,8 @@
       document.getElementById('addSessionBtn').addEventListener('click', () => { if (guardEdit()) openSessionModal(); });
       document.getElementById('addResourceBtn').addEventListener('click', () => { if (guardEdit()) openResourceModal(); });
       document.getElementById('addInvoiceBtn').addEventListener('click', () => { if (guardEdit()) openInvoiceModal(); });
+      const deleteBtn = document.getElementById('deleteAccountBtn');
+      if (deleteBtn) deleteBtn.onclick = deleteAccountFlow;
     }
 
     function applySettingsToUI() {
@@ -1544,6 +1601,107 @@
       document.getElementById('settingsDefaultDuration').value = state.settings.defaultSessionDuration ?? 1.5;
       applyTheme();
       applyDensity();
+    }
+
+    /***********************
+     * PROFILE
+     ***********************/
+    function renderProfileView() {
+      const user = supabaseSession?.user;
+      const emailEl = document.getElementById('profileEmail');
+      const createdEl = document.getElementById('profileCreated');
+      const lastEl = document.getElementById('profileLastSignIn');
+      const badge = document.getElementById('profileEmailVerified');
+      if (!user) {
+        if (emailEl) emailEl.textContent = 'Not signed in';
+        if (createdEl) createdEl.textContent = '—';
+        if (lastEl) lastEl.textContent = '—';
+        if (badge) {
+          badge.textContent = 'Not signed in';
+          badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700';
+        }
+        return;
+      }
+      if (emailEl) emailEl.textContent = user.email || '—';
+      const metadata = user.user_metadata || {};
+      const created = user.created_at ? new Date(user.created_at).toLocaleString() : '—';
+      const lastSignIn = user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString() : '—';
+      if (createdEl) createdEl.textContent = created;
+      if (lastEl) lastEl.textContent = lastSignIn;
+      const verified = metadata.email_verified || user.email_confirmed_at;
+      if (badge) {
+        if (verified) {
+          badge.textContent = 'Verified';
+          badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700';
+        } else {
+          badge.textContent = 'Unverified';
+          badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700';
+        }
+      }
+    }
+
+    async function deleteAccountFlow() {
+      const statusEl = document.getElementById('deleteAccountStatus');
+      const confirm1 = confirm('Delete your account and all associated data? This cannot be undone.');
+      if (!confirm1) return;
+      const confirm2 = confirm('Are you absolutely sure? This will remove all your tutoring data.');
+      if (!confirm2) return;
+      if (!isSupabaseReady()) {
+        alert('Sign in first.');
+        return;
+      }
+      const uid = supabaseSession.user.id;
+      try {
+        if (statusEl) statusEl.textContent = 'Deleting your data...';
+        await deleteUserData(uid);
+        if (statusEl) statusEl.textContent = 'Deleting account...';
+        // To securely delete auth user, you need a server-side function using the service role.
+        // We attempt to call it if available; otherwise we stop after data deletion.
+        try {
+          const { error: fnError } = await supabaseClient.functions.invoke('delete-account', {
+            body: { userId: uid }
+          });
+          if (fnError) {
+            console.warn('delete-account function error', fnError);
+            if (statusEl) statusEl.textContent = 'Data deleted. Ask the admin to remove your auth account.';
+          } else if (statusEl) {
+            statusEl.textContent = 'Account deleted.';
+          }
+        } catch (err) {
+          console.warn('delete-account function missing', err);
+          if (statusEl) statusEl.textContent = 'Data deleted. Ask the admin to remove your auth account.';
+        }
+        // Clear local state and sign out
+        localStorage.removeItem(STORAGE_KEY);
+        state = deepClone(defaultState);
+        await supabaseClient.auth.signOut();
+        alert('Your data has been deleted locally. If the delete-account function is configured, your account is removed; otherwise contact the admin.');
+        window.location.reload();
+      } catch (err) {
+        console.error(err);
+        if (statusEl) statusEl.textContent = 'Delete failed. Please try again.';
+        alert('Delete failed. See console for details.');
+      }
+    }
+
+    async function deleteUserData(uid) {
+      // Delete per-table with RLS (user_id scoped)
+      const tables = [
+        'session_students',
+        'sessions',
+        'resources',
+        'homework',
+        'documents',
+        'contracts',
+        'invoices',
+        'student_todos',
+        'student_checkins',
+        'students'
+      ];
+      for (const table of tables) {
+        const { error } = await supabaseClient.from(table).delete().eq('user_id', uid);
+        if (error) throw error;
+      }
     }
 
     /***********************
@@ -1639,6 +1797,9 @@
           const password = authForm.password.value.trim();
           authMsg.textContent = '';
           try {
+            if (action === 'signup' && !authForm.consent.checked) {
+              throw new Error('Please provide consent to receive account emails.');
+            }
             const captchaToken = await ensureHCaptcha();
             if (action === 'signup') {
               const { error } = await supabaseClient.auth.signUp({
