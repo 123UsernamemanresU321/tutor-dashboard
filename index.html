@@ -2563,6 +2563,21 @@
           }
         });
       }
+      // Merge local invoices/messages if rows are missing (e.g., legacy rows without user_id)
+      if (localState?.invoices?.length) {
+        const remoteIds = new Set(merged.invoices.map(i => cleanId(i.id)));
+        localState.invoices.forEach(inv => {
+          const id = cleanId(inv.id);
+          if (!remoteIds.has(id)) merged.invoices.push(inv);
+        });
+      }
+      if (localState?.messages?.length) {
+        const remoteIds = new Set(merged.messages.map(m => cleanId(m.id)));
+        localState.messages.forEach(msg => {
+          const id = cleanId(msg.id);
+          if (!remoteIds.has(id)) merged.messages.push(msg);
+        });
+      }
 
       sanitizeState(merged);
       normalizeIdsToUuid();
