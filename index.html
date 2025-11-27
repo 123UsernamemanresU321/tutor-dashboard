@@ -1636,6 +1636,8 @@
     // Catch errors to avoid Safari “output” ReferenceErrors
     window.onerror = (msg, src, line, col, err) => {
       if (String(msg).toLowerCase().includes('output')) return true;
+      // Suppress noisy CSP iframe errors
+      if (String(msg).toLowerCase().includes('csp') && String(src || '').includes('hcaptcha')) return true;
       console.error('Global error', msg, err);
       return true;
     };
@@ -2087,7 +2089,7 @@
           // auth header is added automatically by supabase-js with the current session
         });
         if (error || !data?.success) {
-          throw error || new Error(data?.error || 'Deletion failed');
+          throw error || new Error(data?.error || 'Deletion failed (backend).');
         }
         // Clear local state and sign out
         localStorage.removeItem(STORAGE_KEY);
