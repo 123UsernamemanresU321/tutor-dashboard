@@ -1976,7 +1976,7 @@
     }
 
     function renderStudentPortal() {
-      const email = supabaseSession?.user?.email;
+      const email = getSessionEmail();
       const student = state.students.find(s => s.studentEmail === email);
       const sessionsUl = document.getElementById('portalSessions');
       const hwUl = document.getElementById('portalHomework');
@@ -2283,9 +2283,13 @@
       }
     }
 
+    function getSessionEmail() {
+      return (supabaseSession?.user?.email || '').trim().toLowerCase();
+    }
+
     function isOwner() {
       if (!supabaseAvailable) return true;
-      return !!(supabaseSession && supabaseSession.user?.email === OWNER_EMAIL);
+      return !!(supabaseSession && getSessionEmail() === OWNER_EMAIL.toLowerCase());
     }
 
     function updateReadOnlyUI() {
@@ -2293,7 +2297,7 @@
         // Session not resolved yet; keep UI as-is
         return;
       }
-      studentMode = supabaseAvailable ? (!isOwner() && !!supabaseSession?.user?.email) : false;
+      studentMode = supabaseAvailable ? (!isOwner() && !!getSessionEmail()) : false;
       readOnlyMode = studentMode || (supabaseAvailable ? !isOwner() : false);
       const banner = document.getElementById('readOnlyBanner');
       if (banner) {
