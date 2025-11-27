@@ -1654,6 +1654,55 @@
       }
     }
 
+    function getAvailableStudentEmails(currentEmail = '') {
+      const emails = new Set();
+      state.students.forEach(s => {
+        if (s.studentEmail) emails.add(s.studentEmail);
+      });
+      if (currentEmail) emails.add(currentEmail);
+      return Array.from(emails).sort();
+    }
+
+    async function deleteStudentAndDependencies(studentId) {
+      // Local cleanup
+      state.students = state.students.filter(s => s.id !== studentId);
+      state.documents = state.documents.filter(d => d.studentId !== studentId);
+      state.contracts = state.contracts.filter(c => c.studentId !== studentId);
+      state.invoices = state.invoices.filter(i => i.studentId !== studentId);
+      state.homework = state.homework.filter(h => h.studentId !== studentId);
+      state.studentTodos = state.studentTodos.filter(t => t.studentId !== studentId);
+      state.studentCheckins = state.studentCheckins.filter(c => c.studentId !== studentId);
+      // sessions: remove student from studentIds; drop sessions with no students left
+      const sessionsToRemove = [];
+      state.sessions.forEach(sess => {
+        sess.studentIds = (sess.studentIds || []).filter(id => id !== studentId);
+        if (!sess.studentIds.length) sessionsToRemove.push(sess.id);
+      });
+      if (sessionsToRemove.length) {
+        state.sessions = state.sessions.filter(s => !sessionsToRemove.includes(s.id));
+      }
+      saveState();
+
+      // Remote cleanup if signed in
+      if (isSupabaseReady()) {
+        // Remove join rows
+        await supabaseClient.from('session_students').delete().eq('student_id', studentId);
+        // Delete dependents
+        const tables = [
+          'documents','contracts','invoices','homework',
+          'student_todos','student_checkins','session_students'
+        ];
+        for (const t of tables) {
+          await supabaseClient.from(t).delete().eq('student_id', studentId);
+        }
+        if (sessionsToRemove.length) {
+          await supabaseClient.from('sessions').delete().in('id', sessionsToRemove);
+        }
+        // Finally delete student
+        await supabaseClient.from('students').delete().eq('id', studentId);
+      }
+    }
+
     async function deleteAccountFlow() {
       const statusEl = document.getElementById('deleteAccountStatus');
       const confirm1 = confirm('Delete your account and all associated data? This cannot be undone.');
@@ -3564,7 +3613,7 @@ Best regards,
     function openStudentModal(student) {
       if (!guardEdit()) return;
       const isEdit = !!student;
-      const emailOptions = getAvailableStudentEmails().map(e => `<option value="${e}"></option>`).join('');
+      const emailOptions = getAvailableStudentEmails(student?.studentEmail).map(e => `<option value="${e}"></option>`).join('');
       const html = `
         <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit student' : 'Add student'}</h2>
         <form id="studentForm" class="space-y-2">
@@ -3649,7 +3698,7 @@ Best regards,
         };
         if (isEdit) {
           document.getElementById('deleteStudentBtn').onclick = () => {
-            if (!confirm('Delete this student? This will not delete existing sessions/invoices but will orphan them.')) return;
+            if (!confirm('Delete this student and all associated data?')) return;
             deleteStudentAndDependencies(student.id).then(() => {
               closeModal();
               selectedStudentId = null;
