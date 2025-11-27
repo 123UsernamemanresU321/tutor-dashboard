@@ -397,13 +397,13 @@
         <button data-view="resources" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
           <span>📚</span><span>Resources</span>
         </button>
-        <button data-view="finance" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
+        <button id="navFinanceBtn" data-view="finance" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
           <span>💰</span><span>Finance</span>
         </button>
         <button data-view="settings" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
           <span>⚙️</span><span>Settings</span>
         </button>
-        <button data-view="reports" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
+        <button id="navReportsBtn" data-view="reports" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
           <span>📊</span><span>Reports</span>
         </button>
         <button data-view="profile" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
@@ -1328,7 +1328,6 @@
       state.studentCheckins.forEach(c => { c.id = forceUuid(c.id); c.studentId = forceUuid(c.studentId); });
       state.activityLog.forEach(l => { l.id = forceUuid(l.id); });
       state.messages.forEach(m => { m.id = forceUuid(m.id); m.studentId = forceUuid(m.studentId); });
-      state.messages.forEach(m => { m.id = forceUuid(m.id); m.studentId = forceUuid(m.studentId); });
     }
 
     function normalizeIdsToUuid() {
@@ -1703,9 +1702,10 @@
         });
       });
       // default view
-      switchView('dashboard');
-      const dashBtn = document.querySelector('.nav-btn[data-view="dashboard"]');
-      if (dashBtn) dashBtn.classList.add('bg-slate-800', 'active');
+      const defaultView = studentMode ? 'portal' : 'dashboard';
+      switchView(defaultView);
+      const activeBtn = document.querySelector(`.nav-btn[data-view="${defaultView}"]`);
+      if (activeBtn) activeBtn.classList.add('bg-slate-800', 'active');
     }
 
     function switchView(viewName) {
@@ -1714,6 +1714,9 @@
       if (supabaseAvailable && !supabaseSession) {
         toggleAuthOverlay(true);
         return;
+      }
+      if (studentMode && (viewName === 'finance' || viewName === 'reports')) {
+        viewName = 'portal';
       }
       document.getElementById('view-' + viewName).classList.remove('hidden');
       if (viewName === 'dashboard') updateKPIsAndCharts();
@@ -1807,6 +1810,10 @@
         navPortal.classList.toggle('hidden', !studentMode);
         if (studentMode) navPortal.classList.add('bg-slate-800', 'active');
       }
+      const navFinance = document.getElementById('navFinanceBtn');
+      const navReports = document.getElementById('navReportsBtn');
+      if (navFinance) navFinance.classList.toggle('hidden', studentMode);
+      if (navReports) navReports.classList.toggle('hidden', studentMode);
 
       const exportIcsBtn = document.getElementById('exportIcsBtn');
       if (exportIcsBtn) {
@@ -2153,14 +2160,14 @@
     }
 
     async function initSupabaseAuth() {
-      if (!supabaseAvailable) {
-        toggleAuthOverlay(false);
-        return;
-      }
-     if (HCAPTCHA_ENABLED) {
-        loadHCaptcha();
-      }
-      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    if (!supabaseAvailable) {
+      toggleAuthOverlay(false);
+      return;
+    }
+    if (HCAPTCHA_ENABLED) {
+      loadHCaptcha();
+    }
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       const { data: sessionData } = await supabaseClient.auth.getSession();
       supabaseSession = sessionData.session;
       toggleAuthOverlay(!supabaseSession);
@@ -2240,9 +2247,13 @@
         // Session not resolved yet; keep UI as-is
         return;
       }
-      readOnlyMode = supabaseAvailable ? !isOwner() : false;
+      studentMode = supabaseAvailable ? (!isOwner() && !!supabaseSession?.user?.email) : false;
+      readOnlyMode = studentMode || (supabaseAvailable ? !isOwner() : false);
       const banner = document.getElementById('readOnlyBanner');
-      if (banner) banner.classList.toggle('hidden', !readOnlyMode);
+      if (banner) {
+        banner.textContent = studentMode ? 'Student view: read-only access to your profile.' : 'Read-only mode: sign in as the owner to edit.';
+        banner.classList.toggle('hidden', !readOnlyMode);
+      }
       const main = document.querySelector('main#viewsContainer');
       if (main) main.classList.toggle('opacity-70', readOnlyMode);
       document.querySelectorAll('[data-owner-only]').forEach(el => {
@@ -2251,10 +2262,15 @@
         }
         el.classList.toggle('owner-locked', readOnlyMode);
       });
+      const navFinance = document.getElementById('navFinanceBtn');
+      const navReports = document.getElementById('navReportsBtn');
+      if (navFinance) navFinance.classList.toggle('hidden', studentMode);
+      if (navReports) navReports.classList.toggle('hidden', studentMode);
+      if (studentMode) switchView('portal');
     }
 
     function guardEdit() {
-      if (readOnlyMode) {
+      if (readOnlyMode || studentMode) {
         alert('Read-only mode: sign in as the owner to edit.');
         return false;
       }
@@ -2657,10 +2673,14 @@
           expected += Number(inv.total || 0);
         }
       });
-      document.getElementById('kpiExpectedIncome').textContent = 'R ' + expected.toFixed(2);
+      if (studentMode) {
+        document.getElementById('kpiExpectedIncome').textContent = 'N/A';
+      } else {
+        document.getElementById('kpiExpectedIncome').textContent = 'R ' + expected.toFixed(2);
+      }
 
-      const overdueCount = state.invoices.filter(inv => !inv.paid && inv.dueDate && new Date(inv.dueDate) < today).length;
-      document.getElementById('kpiOverdue').textContent = overdueCount;
+      const overdueCount = studentMode ? 0 : state.invoices.filter(inv => !inv.paid && inv.dueDate && new Date(inv.dueDate) < today).length;
+      document.getElementById('kpiOverdue').textContent = studentMode ? 'N/A' : overdueCount;
 
       // Goals & focus
       const weeklyGoal = Number(state.settings.weeklyGoalHours || 0);
