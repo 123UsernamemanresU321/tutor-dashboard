@@ -387,9 +387,6 @@
         </button>
       </nav>
 
-      <div class="px-4 py-3 border-t border-slate-800 text-[11px] text-slate-400">
-        Local-only data • Auto-saved
-      </div>
     </aside>
 
     <!-- Main content -->
@@ -951,6 +948,12 @@
               </div>
               <textarea id="backupTextarea" rows="5" class="mt-2 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]" placeholder="Exported JSON will appear here. Paste JSON here to import."></textarea>
             </div>
+
+            <div class="card p-5 text-xs space-y-3">
+              <h3 class="text-sm font-semibold mb-1">Activity log</h3>
+              <p class="text-[11px] text-slate-500">Recent actions for this account (last 25).</p>
+              <ul id="activityLogList" class="space-y-1 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+            </div>
           </div>
         </section>
 
@@ -1086,6 +1089,7 @@
       studentTodos: [],
       studentCheckins: [],
       contracts: [],
+      activityLog: [],
       settings: {
         theme: 'light',
         density: 'comfortable',
@@ -1134,6 +1138,7 @@
       ['students','sessions','resources','homework','documents','contracts','invoices','studentTodos','studentCheckins'].forEach(key => {
         if (!Array.isArray(st[key])) st[key] = [];
       });
+      if (!Array.isArray(st.activityLog)) st.activityLog = [];
       st.students.forEach(s => { s.id = cleanId(s.id); s.studentEmail = (s.studentEmail || s.student_email || '').trim().toLowerCase(); });
       st.sessions.forEach(s => {
         s.id = cleanId(s.id);
@@ -1154,6 +1159,7 @@
       st.invoices.forEach(i => { i.id = cleanId(i.id); i.studentId = cleanId(i.studentId); });
       st.studentTodos.forEach(t => { t.id = cleanId(t.id); t.studentId = cleanId(t.studentId); });
       st.studentCheckins.forEach(c => { c.id = cleanId(c.id); c.studentId = cleanId(c.studentId); });
+      st.activityLog.forEach(a => { a.id = cleanId(a.id); });
     }
 
     function forceUuid(val) {
@@ -1171,6 +1177,7 @@
       state.invoices.forEach(inv => { inv.id = forceUuid(inv.id); inv.studentId = forceUuid(inv.studentId); });
       state.studentTodos.forEach(t => { t.id = forceUuid(t.id); t.studentId = forceUuid(t.studentId); });
       state.studentCheckins.forEach(c => { c.id = forceUuid(c.id); c.studentId = forceUuid(c.studentId); });
+      state.activityLog.forEach(l => { l.id = forceUuid(l.id); });
     }
 
     function normalizeIdsToUuid() {
@@ -1351,6 +1358,19 @@
         await upsertAndPrune('resources', resources, 'id');
       } catch (err) {
         console.error('Resources upsert failed (check RLS on table "resources")', err);
+      }
+
+      const activity = state.activityLog.map(a => ({
+        id: cleanId(a.id),
+        user_id: uid,
+        action: a.action,
+        detail: a.detail,
+        created_at: a.created_at
+      }));
+      try {
+        await upsertAndPrune('activity_log', activity, 'id');
+      } catch (err) {
+        console.warn('Activity log sync skipped', err);
       }
 
       const homework = state.homework.map(h => ({
@@ -1615,6 +1635,41 @@
       document.getElementById('settingsDefaultDuration').value = state.settings.defaultSessionDuration ?? 1.5;
       applyTheme();
       applyDensity();
+    }
+
+    function renderActivityLog() {
+      const list = document.getElementById('activityLogList');
+      if (!list) return;
+      const items = [...(state.activityLog || [])].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      if (!items.length) {
+        list.innerHTML = '<li class="text-slate-500 text-xs">No activity recorded yet.</li>';
+        return;
+      }
+      list.innerHTML = items.slice(0, 25).map(a => `
+        <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80 flex justify-between items-center">
+          <div>
+            <div class="font-medium">${a.action}</div>
+            <div class="text-[10px] text-slate-500">${a.detail || ''}</div>
+          </div>
+          <div class="text-[10px] text-slate-500">${a.created_at ? new Date(a.created_at).toLocaleString() : ''}</div>
+        </li>
+      `).join('');
+    }
+
+    function logActivity(action, detail) {
+      const entry = {
+        id: generateId('act'),
+        action,
+        detail,
+        created_at: new Date().toISOString()
+      };
+      state.activityLog.push(entry);
+      // keep last 200
+      if (state.activityLog.length > 200) {
+        state.activityLog = state.activityLog.slice(-200);
+      }
+      saveState();
+      renderActivityLog();
     }
 
     /***********************
@@ -1945,7 +2000,8 @@
         contractsRes,
         invoicesRes,
         todosRes,
-        checkinsRes
+        checkinsRes,
+        activityRes
       ] = await Promise.all([
         fetchTable('students'),
         fetchTable('sessions'),
@@ -1956,10 +2012,11 @@
         fetchTable('contracts'),
         fetchTable('invoices'),
         fetchTable('student_todos'),
-        fetchTable('student_checkins')
+        fetchTable('student_checkins'),
+        fetchTable('activity_log')
       ]);
 
-      [studentsRes, sessionsRes, sessionStudentsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes].forEach(res => {
+      [studentsRes, sessionsRes, sessionStudentsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes, activityRes].forEach(res => {
         if (res.error) throw res.error;
       });
 
@@ -2102,6 +2159,12 @@
         date: c.date,
         createdAt: c.created_at
       }));
+      merged.activityLog = (activityRes?.data || []).map(a => ({
+        id: a.id,
+        action: a.action,
+        detail: a.detail,
+        created_at: a.created_at
+      }));
       merged.settings = loadState().settings; // keep local settings
 
       // Merge in any local resources not yet in Supabase so they don't disappear on reload/switch
@@ -2161,6 +2224,8 @@
       renderScheduleView();
       renderResourcesView();
       renderFinanceView();
+      renderProfileView();
+      renderActivityLog();
     }
 
     /******************
@@ -3689,8 +3754,10 @@ Best regards,
           if (isEdit) {
             const idx = state.students.findIndex(s => s.id === student.id);
             state.students[idx] = newStudent;
+            logActivity('Updated student', newStudent.name);
           } else {
             state.students.push(newStudent);
+            logActivity('Added student', newStudent.name);
           }
           saveState();
           closeModal();
@@ -3703,6 +3770,7 @@ Best regards,
               closeModal();
               selectedStudentId = null;
               renderStudentsView();
+              logActivity('Deleted student', student.name);
             }).catch(err => {
               console.error(err);
               alert('Delete failed.');
@@ -3839,12 +3907,14 @@ Best regards,
             notes: form.notes.value.trim(),
             completed: session?.completed || false
           };
-          if (isEdit) {
-            const idx = state.sessions.findIndex(s => s.id === session.id);
-            state.sessions[idx] = newSession;
-          } else {
-            state.sessions.push(newSession);
-          }
+        if (isEdit) {
+          const idx = state.sessions.findIndex(s => s.id === session.id);
+          state.sessions[idx] = newSession;
+          logActivity('Updated session', newSession.topic || newSession.subject || 'Session');
+        } else {
+          state.sessions.push(newSession);
+          logActivity('Added session', newSession.topic || newSession.subject || 'Session');
+        }
           saveState();
           closeModal();
           renderScheduleView();
@@ -3960,12 +4030,14 @@ Best regards,
             alert('Title is required.');
             return;
           }
-          if (isEdit) {
-            const idx = state.resources.findIndex(r => r.id === resource.id);
-            state.resources[idx] = newRes;
-          } else {
-            state.resources.push(newRes);
-          }
+        if (isEdit) {
+          const idx = state.resources.findIndex(r => r.id === resource.id);
+          state.resources[idx] = newRes;
+          logActivity('Updated resource', newRes.title);
+        } else {
+          state.resources.push(newRes);
+          logActivity('Added resource', newRes.title);
+        }
           saveState();
           closeModal();
           renderResourcesView();
@@ -4203,12 +4275,14 @@ Best regards,
             alert('Title required.');
             return;
           }
-          if (isEdit) {
-            const idx = state.documents.findIndex(d => d.id === doc.id);
-            state.documents[idx] = newDoc;
-          } else {
-            state.documents.push(newDoc);
-          }
+        if (isEdit) {
+          const idx = state.documents.findIndex(d => d.id === doc.id);
+          state.documents[idx] = newDoc;
+          logActivity('Updated document', newDoc.title);
+        } else {
+          state.documents.push(newDoc);
+          logActivity('Added document', newDoc.title);
+        }
           saveState();
           closeModal();
           if (selectedStudentId) {
@@ -4389,10 +4463,12 @@ Best regards,
           if (isEdit) {
             const idx = state.invoices.findIndex(i => i.id === inv.id);
             state.invoices[idx] = newInv;
+            logActivity('Updated invoice', newInv.id);
           } else {
             const idx = state.invoices.findIndex(i => i.id === newInv.id);
             if (idx >= 0) state.invoices[idx] = newInv;
             else state.invoices.push(newInv);
+            logActivity('Created invoice', newInv.id);
           }
           saveState();
           closeModal();
