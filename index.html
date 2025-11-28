@@ -3394,8 +3394,16 @@
       renderParentsList();
       // Remote
       if (isSupabaseReady()) {
-        await supabaseClient.from('parent_students').delete().eq('parent_id', parentId).catch(() => {});
-        await supabaseClient.from('parents').delete().eq('id', parentId).catch(() => {});
+        try {
+          await supabaseClient.from('parent_students').delete().eq('parent_id', parentId);
+        } catch (err) {
+          console.warn('Remote parent_students delete failed', err);
+        }
+        try {
+          await supabaseClient.from('parents').delete().eq('id', parentId);
+        } catch (err) {
+          console.warn('Remote parents delete failed', err);
+        }
       }
     }
 
