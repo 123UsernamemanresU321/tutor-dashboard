@@ -2623,8 +2623,10 @@
       });
       const navFinance = document.getElementById('navFinanceBtn');
       const navReports = document.getElementById('navReportsBtn');
-      if (navFinance) navFinance.classList.toggle('hidden', studentMode);
-      if (navReports) navReports.classList.toggle('hidden', studentMode);
+      const navDashboard = document.querySelector('.nav-btn[data-view="dashboard"]');
+      if (navFinance) navFinance.classList.toggle('hidden', studentMode || parentMode);
+      if (navReports) navReports.classList.toggle('hidden', studentMode || parentMode);
+      if (navDashboard) navDashboard.classList.toggle('hidden', studentMode || parentMode);
       if (studentMode) switchView('portal');
       if (parentMode) switchView('parent-portal');
     }
@@ -2647,14 +2649,17 @@
         try {
           state = await loadStateFromSupabase();
           if (!readOnlyMode) saveState(); // persist locally as cache
+          updateReadOnlyUI();
           return;
         } catch (e) {
           console.error('Failed to load from Supabase, falling back to local', e);
           state = loadState(); // keep local data instead of wiping to defaults
+          updateReadOnlyUI();
           return;
         }
       }
       state = loadState();
+      updateReadOnlyUI();
     }
 
     async function loadStateFromSupabase() {
