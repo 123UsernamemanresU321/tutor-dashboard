@@ -165,7 +165,7 @@
       display: none;
       align-items: center;
       justify-content: center;
-      z-index: 50;
+      z-index: 80;
       backdrop-filter: blur(18px);
     }
     .overlay.show {
@@ -1194,6 +1194,10 @@
             <button type="button" id="readTosBtn" class="px-2 py-1 rounded-md border border-slate-300 text-[11px]">Read</button>
           </div>
           <div class="text-[10px] text-slate-500">You must read both documents to sign up.</div>
+          <div class="text-[10px] text-slate-500 flex flex-wrap gap-2">
+            <a class="underline" href="./privacy.html" target="_blank" rel="noopener">Open Privacy Policy</a>
+            <a class="underline" href="./tos.html" target="_blank" rel="noopener">Open Terms of Service</a>
+          </div>
         </div>
         <label class="flex items-start gap-2 text-[11px] text-slate-600 mt-2">
           <input type="checkbox" name="consent" class="mt-0.5 h-3 w-3">
