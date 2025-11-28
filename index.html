@@ -2624,9 +2624,15 @@
       const navFinance = document.getElementById('navFinanceBtn');
       const navReports = document.getElementById('navReportsBtn');
       const navDashboard = document.querySelector('.nav-btn[data-view="dashboard"]');
+      const navStudents = document.querySelector('.nav-btn[data-view="students"]');
+      const navSchedule = document.querySelector('.nav-btn[data-view="schedule"]');
+      const navResources = document.querySelector('.nav-btn[data-view="resources"]');
       if (navFinance) navFinance.classList.toggle('hidden', studentMode || parentMode);
       if (navReports) navReports.classList.toggle('hidden', studentMode || parentMode);
       if (navDashboard) navDashboard.classList.toggle('hidden', studentMode || parentMode);
+      if (navStudents) navStudents.classList.toggle('hidden', parentMode);
+      if (navSchedule) navSchedule.classList.toggle('hidden', parentMode);
+      if (navResources) navResources.classList.toggle('hidden', parentMode);
       if (studentMode) switchView('portal');
       if (parentMode) switchView('parent-portal');
     }
