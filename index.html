@@ -1222,6 +1222,7 @@
     let readOnlyMode = false;
     let hcaptchaWidgetId = null;
     let hcaptchaToken = '';
+    let accountEmails = [];
 
     // SAFE deep clone helper
     function deepClone(obj) {
@@ -1697,6 +1698,7 @@
       applySettingsToUI();
       if (!supabaseAvailable || supabaseSession) {
         await tryLoadRemoteThenLocal();
+        await loadAccountEmails().catch(err => console.warn('Account email fetch failed', err));
         renderAllViews();
       }
       updateReadOnlyUI();
@@ -2087,12 +2089,14 @@
     }
 
     function getAvailableStudentEmails(currentEmail = '') {
-      const emails = new Set();
-      state.students.forEach(s => {
-        if (s.studentEmail) emails.add(s.studentEmail);
-      });
-      if (currentEmail) emails.add(currentEmail);
-      return Array.from(emails).sort();
+      const assigned = new Set(
+        state.students
+          .filter(s => s.studentEmail && s.studentEmail !== currentEmail)
+          .map(s => s.studentEmail)
+      );
+      const options = (accountEmails || []).filter(e => !assigned.has(e));
+      if (currentEmail && !options.includes(currentEmail)) options.push(currentEmail);
+      return options.sort();
     }
 
     async function deleteStudentAndDependencies(studentId) {
@@ -2249,6 +2253,7 @@
         toggleAuthOverlay(!session);
         if (session) {
           document.getElementById('signOutBtn')?.classList.remove('hidden');
+          loadAccountEmails().catch(err => console.warn('Account email fetch failed', err));
           tryLoadRemoteThenLocal().then(() => {
             renderAllViews();
             setupRealtime();
@@ -2256,6 +2261,7 @@
         } else {
           document.getElementById('signOutBtn')?.classList.add('hidden');
           state = deepClone(defaultState);
+          accountEmails = [];
         }
         updateReadOnlyUI();
       });
@@ -2625,6 +2631,20 @@
       state.settings.theme = state.settings.theme === 'dark' ? 'light' : 'dark';
       applyTheme();
       saveState();
+    }
+
+    async function loadAccountEmails() {
+      if (!isSupabaseReady() || !isOwner()) {
+        accountEmails = [];
+        return;
+      }
+      try {
+        const { data, error } = await supabaseClient.functions.invoke('list-account-emails');
+        if (error) throw error;
+        accountEmails = Array.isArray(data?.emails) ? data.emails.filter(Boolean) : [];
+      } catch (err) {
+        console.warn('Account emails fetch failed', err);
+      }
     }
 
     function applyDensity() {
@@ -4233,10 +4253,13 @@ Best regards,
     /***********************
      * STUDENT CRUD MODAL  *
      ***********************/
-    function openStudentModal(student) {
+    async function openStudentModal(student) {
       if (!guardEdit()) return;
+      if (isSupabaseReady() && isOwner()) {
+        await loadAccountEmails().catch(err => console.warn('Account email fetch failed', err));
+      }
       const isEdit = !!student;
-      const emailOptions = getAvailableStudentEmails(student?.studentEmail).map(e => `<option value="${e}"></option>`).join('');
+      const emailOptions = getAvailableStudentEmails(student?.studentEmail).map(e => `<option value="${e}">${e}</option>`).join('');
       const html = `
         <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit student' : 'Add student'}</h2>
         <form id="studentForm" class="space-y-2">
@@ -4247,9 +4270,10 @@ Best regards,
           </div>
           <div>
             <label class="block text-[11px] mb-1">Student email (for login)</label>
-            <input list="studentEmailOptions" name="studentEmail" type="email" value="${student?.studentEmail || ''}"
-                   class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" ${readOnlyMode ? 'disabled' : ''}>
-            <datalist id="studentEmailOptions">${emailOptions}</datalist>
+            <select name="studentEmail" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" ${readOnlyMode ? 'disabled' : ''}>
+              <option value="">Select an account email</option>
+              ${emailOptions}
+            </select>
             <p class="text-[10px] text-slate-500 mt-1">Choose an existing user email; each email can be used for only one student.</p>
           </div>
           <div class="grid grid-cols-2 gap-2">
