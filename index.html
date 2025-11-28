@@ -1893,8 +1893,9 @@
       if (studentMode && ['finance','reports','dashboard','parent-portal'].includes(targetView)) {
         targetView = 'portal';
       }
-      if (parentMode && ['finance','reports','dashboard','portal'].includes(targetView)) {
-        targetView = 'parent-portal';
+      if (parentMode) {
+        const allowed = new Set(['parent-portal','profile','settings']);
+        if (!allowed.has(targetView)) targetView = 'parent-portal';
       }
       document.getElementById('view-' + targetView)?.classList.remove('hidden');
       document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('bg-slate-800', 'active'));
