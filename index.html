@@ -618,6 +618,13 @@
                   </select>
                 </div>
                 <ul id="studentsList" class="space-y-2 text-xs"></ul>
+                <div class="border-t border-slate-200 mt-4 pt-3 space-y-2" data-owner-only>
+                  <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-semibold">Parents</h3>
+                    <button id="addParentBtn" class="px-2 py-1 rounded-lg border border-slate-300 text-[11px]">＋ Add</button>
+                  </div>
+                  <ul id="parentsList" class="space-y-2 text-xs"></ul>
+                </div>
               </div>
 
               <!-- Student detail -->
@@ -1976,6 +1983,8 @@
       document.getElementById('addSessionBtn').addEventListener('click', () => { if (guardEdit()) openSessionModal(); });
       document.getElementById('addResourceBtn').addEventListener('click', () => { if (guardEdit()) openResourceModal(); });
       document.getElementById('addInvoiceBtn').addEventListener('click', () => { if (guardEdit()) openInvoiceModal(); });
+      const addParentBtn = document.getElementById('addParentBtn');
+      if (addParentBtn) addParentBtn.onclick = () => { if (guardEdit()) openParentModal(); };
       const refreshBtn = document.getElementById('refreshBtn');
       if (refreshBtn) {
         refreshBtn.onclick = async () => {
@@ -3344,10 +3353,20 @@
         document.getElementById('studentDetailEmpty').classList.remove('hidden');
         document.getElementById('studentDetail').classList.add('hidden');
       }
+      renderParentsList();
     }
 
     function getStudentById(id) {
       return state.students.find(s => s.id === id);
+    }
+
+    function getParentById(id) {
+      return state.parents.find(p => p.id === id);
+    }
+
+    function getParentLinkedStudents(parentId) {
+      const links = state.parentLinks.filter(pl => pl.parentId === parentId);
+      return links.map(pl => getStudentById(pl.studentId)).filter(Boolean);
     }
 
     function getStudentSubjectHours(studentId) {
@@ -3364,6 +3383,138 @@
         }
       });
       return res;
+    }
+
+    function renderParentsList() {
+      const list = document.getElementById('parentsList');
+      if (!list) return;
+      if (!state.parents.length) {
+        list.innerHTML = '<li class="text-slate-500 text-xs">No parents added yet.</li>';
+        return;
+      }
+      list.innerHTML = state.parents.map(p => {
+        const kids = getParentLinkedStudents(p.id);
+        const kidNames = kids.map(k => k.name).join(', ') || 'No students linked';
+        return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80 flex items-start justify-between gap-2">
+          <div>
+            <div class="font-semibold">${p.name || p.email}</div>
+            <div class="text-[10px] text-slate-500">${p.email}</div>
+            <div class="text-[10px] text-slate-500">${kidNames}</div>
+          </div>
+          <button data-parent-id="${p.id}" class="px-2 py-1 text-[10px] rounded-lg border border-slate-300 hover:bg-slate-50">Edit</button>
+        </li>`;
+      }).join('');
+      list.querySelectorAll('[data-parent-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const parent = getParentById(btn.dataset.parentId);
+          if (parent) openParentModal(parent);
+        });
+      });
+    }
+
+    function openParentModal(parent) {
+      if (!guardEdit()) return;
+      const isEdit = !!parent;
+      const linked = new Set(
+        state.parentLinks.filter(pl => pl.parentId === parent?.id).map(pl => pl.studentId)
+      );
+      const studentChecks = state.students.map(s => `
+        <label class="flex items-center gap-2 text-[11px]">
+          <input type="checkbox" name="studentIds" value="${s.id}" ${linked.has(s.id) ? 'checked' : ''}>
+          <span>${s.name}</span>
+        </label>
+      `).join('');
+      const html = `
+        <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit parent' : 'Add parent'}</h2>
+        <form id="parentForm" class="space-y-2 text-xs">
+          <div>
+            <label class="block text-[11px] mb-1">Name</label>
+            <input name="name" value="${parent?.name || ''}" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Email</label>
+            <input name="email" type="email" value="${parent?.email || ''}" required class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Phone</label>
+            <input name="phone" value="${parent?.phone || ''}" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Notes</label>
+            <textarea name="notes" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${parent?.notes || ''}</textarea>
+          </div>
+          <div class="space-y-1">
+            <div class="text-[11px] font-semibold">Link students</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-1 max-h-40 overflow-y-auto">
+              ${studentChecks || '<div class="text-[10px] text-slate-500">No students yet.</div>'}
+            </div>
+          </div>
+          <div class="flex justify-between items-center mt-3">
+            <button type="submit" class="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium">
+              ${isEdit ? 'Save changes' : 'Add parent'}
+            </button>
+            ${isEdit ? `
+              <button type="button" id="deleteParentBtn"
+                class="px-3 py-1.5 rounded-xl border border-rose-300 text-rose-700 text-xs">
+                Delete
+              </button>` : ''}
+          </div>
+        </form>
+      `;
+      openModal(html, () => {
+        const form = document.getElementById('parentForm');
+        form.onsubmit = (e) => {
+          e.preventDefault();
+          const newParent = {
+            id: parent?.id || generateId('par'),
+            name: form.name.value.trim(),
+            email: form.email.value.trim().toLowerCase(),
+            phone: form.phone.value.trim(),
+            notes: form.notes.value.trim()
+          };
+          if (!newParent.email) {
+            alert('Email is required.');
+            return;
+          }
+          const taken = state.parents.some(p => p.email === newParent.email && p.id !== newParent.id);
+          if (taken) {
+            alert('That email is already used by another parent.');
+            return;
+          }
+          if (isEdit) {
+            const idx = state.parents.findIndex(p => p.id === parent.id);
+            state.parents[idx] = { ...state.parents[idx], ...newParent };
+            logActivity('Updated parent', newParent.email);
+          } else {
+            state.parents.push(newParent);
+            logActivity('Added parent', newParent.email);
+          }
+          const selected = Array.from(form.querySelectorAll('input[name="studentIds"]:checked')).map(i => i.value);
+          state.parentLinks = state.parentLinks.filter(pl => pl.parentId !== newParent.id);
+          selected.forEach(sid => {
+            state.parentLinks.push({
+              id: generateId('plink'),
+              parentId: newParent.id,
+              studentId: sid,
+              relationship: ''
+            });
+          });
+          saveState();
+          closeModal();
+          renderParentsList();
+        };
+        if (isEdit) {
+          const delBtn = document.getElementById('deleteParentBtn');
+          delBtn.onclick = () => {
+            if (!confirm('Delete this parent and unlink from all students?')) return;
+            state.parents = state.parents.filter(p => p.id !== parent.id);
+            state.parentLinks = state.parentLinks.filter(pl => pl.parentId !== parent.id);
+            saveState();
+            closeModal();
+            renderParentsList();
+          };
+        }
+      });
     }
 
     function getLastSessionDate(studentId) {
