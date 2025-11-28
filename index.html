@@ -1184,6 +1184,17 @@
           <button type="submit" data-action="signin" class="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium">Sign in</button>
           <button type="submit" data-action="signup" class="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 text-xs">Sign up</button>
         </div>
+        <div class="space-y-1 bg-slate-50 border border-slate-200 rounded-lg p-2">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-[11px] text-slate-700">Privacy Policy</span>
+            <button type="button" id="readPrivacyBtn" class="px-2 py-1 rounded-md border border-slate-300 text-[11px]">Read</button>
+          </div>
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-[11px] text-slate-700">Terms of Service</span>
+            <button type="button" id="readTosBtn" class="px-2 py-1 rounded-md border border-slate-300 text-[11px]">Read</button>
+          </div>
+          <div class="text-[10px] text-slate-500">You must read both documents to sign up.</div>
+        </div>
         <label class="flex items-start gap-2 text-[11px] text-slate-600 mt-2">
           <input type="checkbox" name="consent" class="mt-0.5 h-3 w-3">
           <span>I consent to receive account emails for access and updates related to this tutor dashboard.</span>
@@ -1223,6 +1234,8 @@
     let hcaptchaWidgetId = null;
     let hcaptchaToken = '';
     let accountEmails = [];
+    let privacyRead = false;
+    let tosRead = false;
 
     // SAFE deep clone helper
     function deepClone(obj) {
@@ -2263,12 +2276,18 @@
           document.getElementById('signOutBtn')?.classList.add('hidden');
           state = deepClone(defaultState);
           accountEmails = [];
+          privacyRead = false;
+          tosRead = false;
         }
         updateReadOnlyUI();
       });
 
       const authForm = document.getElementById('authForm');
       const authMsg = document.getElementById('authMessage');
+      const readPrivacyBtn = document.getElementById('readPrivacyBtn');
+      const readTosBtn = document.getElementById('readTosBtn');
+      if (readPrivacyBtn) readPrivacyBtn.onclick = () => openPolicyModal('privacy');
+      if (readTosBtn) readTosBtn.onclick = () => openPolicyModal('tos');
       if (authForm) {
         authForm.onsubmit = async (e) => {
           e.preventDefault();
@@ -2280,6 +2299,9 @@
             if (action === 'signup' && !authForm.consent.checked) {
               throw new Error('Please provide consent to receive account emails.');
             }
+            if (action === 'signup' && (!privacyRead || !tosRead)) {
+              throw new Error('Please read and acknowledge the Privacy Policy and Terms of Service before signing up.');
+            }
             const captchaToken = await ensureHCaptcha();
             if (action === 'signup') {
               const { error } = await supabaseClient.auth.signUp({
@@ -2287,7 +2309,7 @@
                 password,
                 options: {
                   captchaToken,
-                  emailRedirectTo: new URL('/confirmation.html', window.location.origin).href
+                  emailRedirectTo: new URL('./confirmation.html', window.location.href).href
                 }
               });
               if (error) throw error;
@@ -2635,6 +2657,71 @@
       state.settings.theme = state.settings.theme === 'dark' ? 'light' : 'dark';
       applyTheme();
       saveState();
+    }
+
+    const policyContent = {
+      privacy: `
+<h3 class="text-sm font-semibold mb-2">Privacy Policy (Last Updated: 28 November 2025)</h3>
+<p class="text-[11px] mb-2">This Privacy Policy explains how I collect, use, store, and protect personal information for students who use my tutoring dashboard (“the Dashboard”). By creating an account or using the Dashboard, you agree to the terms described below.</p>
+<ul class="list-disc list-inside text-[11px] space-y-2">
+  <li><strong>Information I Collect:</strong> name, email, password (via Supabase Auth), subjects, sessions, homework status, resources accessed, invoices/payment status (no card/bank details), local preferences stored only on your device.</li>
+  <li><strong>Use:</strong> authentication, scheduling, resources/homework display, invoices, lesson communications. No marketing or third-party sharing.</li>
+  <li><strong>Storage & Security:</strong> Supabase for auth/data; localStorage/IndexedDB for on-device preferences; only I (the tutor) can view academic data.</li>
+  <li><strong>Sharing:</strong> Never sold or shared; only if legally required or if you request it.</li>
+  <li><strong>Your Rights:</strong> Access, correct, export, or delete your data; opt out anytime.</li>
+  <li><strong>Retention:</strong> Kept while you are a student; delete on request.</li>
+  <li><strong>Minors:</strong> Only essential data; no non-academic use; follow guardian instructions.</li>
+  <li><strong>Contact:</strong> erichuang.shangjing@outlook.com</li>
+</ul>
+      `,
+      tos: `
+<h3 class="text-sm font-semibold mb-2">Terms of Service (Last Updated: 28 November 2025)</h3>
+<ul class="list-disc list-inside text-[11px] space-y-2">
+  <li><strong>Eligibility:</strong> Students I tutor; under 18 requires guardian approval.</li>
+  <li><strong>Account:</strong> Keep credentials private; use only for tutoring; report unauthorized access.</li>
+  <li><strong>Acceptable Use:</strong> No hacking, sharing other students’ data, or harmful uploads.</li>
+  <li><strong>Sessions:</strong> Attend bookings; give reasonable cancellation notice.</li>
+  <li><strong>Payments:</strong> Pay invoices by due date; late payments may incur late fees/suspension.</li>
+  <li><strong>Resources:</strong> Personal academic use only; no reposting/reselling.</li>
+  <li><strong>Privacy:</strong> Handled per the Privacy Policy.</li>
+  <li><strong>Liability:</strong> Dashboard provided “as is”; not responsible for outages, third-party downtime, device loss, or grades.</li>
+  <li><strong>Termination:</strong> I may restrict access for violations; you may delete anytime.</li>
+  <li><strong>Contact:</strong> erichuang.shangjing@outlook.com</li>
+</ul>
+      `
+    };
+
+    function openPolicyModal(type) {
+      const content = policyContent[type];
+      if (!content) return;
+      const title = type === 'privacy' ? 'Privacy Policy' : 'Terms of Service';
+      const html = `
+        <h2 class="text-sm font-semibold mb-2">${title}</h2>
+        <div id="policyScroll" class="border border-slate-200 rounded-lg p-3 max-h-72 overflow-y-auto text-xs space-y-2 bg-white">
+          ${content}
+        </div>
+        <button id="policyAcknowledgeBtn" class="mt-3 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium" disabled>
+          Scroll to the bottom to continue
+        </button>
+      `;
+      openModal(html, () => {
+        const box = document.getElementById('policyScroll');
+        const btn = document.getElementById('policyAcknowledgeBtn');
+        const onScroll = () => {
+          if (box.scrollTop + box.clientHeight >= box.scrollHeight - 4) {
+            btn.disabled = false;
+            btn.textContent = 'I have read this';
+          }
+        };
+        if (box) box.addEventListener('scroll', onScroll);
+        if (btn) {
+          btn.onclick = () => {
+            if (type === 'privacy') privacyRead = true;
+            if (type === 'tos') tosRead = true;
+            closeModal();
+          };
+        }
+      });
     }
 
     async function loadAccountEmails() {
