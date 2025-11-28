@@ -1224,7 +1224,7 @@
     // If true, try Supabase Storage uploads; if false, always fall back to local data URL to avoid 400/RLS spam until backend is fixed.
     const ALLOW_STORAGE_UPLOADS = true;
     // hCaptcha config
-    const HCAPTCHA_ENABLED = false;
+    const HCAPTCHA_ENABLED = true;
     const HCAPTCHA_SITEKEY = '3ff631fc-4c9c-43ee-a486-3232939eedb2';
     const supabaseAvailable =
       typeof supabase !== 'undefined' &&
@@ -2256,6 +2256,9 @@
       if (!HCAPTCHA_ENABLED) return undefined;
       if (!HCAPTCHA_SITEKEY || HCAPTCHA_SITEKEY.includes('YOUR_HCAPTCHA')) {
         throw new Error('hCaptcha site key missing.');
+      }
+      if (!window.hcaptcha) {
+        throw new Error('hCaptcha did not load. Please allow scripts for js.hcaptcha.com and retry.');
       }
       if (!hcaptchaToken) {
         throw new Error('Please complete hCaptcha.');
