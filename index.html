@@ -1224,7 +1224,7 @@
     // If true, try Supabase Storage uploads; if false, always fall back to local data URL to avoid 400/RLS spam until backend is fixed.
     const ALLOW_STORAGE_UPLOADS = true;
     // hCaptcha config
-    const HCAPTCHA_ENABLED = true;
+    const HCAPTCHA_ENABLED = false;
     const HCAPTCHA_SITEKEY = '3ff631fc-4c9c-43ee-a486-3232939eedb2';
     const supabaseAvailable =
       typeof supabase !== 'undefined' &&
@@ -1685,7 +1685,10 @@
     const suppressOutputError = (msg = '', src = '') => {
       const lowerMsg = String(msg).toLowerCase();
       const lowerSrc = String(src || '').toLowerCase();
-      return lowerMsg.includes('output') || (lowerMsg.includes('csp') && lowerSrc.includes('hcaptcha'));
+      if (lowerMsg.includes('output')) return true;
+      if (lowerMsg.includes('refused to execute a script') && lowerSrc.includes('hcaptcha')) return true;
+      if (lowerMsg.includes('csp') && lowerSrc.includes('hcaptcha')) return true;
+      return false;
     };
     window.addEventListener('error', (event) => {
       if (suppressOutputError(event.message, event.filename)) {
@@ -1701,8 +1704,9 @@
     };
     // Catch any unhandled promise rejections so Safari doesn’t throw “output” ReferenceErrors
     window.addEventListener('unhandledrejection', (event) => {
-      const reason = String(event.reason || '');
-      if (reason.toLowerCase().includes('output')) {
+      const reason = String(event.reason?.message || event.reason || '');
+      const lower = reason.toLowerCase();
+      if (lower.includes('output')) {
         event.preventDefault();
         return true;
       }
@@ -1711,8 +1715,9 @@
       return true;
     });
     window.onunhandledrejection = (event) => {
-      const reason = String(event.reason || '');
-      if (reason.toLowerCase().includes('output')) {
+      const reason = String(event.reason?.message || event.reason || '');
+      const lower = reason.toLowerCase();
+      if (lower.includes('output')) {
         if (event.preventDefault) event.preventDefault();
         return true;
       }
@@ -2183,7 +2188,7 @@
       try {
         if (statusEl) statusEl.textContent = 'Deleting your data & account...';
         const { data, error } = await supabaseClient.functions.invoke('delete-account', {
-          // auth header is added automatically by supabase-js with the current session
+          headers: { Authorization: `Bearer ${supabaseSession.access_token}` }
         });
         if (error || !data?.success) {
           throw error || new Error(data?.error || 'Deletion failed (backend).');
