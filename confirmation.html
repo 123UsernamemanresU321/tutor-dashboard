@@ -47,11 +47,32 @@
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>✅ Email confirmed</h1>
-    <p>Your account is verified. You can now sign in to the tutor dashboard.</p>
-    <a class="button" href="./index.html">Go to dashboard</a>
-    <small>If you didn’t request this, you can ignore this page.</small>
+  <div class="card" id="card">
+    <h1 id="title">✅ Email confirmed</h1>
+    <p id="message">Your account is verified. You can now sign in to the tutor dashboard.</p>
+    <a class="button" href="./index.html" id="cta">Go to dashboard</a>
+    <small id="meta">You can close this tab if you’re already signed in elsewhere.</small>
   </div>
+  <script>
+    // Supabase sends tokens in the hash; clear them from the URL for cleanliness.
+    (function() {
+      const hash = window.location.hash || '';
+      if (hash.startsWith('#')) {
+        const params = new URLSearchParams(hash.slice(1));
+        const type = params.get('type');
+        const title = document.getElementById('title');
+        const message = document.getElementById('message');
+        if (type === 'recovery') {
+          title.textContent = '🔑 Password reset';
+          message.textContent = 'Your password reset link is confirmed. You can now sign in with your new password.';
+        } else {
+          title.textContent = '✅ Email confirmed';
+          message.textContent = 'Your account is verified. You can now sign in to the tutor dashboard.';
+        }
+        // Drop the hash from the address bar to avoid leaking tokens
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    })();
+  </script>
 </body>
 </html>
