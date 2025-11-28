@@ -2115,7 +2115,11 @@
       const lastSignIn = user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString() : '—';
       if (createdEl) createdEl.textContent = created;
       if (lastEl) lastEl.textContent = lastSignIn;
-      if (roleEl) roleEl.textContent = isOwner() ? 'Owner' : 'Student';
+      if (roleEl) {
+        if (isOwner()) roleEl.textContent = 'Owner';
+        else if (parentMode) roleEl.textContent = 'Parent';
+        else roleEl.textContent = 'Student';
+      }
       if (uidEl) uidEl.textContent = user.id || '—';
       if (sessMeta && supabaseSession?.expires_at) {
         const exp = new Date(supabaseSession.expires_at * 1000).toLocaleString();
@@ -2326,6 +2330,17 @@
       return options.sort();
     }
 
+    function getAvailableParentEmails(currentEmail = '') {
+      const assigned = new Set(
+        state.parents
+          .filter(p => p.email && p.email !== currentEmail)
+          .map(p => p.email)
+      );
+      const options = (accountEmails || []).filter(e => !assigned.has(e));
+      if (currentEmail && !options.includes(currentEmail)) options.push(currentEmail);
+      return options.sort();
+    }
+
     async function deleteStudentAndDependencies(studentId) {
       // Local cleanup
       state.students = state.students.filter(s => s.id !== studentId);
@@ -2335,6 +2350,7 @@
       state.homework = state.homework.filter(h => h.studentId !== studentId);
       state.studentTodos = state.studentTodos.filter(t => t.studentId !== studentId);
       state.studentCheckins = state.studentCheckins.filter(c => c.studentId !== studentId);
+      state.parentLinks = state.parentLinks.filter(pl => pl.studentId !== studentId);
       // sessions: remove student from studentIds; drop sessions with no students left
       const sessionsToRemove = [];
       state.sessions.forEach(sess => {
@@ -2358,6 +2374,7 @@
         for (const t of tables) {
           await supabaseClient.from(t).delete().eq('student_id', studentId);
         }
+        await supabaseClient.from('parent_students').delete().eq('student_id', studentId).catch(() => {});
         if (sessionsToRemove.length) {
           await supabaseClient.from('sessions').delete().in('id', sessionsToRemove);
         }
@@ -3369,6 +3386,19 @@
       return links.map(pl => getStudentById(pl.studentId)).filter(Boolean);
     }
 
+    async function deleteParentAndLinks(parentId) {
+      // Local
+      state.parents = state.parents.filter(p => p.id !== parentId);
+      state.parentLinks = state.parentLinks.filter(pl => pl.parentId !== parentId);
+      saveState();
+      renderParentsList();
+      // Remote
+      if (isSupabaseReady()) {
+        await supabaseClient.from('parent_students').delete().eq('parent_id', parentId).catch(() => {});
+        await supabaseClient.from('parents').delete().eq('id', parentId).catch(() => {});
+      }
+    }
+
     function getStudentSubjectHours(studentId) {
       const res = { Physics: 0, Chemistry: 0, Maths: 0 };
       const now = new Date();
@@ -3415,6 +3445,7 @@
     function openParentModal(parent) {
       if (!guardEdit()) return;
       const isEdit = !!parent;
+      const parentEmailOptions = getAvailableParentEmails(parent?.email).map(e => `<option value="${e}">${e}</option>`).join('');
       const linked = new Set(
         state.parentLinks.filter(pl => pl.parentId === parent?.id).map(pl => pl.studentId)
       );
@@ -3433,11 +3464,20 @@
           </div>
           <div>
             <label class="block text-[11px] mb-1">Email</label>
-            <input name="email" type="email" value="${parent?.email || ''}" required class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            <select name="email" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+              <option value="">Select an account email</option>
+              ${parentEmailOptions}
+            </select>
           </div>
           <div>
             <label class="block text-[11px] mb-1">Phone</label>
-            <input name="phone" value="${parent?.phone || ''}" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            <div class="flex gap-2">
+              <select name="phoneCode" class="border border-slate-300 rounded-lg px-2 py-1 text-xs w-28">
+                ${['+1','+27','+44','+61','+65','+91'].map(c => `<option value="${c}" ${parent?.phone?.startsWith(c) ? 'selected' : ''}>${c}</option>`).join('')}
+                <option value="" ${!(parent?.phone) ? 'selected' : ''}>Code</option>
+              </select>
+              <input name="phoneLocal" value="${parent?.phone ? parent.phone.replace(/^\\+\\d+\\s?/, '') : ''}" class="flex-1 border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="Number">
+            </div>
           </div>
           <div>
             <label class="block text-[11px] mb-1">Notes</label>
@@ -3469,7 +3509,7 @@
             id: parent?.id || generateId('par'),
             name: form.name.value.trim(),
             email: form.email.value.trim().toLowerCase(),
-            phone: form.phone.value.trim(),
+            phone: (form.phoneCode.value || '') + (form.phoneLocal.value.trim() ? (' ' + form.phoneLocal.value.trim()) : ''),
             notes: form.notes.value.trim()
           };
           if (!newParent.email) {
@@ -3503,15 +3543,16 @@
           closeModal();
           renderParentsList();
         };
-        if (isEdit) {
-          const delBtn = document.getElementById('deleteParentBtn');
+          if (isEdit) {
+            const delBtn = document.getElementById('deleteParentBtn');
           delBtn.onclick = () => {
             if (!confirm('Delete this parent and unlink from all students?')) return;
-            state.parents = state.parents.filter(p => p.id !== parent.id);
-            state.parentLinks = state.parentLinks.filter(pl => pl.parentId !== parent.id);
-            saveState();
-            closeModal();
-            renderParentsList();
+            deleteParentAndLinks(parent.id).then(() => {
+              closeModal();
+            }).catch(err => {
+              console.error(err);
+              alert('Failed to delete parent: ' + (err?.message || err));
+            });
           };
         }
       });
@@ -5601,16 +5642,6 @@ Best regards,
         }
       });
     }
-
-    /***********************
-     * VALIDATION SUMMARY  *
-     ***********************
-     * Changes this debug pass:
-     * - Dark mode completely reskinned: cohesive gradients, proper backgrounds for cards, sidebar, topbar, calendar, inputs.
-     * - Layout tightened: centered main content (max-width), rounded cards, consistent spacing, better nav styling.
-     * - Innovation / integration: quick “Invoice for this student” button inside the student finance tab wired to invoice modal; homework, docs, invoices, sessions still visible in the 360° timeline.
-     * All core features (students, schedule, resources + homework, invoices, documents, search, backup, theme, density) remain wired and functional.
-     */
   </script>
 </body>
 </html>
