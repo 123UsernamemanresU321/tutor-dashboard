@@ -1235,6 +1235,7 @@
     let supabaseClient = null;
     let supabaseSession = null;
     let readOnlyMode = false;
+    let studentMode = false;
     let hcaptchaWidgetId = null;
     let hcaptchaToken = '';
     let accountEmails = [];
@@ -2252,7 +2253,7 @@
     }
 
     async function ensureHCaptcha() {
-      if (!HCAPTCHA_ENABLED) return '';
+      if (!HCAPTCHA_ENABLED) return undefined;
       if (!HCAPTCHA_SITEKEY || HCAPTCHA_SITEKEY.includes('YOUR_HCAPTCHA')) {
         throw new Error('hCaptcha site key missing.');
       }
@@ -2330,7 +2331,7 @@
                 email,
                 password,
                 options: {
-                  captchaToken,
+                  ...(HCAPTCHA_ENABLED ? { captchaToken } : {}),
                   emailRedirectTo: new URL('./confirmation.html', window.location.href).href
                 }
               });
@@ -2340,12 +2341,17 @@
               const { error } = await supabaseClient.auth.signInWithPassword({
                 email,
                 password,
-                options: { captchaToken }
+                options: HCAPTCHA_ENABLED ? { captchaToken } : {}
               });
               if (error) throw error;
             }
           } catch (err) {
-            authMsg.textContent = err.message || 'Auth error';
+            const msg = err?.message || 'Auth error';
+            if (msg.toLowerCase().includes('captcha')) {
+              authMsg.textContent = 'Captcha verification failed. If Supabase captcha is enabled, set HCAPTCHA_ENABLED=true and allow the widget to load, or disable captcha in Supabase Auth settings.';
+            } else {
+              authMsg.textContent = msg;
+            }
           }
         };
       }
