@@ -1327,7 +1327,8 @@
       state.homework.forEach(hw => { hw.id = forceUuid(hw.id); hw.studentId = forceUuid(hw.studentId); hw.resourceId = forceUuid(hw.resourceId); });
       state.documents.forEach(d => { d.id = forceUuid(d.id); d.studentId = forceUuid(d.studentId); });
       state.contracts.forEach(c => { c.id = forceUuid(c.id); c.studentId = forceUuid(c.studentId); });
-      state.invoices.forEach(inv => { inv.id = forceUuid(inv.id); inv.studentId = forceUuid(inv.studentId); });
+      // Do NOT force invoice IDs to UUIDs to preserve existing invoice identifiers in the DB.
+      state.invoices.forEach(inv => { inv.id = cleanId(inv.id); inv.studentId = forceUuid(inv.studentId); });
       state.studentTodos.forEach(t => { t.id = forceUuid(t.id); t.studentId = forceUuid(t.studentId); });
       state.studentCheckins.forEach(c => { c.id = forceUuid(c.id); c.studentId = forceUuid(c.studentId); });
       state.activityLog.forEach(l => { l.id = forceUuid(l.id); });
