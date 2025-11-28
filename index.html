@@ -2015,6 +2015,8 @@
       const navReports = document.getElementById('navReportsBtn');
       if (navFinance) navFinance.classList.toggle('hidden', studentMode || parentMode);
       if (navReports) navReports.classList.toggle('hidden', studentMode || parentMode);
+      const navDashboard = document.querySelector('.nav-btn[data-view="dashboard"]');
+      if (navDashboard) navDashboard.classList.toggle('hidden', studentMode || parentMode);
 
       const exportIcsBtn = document.getElementById('exportIcsBtn');
       if (exportIcsBtn) {
