@@ -412,6 +412,9 @@
         <button data-view="portal" id="navPortalBtn" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition hidden">
           <span>📂</span><span>My portal</span>
         </button>
+        <button data-view="parent-portal" id="navParentPortalBtn" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition hidden">
+          <span>👪</span><span>Parent portal</span>
+        </button>
       </nav>
 
     </aside>
@@ -1152,6 +1155,48 @@
             </div>
           </div>
         </section>
+
+        <!-- Parent portal (parent-mode only) -->
+        <section id="view-parent-portal" class="view hidden">
+          <div class="section-shell space-y-4">
+            <div class="flex items-center justify-between mb-1">
+              <div>
+                <h2 class="text-lg font-semibold">Parent portal</h2>
+                <p class="text-xs text-slate-500">Linked students, schedules, homework, invoices, and messages.</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
+              <div class="card p-4 space-y-2">
+                <h3 class="text-sm font-semibold">Linked students</h3>
+                <ul id="parentStudentsList" class="space-y-2 max-h-72 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+              <div class="card p-4 space-y-2">
+                <h3 class="text-sm font-semibold">Messages</h3>
+                <ul id="parentMessages" class="space-y-2 max-h-72 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
+              <div class="card p-4 space-y-2">
+                <h3 class="text-sm font-semibold">Upcoming sessions</h3>
+                <ul id="parentSessions" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+              <div class="card p-4 space-y-2">
+                <h3 class="text-sm font-semibold">Homework status</h3>
+                <ul id="parentHomework" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
+              <div class="card p-4 space-y-2">
+                <h3 class="text-sm font-semibold">Invoices</h3>
+                <ul id="parentInvoices" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+              <div class="card p-4 space-y-2">
+                <h3 class="text-sm font-semibold">Resources</h3>
+                <ul id="parentResources" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   </div>
@@ -1236,6 +1281,7 @@
     let supabaseSession = null;
     let readOnlyMode = false;
     let studentMode = false;
+    let parentMode = false;
     let hcaptchaWidgetId = null;
     let hcaptchaToken = '';
     let accountEmails = [];
@@ -1249,6 +1295,8 @@
 
     const defaultState = {
       students: [],
+      parents: [],
+      parentLinks: [],
       sessions: [],
       resources: [],
       invoices: [],
@@ -1304,11 +1352,13 @@
     }
 
     function sanitizeState(st) {
-      ['students','sessions','resources','homework','documents','contracts','invoices','studentTodos','studentCheckins','messages'].forEach(key => {
+      ['students','parents','parentLinks','sessions','resources','homework','documents','contracts','invoices','studentTodos','studentCheckins','messages'].forEach(key => {
         if (!Array.isArray(st[key])) st[key] = [];
       });
       if (!Array.isArray(st.activityLog)) st.activityLog = [];
       st.students.forEach(s => { s.id = cleanId(s.id); s.studentEmail = (s.studentEmail || s.student_email || '').trim().toLowerCase(); });
+      st.parents.forEach(p => { p.id = cleanId(p.id); p.email = (p.email || '').trim().toLowerCase(); });
+      st.parentLinks.forEach(pl => { pl.id = cleanId(pl.id); pl.parentId = cleanId(pl.parentId); pl.studentId = cleanId(pl.studentId); });
       st.sessions.forEach(s => {
         s.id = cleanId(s.id);
         s.studentIds = (s.studentIds || []).map(cleanId);
@@ -1340,6 +1390,8 @@
 
     function enforceUuidFields() {
       state.students.forEach(s => { s.id = forceUuid(s.id); });
+      state.parents.forEach(p => { p.id = forceUuid(p.id); });
+      state.parentLinks.forEach(pl => { pl.id = forceUuid(pl.id); pl.parentId = forceUuid(pl.parentId); pl.studentId = forceUuid(pl.studentId); });
       state.sessions.forEach(sess => { sess.id = forceUuid(sess.id); sess.studentIds = (sess.studentIds || []).map(forceUuid); });
       state.resources.forEach(r => { r.id = forceUuid(r.id); });
       state.homework.forEach(hw => { hw.id = forceUuid(hw.id); hw.studentId = forceUuid(hw.studentId); hw.resourceId = forceUuid(hw.resourceId); });
@@ -1357,6 +1409,8 @@
       sanitizeState(state);
       const maps = {
         students: new Map(),
+        parents: new Map(),
+        parentLinks: new Map(),
         sessions: new Map(),
         resources: new Map(),
         homework: new Map(),
@@ -1380,6 +1434,8 @@
         return newId;
       }
       state.students.forEach(s => ensureId(s, 'students', maps.students));
+      state.parents.forEach(p => ensureId(p, 'parents', maps.parents));
+      state.parentLinks.forEach(pl => ensureId(pl, 'parentLinks', maps.parentLinks));
       state.sessions.forEach(sess => ensureId(sess, 'sessions', maps.sessions));
       state.resources.forEach(r => ensureId(r, 'resources', maps.resources));
       state.homework.forEach(hw => ensureId(hw, 'homework', maps.homework));
@@ -1457,6 +1513,26 @@
       enforceUuidFields();
       const uid = supabaseSession?.user?.id;
       if (!uid) return;
+
+      const parents = state.parents.map(p => ({
+        id: cleanId(p.id),
+        user_id: uid,
+        email: (p.email || '').trim().toLowerCase(),
+        name: p.name,
+        phone: p.phone,
+        notes: p.notes,
+        verified: p.verified || false
+      }));
+      await upsertAndPrune('parents', parents, 'id');
+
+      const parentLinks = state.parentLinks.map(pl => ({
+        id: cleanId(pl.id),
+        user_id: uid,
+        parent_id: cleanId(pl.parentId),
+        student_id: cleanId(pl.studentId),
+        relationship: pl.relationship
+      }));
+      await upsertAndPrune('parent_students', parentLinks, 'id');
 
       // prepare rows with user_id
       const students = state.students.map(s => ({
@@ -1772,7 +1848,7 @@
         });
       });
       // default view
-      const defaultView = studentMode ? 'portal' : 'dashboard';
+      const defaultView = studentMode ? 'portal' : parentMode ? 'parent-portal' : 'dashboard';
       switchView(defaultView);
       const activeBtn = document.querySelector(`.nav-btn[data-view="${defaultView}"]`);
       if (activeBtn) activeBtn.classList.add('bg-slate-800', 'active');
@@ -1807,10 +1883,13 @@
         return;
       }
       let targetView = viewName;
-      if (studentMode && ['finance','reports','dashboard'].includes(targetView)) {
+      if (studentMode && ['finance','reports','dashboard','parent-portal'].includes(targetView)) {
         targetView = 'portal';
       }
-      document.getElementById('view-' + targetView).classList.remove('hidden');
+      if (parentMode && ['finance','reports','dashboard','portal'].includes(targetView)) {
+        targetView = 'parent-portal';
+      }
+      document.getElementById('view-' + targetView)?.classList.remove('hidden');
       document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('bg-slate-800', 'active'));
       const activeBtn = document.querySelector(`.nav-btn[data-view="${targetView}"]`);
       if (activeBtn) activeBtn.classList.add('bg-slate-800','active');
@@ -1822,6 +1901,7 @@
       if (targetView === 'settings') applySettingsToUI();
       if (targetView === 'profile') renderProfileView();
       if (targetView === 'portal') renderStudentPortal();
+      if (targetView === 'parent-portal') renderParentPortal();
       if (targetView === 'reports') renderReportsView();
     }
 
@@ -1917,10 +1997,15 @@
         navPortal.classList.toggle('hidden', !studentMode);
         if (studentMode) navPortal.classList.add('bg-slate-800', 'active');
       }
+      const navParentPortal = document.getElementById('navParentPortalBtn');
+      if (navParentPortal) {
+        navParentPortal.classList.toggle('hidden', !parentMode);
+        if (parentMode) navParentPortal.classList.add('bg-slate-800', 'active');
+      }
       const navFinance = document.getElementById('navFinanceBtn');
       const navReports = document.getElementById('navReportsBtn');
-      if (navFinance) navFinance.classList.toggle('hidden', studentMode);
-      if (navReports) navReports.classList.toggle('hidden', studentMode);
+      if (navFinance) navFinance.classList.toggle('hidden', studentMode || parentMode);
+      if (navReports) navReports.classList.toggle('hidden', studentMode || parentMode);
 
       const exportIcsBtn = document.getElementById('exportIcsBtn');
       if (exportIcsBtn) {
@@ -2121,6 +2206,103 @@
             <div>${m.text}</div>
           </li>
         `).join('') : '<li class="text-slate-500 text-xs">No messages yet.</li>';
+      }
+    }
+
+    function getChildrenForParent() {
+      const parent = getParentProfileBySession();
+      if (!parent) return [];
+      const links = state.parentLinks.filter(pl => pl.parentId === parent.id);
+      return links.map(pl => state.students.find(s => s.id === pl.studentId)).filter(Boolean);
+    }
+
+    function renderParentPortal() {
+      const parent = getParentProfileBySession();
+      const students = getChildrenForParent();
+      const sList = document.getElementById('parentStudentsList');
+      if (sList) {
+        sList.innerHTML = students.length ? students.map(s => `
+          <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
+            <div class="font-medium">${s.name}</div>
+            <div class="text-[10px] text-slate-500">${s.subjects?.join(', ') || 'Subjects not set'}</div>
+          </li>
+        `).join('') : '<li class="text-slate-500 text-xs">No linked students.</li>';
+      }
+      const sessionsUl = document.getElementById('parentSessions');
+      const hwUl = document.getElementById('parentHomework');
+      const resUl = document.getElementById('parentResources');
+      const invUl = document.getElementById('parentInvoices');
+      const msgsUl = document.getElementById('parentMessages');
+      const childIds = new Set(students.map(s => s.id));
+
+      const now = new Date();
+      const soon = new Date(now.getTime() + 14*24*60*60*1000);
+      const mySessions = state.sessions.filter(s => s.studentIds.some(id => childIds.has(id)))
+        .filter(s => {
+          const d = new Date(s.date + 'T' + (s.startTime || '00:00'));
+          return d >= now && d <= soon;
+        })
+        .sort((a,b) => new Date(a.date) - new Date(b.date));
+      if (sessionsUl) {
+        sessionsUl.innerHTML = mySessions.length ? mySessions.map(s => {
+          const names = s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+          return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
+            <div class="font-medium">${s.subject} • ${s.topic || 'Lesson'}</div>
+            <div class="text-[10px] text-slate-500">${s.date} ${s.startTime || ''} • ${s.durationHours || 1}h • ${names}</div>
+          </li>`;
+        }).join('') : '<li class="text-slate-500 text-xs">No sessions in the next 14 days.</li>';
+      }
+
+      const myHw = state.homework.filter(hw => childIds.has(hw.studentId));
+      if (hwUl) {
+        hwUl.innerHTML = myHw.length ? myHw.map(hw => {
+          const res = getResourceById(hw.resourceId);
+          const stu = getStudentById(hw.studentId);
+          return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
+            <div class="font-medium">${res?.title || 'Homework'}</div>
+            <div class="text-[10px] text-slate-500">${stu?.name || ''} • Status: ${hw.status} • Due ${hw.dueDate || 'n/a'}</div>
+          </li>`;
+        }).join('') : '<li class="text-slate-500 text-xs">No homework posted.</li>';
+      }
+
+      const myResIds = new Set(myHw.map(hw => hw.resourceId));
+      const myRes = state.resources.filter(r => myResIds.has(r.id));
+      if (resUl) {
+        resUl.innerHTML = myRes.length ? myRes.map(r => `
+          <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
+            <div class="font-medium">${r.title}</div>
+            <div class="text-[10px] text-slate-500">${r.subject} • ${r.level || ''}</div>
+            ${r.signedUrl ? `<a class="text-[10px] text-indigo-600" href="${r.signedUrl}" target="_blank">Download</a>` : ''}
+          </li>
+        `).join('') : '<li class="text-slate-500 text-xs">No resources yet.</li>';
+      }
+
+      const myInv = state.invoices.filter(inv => childIds.has(inv.studentId))
+        .sort((a,b) => new Date(a.dueDate||0) - new Date(b.dueDate||0));
+      if (invUl) {
+        invUl.innerHTML = myInv.length ? myInv.map(inv => {
+          const s = getStudentById(inv.studentId);
+          return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
+            <div class="font-medium">Invoice ${inv.id}</div>
+            <div class="text-[10px] text-slate-500">${s?.name || ''} • Issued ${inv.issueDate || 'n/a'} • Due ${inv.dueDate || 'n/a'} • R ${Number(inv.total||0).toFixed(2)} • ${inv.paid ? 'Paid' : 'Unpaid'}</div>
+          </li>`;
+        }).join('') : '<li class="text-slate-500 text-xs">No invoices yet.</li>';
+      }
+
+      if (msgsUl) {
+        const msgs = state.messages
+          .filter(m => childIds.has(m.studentId))
+          .sort((a,b) => new Date(a.created_at||0) - new Date(b.created_at||0));
+        msgsUl.innerHTML = msgs.length ? msgs.map(m => {
+          const s = getStudentById(m.studentId);
+          return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
+            <div class="flex justify-between text-[10px] text-slate-500">
+              <span>${s?.name || 'Student'}</span>
+              <span>${m.created_at ? new Date(m.created_at).toLocaleString() : ''}</span>
+            </div>
+            <div>${m.text}</div>
+          </li>`;
+        }).join('') : '<li class="text-slate-500 text-xs">No messages yet.</li>';
       }
     }
 
@@ -2376,6 +2558,11 @@
       return (supabaseSession?.user?.email || '').trim().toLowerCase();
     }
 
+    function getParentProfileBySession() {
+      const email = getSessionEmail();
+      return state.parents.find(p => p.email === email);
+    }
+
     function isOwner() {
       if (!supabaseAvailable) return true;
       return !!(supabaseSession && getSessionEmail() === OWNER_EMAIL.toLowerCase());
@@ -2386,11 +2573,15 @@
         // Session not resolved yet; keep UI as-is
         return;
       }
-      studentMode = supabaseAvailable ? (!isOwner() && !!getSessionEmail()) : false;
-      readOnlyMode = studentMode || (supabaseAvailable ? !isOwner() : false);
+      const parentProfile = supabaseAvailable ? getParentProfileBySession() : null;
+      studentMode = supabaseAvailable ? (!isOwner() && !!getSessionEmail() && !parentProfile) : false;
+      parentMode = supabaseAvailable ? (!isOwner() && !!parentProfile) : false;
+      readOnlyMode = studentMode || parentMode || (supabaseAvailable ? !isOwner() : false);
       const banner = document.getElementById('readOnlyBanner');
       if (banner) {
-        banner.textContent = studentMode ? 'Student view: read-only access to your profile.' : 'Read-only mode: sign in as the owner to edit.';
+        if (studentMode) banner.textContent = 'Student view: read-only access to your profile.';
+        else if (parentMode) banner.textContent = 'Parent view: read-only access to your child/children.';
+        else banner.textContent = 'Read-only mode: sign in as the owner to edit.';
         banner.classList.toggle('hidden', !readOnlyMode);
       }
       const main = document.querySelector('main#viewsContainer');
@@ -2406,6 +2597,7 @@
       if (navFinance) navFinance.classList.toggle('hidden', studentMode);
       if (navReports) navReports.classList.toggle('hidden', studentMode);
       if (studentMode) switchView('portal');
+      if (parentMode) switchView('parent-portal');
     }
 
     function guardEdit() {
@@ -2448,6 +2640,8 @@
 
       const [
         studentsRes,
+        parentsRes,
+        parentLinksRes,
         sessionsRes,
         sessionStudentsRes,
         resourcesRes,
@@ -2461,6 +2655,8 @@
         messagesRes
       ] = await Promise.all([
         fetchTable('students'),
+        fetchTable('parents'),
+        fetchTable('parent_students'),
         fetchTable('sessions'),
         fetchTable('session_students'),
         fetchTable('resources'),
@@ -2474,7 +2670,7 @@
         fetchTable('messages')
       ]);
 
-      [studentsRes, sessionsRes, sessionStudentsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes, activityRes, messagesRes].forEach(res => {
+      [studentsRes, parentsRes, parentLinksRes, sessionsRes, sessionStudentsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes, activityRes, messagesRes].forEach(res => {
         if (res.error) throw res.error;
       });
 
@@ -2541,6 +2737,20 @@
         notes: s.notes,
         studentEmail: s.student_email || '',
         createdAt: s.created_at
+      }));
+      merged.parents = (parentsRes?.data || []).map(p => ({
+        id: p.id,
+        email: (p.email || '').toLowerCase(),
+        name: p.name,
+        phone: p.phone,
+        notes: p.notes,
+        verified: p.verified
+      }));
+      merged.parentLinks = (parentLinksRes?.data || []).map(pl => ({
+        id: pl.id,
+        parentId: pl.parent_id,
+        studentId: pl.student_id,
+        relationship: pl.relationship
       }));
       merged.sessions = sessionsWithStudents;
       const resources = await Promise.all(
@@ -2786,6 +2996,8 @@
       renderProfileView();
       renderActivityLog();
       renderReportsView();
+      if (studentMode) renderStudentPortal();
+      if (parentMode) renderParentPortal();
     }
 
     /******************
