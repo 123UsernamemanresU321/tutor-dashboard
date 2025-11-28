@@ -2377,7 +2377,11 @@
         for (const t of tables) {
           await supabaseClient.from(t).delete().eq('student_id', studentId);
         }
-        await supabaseClient.from('parent_students').delete().eq('student_id', studentId).catch(() => {});
+        try {
+          await supabaseClient.from('parent_students').delete().eq('student_id', studentId);
+        } catch (err) {
+          console.warn('Remote parent_students delete failed', err);
+        }
         if (sessionsToRemove.length) {
           await supabaseClient.from('sessions').delete().in('id', sessionsToRemove);
         }
