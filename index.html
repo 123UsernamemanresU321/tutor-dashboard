@@ -2284,7 +2284,10 @@
               const { error } = await supabaseClient.auth.signUp({
                 email,
                 password,
-                options: { captchaToken }
+                options: {
+                  captchaToken,
+                  emailRedirectTo: new URL('/confirmation.html', window.location.origin).href
+                }
               });
               if (error) throw error;
               authMsg.textContent = 'Check your email to confirm, then sign in.';
