@@ -1681,17 +1681,28 @@
     /****************
      * INITIAL SETUP *
      ****************/
-    // Catch errors to avoid Safari “output” ReferenceErrors
+    // Catch errors to avoid Safari “output” ReferenceErrors and noisy hCaptcha CSP iframe errors
+    const suppressOutputError = (msg = '', src = '') => {
+      const lowerMsg = String(msg).toLowerCase();
+      const lowerSrc = String(src || '').toLowerCase();
+      return lowerMsg.includes('output') || (lowerMsg.includes('csp') && lowerSrc.includes('hcaptcha'));
+    };
+    window.addEventListener('error', (event) => {
+      if (suppressOutputError(event.message, event.filename)) {
+        event.preventDefault();
+        return true;
+      }
+      return false;
+    });
     window.onerror = (msg, src, line, col, err) => {
-      if (String(msg).toLowerCase().includes('output')) return true;
-      // Suppress noisy CSP iframe errors
-      if (String(msg).toLowerCase().includes('csp') && String(src || '').includes('hcaptcha')) return true;
+      if (suppressOutputError(msg, src)) return true;
       console.error('Global error', msg, err);
       return true;
     };
     // Catch any unhandled promise rejections so Safari doesn’t throw “output” ReferenceErrors
     window.addEventListener('unhandledrejection', (event) => {
-      if (String(event.reason || '').toLowerCase().includes('output')) {
+      const reason = String(event.reason || '');
+      if (reason.toLowerCase().includes('output')) {
         event.preventDefault();
         return true;
       }
@@ -1700,7 +1711,8 @@
       return true;
     });
     window.onunhandledrejection = (event) => {
-      if (String(event.reason || '').toLowerCase().includes('output')) {
+      const reason = String(event.reason || '');
+      if (reason.toLowerCase().includes('output')) {
         if (event.preventDefault) event.preventDefault();
         return true;
       }
@@ -2184,8 +2196,9 @@
         window.location.reload();
       } catch (err) {
         console.error(err);
-        if (statusEl) statusEl.textContent = 'Delete failed. Please try again.';
-        alert('Delete failed. See console for details.');
+        const msg = err?.message || 'Delete failed. Please try again.';
+        if (statusEl) statusEl.textContent = msg;
+        alert(msg);
       }
     }
 
