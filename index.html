@@ -1263,6 +1263,8 @@
     let accountEmails = [];
     let privacyRead = false;
     let tosRead = false;
+    let presenceHeartbeat = null;
+    let presenceMap = new Map();
 
     // SAFE deep clone helper
     function deepClone(obj) {
@@ -1841,14 +1843,19 @@
      ***********************/
     function setupRealtime() {
       if (!supabaseClient || !supabaseSession) return;
-      const tables = ['students','sessions','homework','invoices','messages','resources','documents','contracts','student_todos','student_checkins'];
+      const tables = ['students','sessions','homework','invoices','messages','resources','documents','contracts','student_todos','student_checkins','presence'];
       tables.forEach(table => {
         supabaseClient
           .channel(`${table}-changes`)
           .on('postgres_changes', { event: '*', schema: 'public', table }, async () => {
             try {
-              await tryLoadRemoteThenLocal();
-              renderAllViews();
+              if (table === 'presence') {
+                await refreshPresence();
+                renderStudentsView();
+              } else {
+                await tryLoadRemoteThenLocal();
+                renderAllViews();
+              }
             } catch (err) {
               console.error('Realtime refresh failed', err);
             }
@@ -2476,6 +2483,7 @@
       toggleAuthOverlay(!supabaseSession);
       if (supabaseSession) {
         document.getElementById('signOutBtn')?.classList.remove('hidden');
+        startPresence();
       }
       updateReadOnlyUI();
       supabaseClient.auth.onAuthStateChange((event, session) => {
@@ -2487,6 +2495,7 @@
           tryLoadRemoteThenLocal().then(() => {
             renderAllViews();
             setupRealtime();
+            startPresence();
           });
         } else {
           document.getElementById('signOutBtn')?.classList.add('hidden');
@@ -2494,6 +2503,7 @@
           accountEmails = [];
           privacyRead = false;
           tosRead = false;
+          stopPresence();
         }
         updateReadOnlyUI();
       });
@@ -2634,6 +2644,9 @@
         try {
           state = await loadStateFromSupabase();
           if (!readOnlyMode) saveState(); // persist locally as cache
+          if (isSupabaseReady()) {
+            await refreshPresence().catch(() => {});
+          }
           updateReadOnlyUI();
           return;
         } catch (e) {
@@ -3167,6 +3180,55 @@
       container.classList.toggle('dense-mode', compact);
     }
 
+    /******************
+     * PRESENCE       *
+     ******************/
+    async function refreshPresence() {
+      if (!isSupabaseReady()) return;
+      try {
+        const { data, error } = await supabaseClient.from('presence').select('*');
+        if (error) throw error;
+        const now = Date.now();
+        presenceMap = new Map();
+        (data || []).forEach(row => {
+          const keyUser = cleanId(row.user_id || row.id || row.email);
+          const keyEmail = (row.email || '').toLowerCase();
+          const fresh = now - new Date(row.updated_at).getTime() < 65000;
+          presenceMap.set(keyUser, { email: row.email, role: row.role, fresh });
+          presenceMap.set(keyEmail, { email: row.email, role: row.role, fresh });
+        });
+      } catch (err) {
+        console.warn('Presence fetch failed', err);
+      }
+    }
+
+    function startPresence() {
+      if (!isSupabaseReady()) return;
+      stopPresence();
+      const run = async () => {
+        try {
+          await supabaseClient.from('presence').upsert({
+            user_id: supabaseSession.user.id,
+            email: getSessionEmail(),
+            role: isOwner() ? 'owner' : parentMode ? 'parent' : 'student',
+            updated_at: new Date().toISOString()
+          });
+          await refreshPresence();
+          renderStudentsView();
+        } catch (err) {
+          console.warn('Presence heartbeat failed', err);
+        }
+      };
+      run();
+      presenceHeartbeat = setInterval(run, 30000);
+    }
+
+    function stopPresence() {
+      if (presenceHeartbeat) clearInterval(presenceHeartbeat);
+      presenceHeartbeat = null;
+      presenceMap = new Map();
+    }
+
     function renderAllViews() {
       updateKPIsAndCharts();
       renderStudentsView();
@@ -3489,6 +3551,8 @@
           const daysSince = last ? Math.floor((now - last) / (1000 * 60 * 60 * 24)) : null;
           const next = getNextSessionForStudent(s.id);
           const nextLabel = next ? `${next.date} ${next.startTime || ''}` : 'Unscheduled';
+          const presence = presenceMap.get((s.studentEmail || '').toLowerCase()) || presenceMap.get(cleanId(s.id));
+          const online = !!presence?.fresh;
           return `<li class="border border-slate-200 bg-white/85 rounded-xl px-3 py-2 cursor-pointer hover:bg-slate-50 flex flex-col gap-1"
                      data-student-id="${s.id}">
               <div class="flex items-center justify-between">
@@ -3496,7 +3560,13 @@
                   <div class="font-semibold">${s.name}</div>
                   <div class="text-[10px] text-slate-500">${s.gradeLevel || ''}</div>
                 </div>
-                <div class="text-[11px] text-slate-600 text-right">${s.subjects?.join(', ') || ''}</div>
+                <div class="text-right flex items-center gap-2">
+                  <span class="inline-flex items-center gap-1 text-[10px] ${online ? 'text-emerald-600' : 'text-slate-500'}">
+                    <span class="h-2.5 w-2.5 rounded-full ${online ? 'bg-emerald-500' : 'bg-slate-400'}"></span>
+                    ${online ? 'Online' : 'Offline'}
+                  </span>
+                  <span class="text-[11px] text-slate-600">${s.subjects?.join(', ') || ''}</span>
+                </div>
               </div>
               <div class="flex items-center justify-between text-[10px] text-slate-500">
                 <span>${daysSince != null ? `${daysSince}d since last` : 'No sessions yet'}</span>
