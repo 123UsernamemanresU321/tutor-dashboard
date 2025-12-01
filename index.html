@@ -5552,6 +5552,7 @@ Best regards,
         const sessionBox = form.querySelector('#invoiceSessions');
 
         const renderSessionChoices = () => {
+          if (!sessionBox) return;
           const studentId = form.studentId.value;
           const selectedExisting = new Set([...form.querySelectorAll('input[name="sessionIds"]:checked')].map(i => i.value));
           const eligible = state.sessions.filter(s => s.studentIds.includes(studentId));
