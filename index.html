@@ -1222,42 +1222,11 @@
       <div class="flex items-center justify-between">
         <h2 class="text-base font-semibold">Sign in</h2>
       </div>
-      <p class="text-[11px] text-slate-500">Private access to your dashboard. Sign up once, confirm your email, then sign in.</p>
-      <form id="authForm" class="space-y-2">
-        <div>
-          <label class="block text-[11px] mb-1">Email</label>
-          <input type="email" name="email" required class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
-        </div>
-        <div>
-          <label class="block text-[11px] mb-1">Password</label>
-          <input type="password" name="password" required class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
-        </div>
-        <div class="flex gap-2">
-          <button type="submit" data-action="signin" class="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium">Sign in</button>
-          <button type="submit" data-action="signup" class="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 text-xs">Sign up</button>
-        </div>
-        <div class="space-y-1 bg-slate-50 border border-slate-200 rounded-lg p-2">
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-[11px] text-slate-700">Privacy Policy</span>
-            <button type="button" id="readPrivacyBtn" class="px-2 py-1 rounded-md border border-slate-300 text-[11px]">Read</button>
-          </div>
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-[11px] text-slate-700">Terms of Service</span>
-            <button type="button" id="readTosBtn" class="px-2 py-1 rounded-md border border-slate-300 text-[11px]">Read</button>
-          </div>
-          <div class="text-[10px] text-slate-500">You must read both documents to sign up.</div>
-          <div class="text-[10px] text-slate-500 flex flex-wrap gap-2">
-            <a class="underline" href="./privacy.html" target="_blank" rel="noopener">Open Privacy Policy</a>
-            <a class="underline" href="./tos.html" target="_blank" rel="noopener">Open Terms of Service</a>
-          </div>
-        </div>
-        <label class="flex items-start gap-2 text-[11px] text-slate-600 mt-2">
-          <input type="checkbox" name="consent" class="mt-0.5 h-3 w-3">
-          <span>I consent to receive account emails for access and updates related to this tutor dashboard.</span>
-        </label>
-        <div id="hcaptchaContainer" class="mt-3"></div>
-      </form>
-      <div id="authMessage" class="text-[11px] text-rose-600"></div>
+      <p class="text-[11px] text-slate-500">Please sign in or sign up from the dedicated pages.</p>
+      <div class="space-y-2">
+        <a href="./login.html" class="block px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium text-center">Go to Sign in</a>
+        <a href="./signup.html" class="block px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-medium text-center">Go to Sign up</a>
+      </div>
     </div>
   </div>
 
