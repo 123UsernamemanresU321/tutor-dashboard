@@ -22,6 +22,7 @@
   </style>
 </head>
 <body>
+  <form id="signForm">
   <div class="page" id="contractPage">
     <div id="status" class="status"></div>
     <h1>Tutoring Services Agreement (Minor Tutor Version)</h1>
@@ -31,15 +32,15 @@
 
     <p class="section-title">PARTIES</p>
     <p><span class="inline-label">Tutor's Legal Guardian (Contracting Party):</span><br>
-    Name: <input class="field-inline" name="guardian_name" data-field required><br>
-    ID / Passport No.: <input class="field-inline" name="guardian_id" data-field><br>
-    Email: <input class="field-inline" name="guardian_email" data-field type="email" required><br>
-    Mobile / WhatsApp: <input class="field-inline" name="guardian_phone" data-field></p>
+    Name: <input class="field-inline" name="guardian_name" data-field required value="Yu Qin" readonly><br>
+    ID / Passport No.: <input class="field-inline" name="guardian_id" data-field placeholder="Optional"><br>
+    Email: <input class="field-inline" name="guardian_email" data-field type="email" required value="17449125@qq.com" readonly><br>
+    Mobile / WhatsApp: <input class="field-inline" name="guardian_phone" data-field value="+27 736696754" readonly></p>
 
     <p class="section-title">Minor Tutor (Service Provider):</p>
-    <p>Name: <input class="field-inline" name="tutor_name" data-field><br>
+    <p>Name: <input class="field-inline" name="tutor_name" data-field value="Shangjing Huang" readonly><br>
     Age: 16<br>
-    Email: <input class="field-inline" name="tutor_email" data-field></p>
+    Email: <input class="field-inline" name="tutor_email" data-field value="erichuang.shangjing@outlook.com" readonly></p>
 
     <p class="section-title">Client (Parent/Guardian):</p>
     <p>Name: <input class="field-inline" name="parent_name" data-field required><br>
@@ -81,7 +82,7 @@
     <p>Client may cancel/reschedule with ≥24h notice (no fee; subject to availability). &lt;24h or no-show: full fee payable, no automatic make-up. Tutor cancellations: notice + reschedule or credit/refund. Make-ups to be rescheduled and attended within 8 weeks; maximum 2 reschedules.</p>
 
     <p class="section-title">7. HOLIDAYS & EXAM SEASONS</p>
-    <p>Schedule confirmed in advance. Prepaid packages valid <input class="field-inline" name="package_months" data-field value="6"> months unless agreed otherwise.</p>
+    <p>Schedule confirmed in advance. Prepaid packages valid <input class="field-inline" name="package_months" data-field value="6" readonly> months unless agreed otherwise.</p>
 
     <p class="section-title">8. ACADEMIC INTEGRITY</p>
     <p>Tutor will not do the Student’s work, take tests, or log into school platforms. Student remains responsible for submissions and honesty policies.</p>
@@ -136,8 +137,8 @@
 
     <p class="section-title">SIGNATURES</p>
     <p><strong>Tutor's Legal Guardian (Contracting Party)</strong><br>
-    Signature: <input class="field-inline" name="guardian_signature" data-field required><br>
-    Name: <input class="field-inline" name="guardian_name_sig" data-field required><br>
+    Signature: <input class="field-inline" name="guardian_signature" data-field required value="Yu Qin" readonly><br>
+    Name: <input class="field-inline" name="guardian_name_sig" data-field required value="Yu Qin" readonly><br>
     Date: <input class="field-inline" name="date_guardian" data-field></p>
 
     <p><strong>Parent/Guardian (Client)</strong><br>
@@ -153,6 +154,7 @@
       <span id="message" class="muted"></span>
     </div>
   </div>
+  </form>
 
   <script>
     const SUPABASE_URL = 'https://wdsqnbebutuhwckjpwqf.supabase.co';
@@ -530,6 +532,19 @@ Date: ___________________________________
         const el = document.querySelector(`[name="${n}"]`);
         if (el && !el.value) el.value = today;
       });
+      // auto-fill tutor/guardian fixed fields if empty
+      const setIfEmpty = (name, val) => {
+        const el = document.querySelector(`[name="${name}"]`);
+        if (el && !el.value) el.value = val;
+      };
+      setIfEmpty('guardian_name', 'Yu Qin');
+      setIfEmpty('guardian_email', '17449125@qq.com');
+      setIfEmpty('guardian_phone', '+27 736696754');
+      setIfEmpty('guardian_signature', 'Yu Qin');
+      setIfEmpty('guardian_name_sig', 'Yu Qin');
+      setIfEmpty('tutor_name', 'Shangjing Huang');
+      setIfEmpty('tutor_email', 'erichuang.shangjing@outlook.com');
+      setIfEmpty('package_months', '6');
       if (data.contract_signed) {
         statusEl.textContent = 'Already signed';
       }
