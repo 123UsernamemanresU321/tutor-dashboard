@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #0f172a; padding: 1.5rem; }
     .page { max-width: 900px; margin: 0 auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.5rem; box-shadow: 0 20px 60px -40px rgba(15,23,42,0.4); }
@@ -586,11 +587,12 @@ Date: ___________________________________
       msgEl.textContent = 'Signing...';
       try {
         const contractTextSnapshot = buildContractSnapshot(fields);
-        // Generate PDF from the full contract text
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-        const lines = doc.splitTextToSize(contractTextSnapshot, 520);
-        doc.text(lines, 40, 40);
+        const doc = new jsPDF('p', 'pt', 'a4');
+        await doc.html(document.getElementById('contractPage'), {
+          html2canvas: { scale: 0.8 },
+          margin: [20, 20, 20, 20]
+        });
         const pdfDataUri = doc.output('datauristring');
         const pdfBase64 = pdfDataUri.split(',')[1];
         const resp = await fetch(`${SUPABASE_URL}/functions/v1/sign-contract`, {
@@ -615,7 +617,8 @@ Date: ___________________________________
             student_name: fields.student_name,
             student_dob: fields.student_dob,
             student_school: fields.student_school,
-            relationship: fields.relationship
+            relationship: fields.relationship,
+            user_agent: navigator.userAgent || ''
           })
         });
         const json = await resp.json();
