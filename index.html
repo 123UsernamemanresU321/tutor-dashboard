@@ -1544,7 +1544,11 @@
         completed: sess.completed,
         invoice_id: cleanId(sess.invoiceId)
       }));
-      await upsertAndPrune('sessions', sessions, 'id');
+      try {
+        await upsertAndPrune('sessions', sessions, 'id');
+      } catch (err) {
+        console.warn('Sessions sync failed (check schema for invoice_id column):', err?.message || err);
+      }
 
       const sessionStudents = [];
       const pairSeen = new Set();
@@ -1720,13 +1724,13 @@
         paid: inv.paid,
         notes: inv.notes
       });
-      if (error) throw error;
+      if (error) throw new Error('Supabase invoice upsert failed: ' + error.message);
     }
 
     async function deleteInvoiceRemote(id) {
       if (!isSupabaseReady()) return;
       const { error } = await supabaseClient.from('invoices').delete().eq('id', cleanId(id));
-      if (error) throw error;
+      if (error) throw new Error('Supabase invoice delete failed: ' + error.message);
     }
 
     function generateId(prefix) {
