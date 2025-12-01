@@ -1773,6 +1773,7 @@
       if (isSupabaseReady()) {
         try {
           await supabaseClient.from('parent_contract_signatures').delete().eq('id', signatureId);
+          await supabaseClient.from('contracts').delete().eq('id', signatureId);
           await supabaseClient.from('students').update({
             contract_signed: false,
             contract_signed_at: null,
