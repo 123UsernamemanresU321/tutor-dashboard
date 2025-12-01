@@ -3038,19 +3038,32 @@
         assignedDate: h.assigned_date
       }));
 
-      merged.resources = (resourcesRes.data || []).map(r => ({
-        id: r.id,
-        title: r.title,
-        subject: r.subject,
-        level: r.level,
-        tags: r.tags,
-        description: r.description,
-        createdAt: r.created_at,
-        favorite: r.favorite,
-        storage_path: r.storage_path,
-        fileName: r.file_name,
-        signedUrl: r.signed_url || ''
-      }));
+      merged.resources = await Promise.all(
+        (resourcesRes.data || []).map(async r => {
+          let signedUrl = r.signed_url || '';
+          if (!signedUrl && r.storage_path && supabaseClient.storage) {
+            try {
+              const { data, error } = await supabaseClient.storage.from('resources').createSignedUrl(r.storage_path, 60 * 60 * 24);
+              if (!error && data?.signedUrl) signedUrl = data.signedUrl;
+            } catch (err) {
+              console.warn('Student/parent resource signed URL fetch failed', err);
+            }
+          }
+          return {
+            id: r.id,
+            title: r.title,
+            subject: r.subject,
+            level: r.level,
+            tags: r.tags,
+            description: r.description,
+            createdAt: r.created_at,
+            favorite: r.favorite,
+            storage_path: r.storage_path,
+            fileName: r.file_name,
+            signedUrl
+          };
+        })
+      );
 
       merged.invoices = (invoicesRes.data || []).map(inv => ({
         id: inv.id,
