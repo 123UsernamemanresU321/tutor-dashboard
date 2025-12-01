@@ -116,15 +116,23 @@
         msg.textContent = 'Enter your email first.';
         return;
       }
+      if (!hcaptchaToken) {
+        msg.textContent = 'Please complete hCaptcha.';
+        return;
+      }
       try {
         msg.textContent = 'Sending reset email...';
         const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-          redirectTo: new URL('./reset-password.html', window.location.href).href
+          redirectTo: new URL('./reset-password.html', window.location.href).href,
+          captchaToken: hcaptchaToken
         });
         if (error) throw error;
         msg.textContent = 'Check your email for a reset link (check spam too).';
       } catch (err) {
         msg.textContent = err?.message || 'Failed to send reset email';
+      } finally {
+        if (window.hcaptcha && hcaptchaWidgetId != null) hcaptcha.reset(hcaptchaWidgetId);
+        hcaptchaToken = '';
       }
     };
   </script>
