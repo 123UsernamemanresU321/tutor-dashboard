@@ -574,6 +574,20 @@ Date: ___________________________________
         .replaceAll('[date]', fields.date_parent || fields.date);
     }
 
+    async function generatePdfFromPage(pageEl) {
+      await new Promise((r) => requestAnimationFrame(r));
+      const canvas = await html2canvas(pageEl, { scale: 2, useCORS: true, logging: false });
+      const imgData = canvas.toDataURL('image/png');
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: 'p',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      return pdf.output('datauristring').split(',')[1];
+    }
+
     form.onsubmit = async (e) => {
       e.preventDefault();
       if (!studentId) return;
@@ -587,14 +601,8 @@ Date: ___________________________________
       msgEl.textContent = 'Signing...';
       try {
         const contractTextSnapshot = buildContractSnapshot(fields);
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('p', 'pt', 'a4');
-        await doc.html(document.getElementById('contractPage'), {
-          html2canvas: { scale: 0.8 },
-          margin: [20, 20, 20, 20]
-        });
-        const pdfDataUri = doc.output('datauristring');
-        const pdfBase64 = pdfDataUri.split(',')[1];
+        const pageEl = document.getElementById('contractPage');
+        const pdfBase64 = await generatePdfFromPage(pageEl);
         const resp = await fetch(`${SUPABASE_URL}/functions/v1/sign-contract`, {
           method: 'POST',
           headers: {
