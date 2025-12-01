@@ -2649,52 +2649,355 @@
 
     async function loadStateFromSupabase() {
       const uid = supabaseSession?.user?.id;
+      const email = getSessionEmail();
       if (!uid) return supabaseAvailable ? deepClone(defaultState) : loadState();
       const isOwnerUser = isOwner();
 
-      const fetchTable = (table, cols = '*') => {
-        // rely on RLS; do not add extra filters that might drop older rows
-        return supabaseClient.from(table).select(cols);
-      };
+      // Owner: load everything (existing behaviour)
+      if (isOwnerUser) {
+        const fetchTable = (table, cols = '*') => supabaseClient.from(table).select(cols);
+        const [
+          studentsRes,
+          parentsRes,
+          parentLinksRes,
+          sessionsRes,
+          sessionStudentsRes,
+          resourcesRes,
+          homeworkRes,
+          documentsRes,
+          contractsRes,
+          invoicesRes,
+          todosRes,
+          checkinsRes,
+          activityRes,
+          messagesRes
+        ] = await Promise.all([
+          fetchTable('students'),
+          fetchTable('parents'),
+          fetchTable('parent_students'),
+          fetchTable('sessions'),
+          fetchTable('session_students'),
+          fetchTable('resources'),
+          fetchTable('homework'),
+          fetchTable('documents'),
+          fetchTable('contracts'),
+          fetchTable('invoices'),
+          fetchTable('student_todos'),
+          fetchTable('student_checkins'),
+          fetchTable('activity_log'),
+          fetchTable('messages')
+        ]);
 
-      const [
-        studentsRes,
-        parentsRes,
-        parentLinksRes,
-        sessionsRes,
-        sessionStudentsRes,
-        resourcesRes,
-        homeworkRes,
-        documentsRes,
-        contractsRes,
-        invoicesRes,
-        todosRes,
-        checkinsRes,
-        activityRes,
-        messagesRes
-      ] = await Promise.all([
-        fetchTable('students'),
-        fetchTable('parents'),
-        fetchTable('parent_students'),
-        fetchTable('sessions'),
-        fetchTable('session_students'),
-        fetchTable('resources'),
-        fetchTable('homework'),
-        fetchTable('documents'),
-        fetchTable('contracts'),
-        fetchTable('invoices'),
-        fetchTable('student_todos'),
-        fetchTable('student_checkins'),
-        fetchTable('activity_log'),
-        fetchTable('messages')
+        [studentsRes, parentsRes, parentLinksRes, sessionsRes, sessionStudentsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes, activityRes, messagesRes].forEach(res => {
+          if (res.error) throw res.error;
+        });
+
+        const sessions = (sessionsRes.data || []).map(sess => {
+          const studentIds = (sessionStudentsRes.data || [])
+            .filter(ss => ss.session_id === sess.id)
+            .map(ss => cleanId(ss.student_id))
+            .filter(Boolean);
+          return {
+            id: sess.id,
+            date: sess.date,
+            startTime: sess.start_time,
+            durationHours: sess.duration_hours,
+            subject: sess.subject,
+            topic: sess.topic,
+            notes: sess.notes,
+            completed: sess.completed,
+            invoiceId: sess.invoice_id,
+            studentIds
+          };
+        });
+        const sessionsWithStudents = sessions.filter(s => (s.studentIds || []).length > 0);
+
+        // Fetch signed URLs for contracts if storage_path exists (ignore missing/forbidden)
+        const contracts = await Promise.all(
+          (contractsRes.data || []).map(async c => {
+            try {
+              if (c.storage_path && supabaseClient.storage) {
+                const { data, error } = await supabaseClient.storage.from('contracts').createSignedUrl(c.storage_path, 60 * 60 * 24);
+                if (!error && data?.signedUrl) {
+                  return {
+                    id: c.id,
+                    studentId: c.student_id,
+                    fileName: c.file_name,
+                    storage_path: c.storage_path,
+                    status: c.status,
+                    notes: c.notes,
+                    uploadedAt: c.uploaded_at,
+                    signedUrl: data.signedUrl
+                  };
+                }
+              }
+            } catch (err) {
+              console.warn('Contract signed URL fetch failed', err);
+            }
+            return {
+              id: c.id,
+              studentId: c.student_id,
+              fileName: c.file_name,
+              storage_path: c.storage_path,
+              status: c.status,
+              notes: c.notes,
+              uploadedAt: c.uploaded_at
+            };
+          })
+        );
+
+        const merged = deepClone(defaultState);
+        merged.students = (studentsRes.data || []).map(s => ({
+          id: s.id,
+          name: s.name,
+          gradeLevel: s.grade_level ?? s.gradeLevel,
+          rate: s.rate,
+          subjects: s.subjects,
+          notes: s.notes,
+          studentEmail: s.student_email || '',
+          createdAt: s.created_at
+        }));
+        merged.parents = (parentsRes?.data || []).map(p => ({
+          id: p.id,
+          email: (p.email || '').toLowerCase(),
+          name: p.name,
+          phone: p.phone,
+          notes: p.notes,
+          verified: p.verified
+        }));
+        merged.parentLinks = (parentLinksRes?.data || []).map(pl => ({
+          id: pl.id,
+          parentId: pl.parent_id,
+          studentId: pl.student_id,
+          relationship: pl.relationship
+        }));
+        merged.sessions = sessionsWithStudents;
+        const resources = await Promise.all(
+          (resourcesRes.data || []).map(async r => {
+            let signedUrl = '';
+            try {
+              if (r.storage_path && supabaseClient.storage) {
+                const { data, error } = await supabaseClient.storage.from('resources').createSignedUrl(r.storage_path, 60 * 60 * 24);
+                if (!error && data?.signedUrl) signedUrl = data.signedUrl;
+              }
+            } catch (err) {
+              console.warn('Resource signed URL fetch failed', err);
+            }
+            return {
+              id: r.id,
+              title: r.title,
+              subject: r.subject,
+              level: r.level,
+              tags: r.tags,
+              description: r.description,
+              createdAt: r.created_at,
+              favorite: r.favorite,
+              storage_path: r.storage_path,
+              fileName: r.file_name,
+              signedUrl
+            };
+          })
+        );
+        merged.resources = resources;
+        merged.homework = (homeworkRes.data || []).map(h => ({
+          id: h.id,
+          studentId: h.student_id,
+          resourceId: h.resource_id,
+          status: h.status,
+          dueDate: h.due_date,
+          assignedDate: h.assigned_date
+        }));
+        merged.documents = (documentsRes.data || []).map(d => ({
+          id: d.id,
+          studentId: d.student_id,
+          title: d.title,
+          status: d.status,
+          date: d.date,
+          notes: d.notes,
+          createdAt: d.created_at
+        }));
+        merged.contracts = contracts;
+        merged.invoices = (invoicesRes.data || []).map(inv => ({
+          id: inv.id,
+          studentId: inv.student_id,
+          issueDate: inv.issue_date,
+          dueDate: inv.due_date,
+          baseAmount: inv.base_amount,
+          total: inv.total,
+          lateFeePercent: inv.late_fee_percent,
+          shortNoticePercent: inv.short_notice_percent,
+          lateApplied: inv.late_applied,
+          shortApplied: inv.short_applied,
+          paid: inv.paid,
+          notes: inv.notes
+        }));
+        merged.studentTodos = (todosRes.data || []).map(t => ({
+          id: t.id,
+          studentId: t.student_id,
+          text: t.text,
+          dueDate: t.due_date,
+          done: t.done,
+          createdAt: t.created_at
+        }));
+        merged.studentCheckins = (checkinsRes.data || []).map(c => ({
+          id: c.id,
+          studentId: c.student_id,
+          text: c.text,
+          date: c.date,
+          createdAt: c.created_at
+        }));
+        merged.messages = (messagesRes?.data || []).map(m => ({
+          id: m.id,
+          studentId: m.student_id,
+          text: m.text,
+          sender: m.sender,
+          created_at: m.created_at
+        }));
+        merged.activityLog = (activityRes?.data || []).map(a => ({
+          id: a.id,
+          action: a.action,
+          detail: a.detail,
+          created_at: a.created_at
+        }));
+        merged.settings = loadState().settings; // keep local settings
+
+        // Merge in any local resources not yet in Supabase so they don't disappear on reload/switch
+        const localState = loadState();
+        if (localState?.resources?.length) {
+          const remoteIds = new Set(merged.resources.map(r => cleanId(r.id)));
+          localState.resources.forEach(r => {
+            const id = cleanId(r.id);
+            if (!remoteIds.has(id)) {
+              merged.resources.push({
+                id,
+                title: r.title,
+                subject: r.subject,
+                level: r.level,
+                tags: r.tags,
+                description: r.description,
+                createdAt: r.createdAt,
+                favorite: r.favorite,
+                storage_path: r.storage_path,
+                fileName: r.fileName,
+                signedUrl: r.signedUrl,
+                dataUrl: r.dataUrl
+              });
+            }
+          });
+        }
+        // Merge local invoices/messages if rows are missing (e.g., legacy rows without user_id)
+        if (localState?.invoices?.length) {
+          const remoteIds = new Set(merged.invoices.map(i => cleanId(i.id)));
+          localState.invoices.forEach(inv => {
+            const id = cleanId(inv.id);
+            if (!remoteIds.has(id)) merged.invoices.push(inv);
+          });
+        }
+        if (localState?.messages?.length) {
+          const remoteIds = new Set(merged.messages.map(m => cleanId(m.id)));
+          localState.messages.forEach(msg => {
+            const id = cleanId(msg.id);
+            if (!remoteIds.has(id)) merged.messages.push(msg);
+          });
+        }
+
+        sanitizeState(merged);
+        normalizeIdsToUuid();
+        return merged;
+      }
+
+      // Student / parent: load only allowed rows; ignore tables that RLS blocks
+      const merged = deepClone(defaultState);
+      const localSettings = loadState().settings;
+      merged.settings = localSettings;
+
+      let studentsRes = { data: [] };
+      let parentsRes = { data: [] };
+      let parentLinksRes = { data: [] };
+      let sessionStudentsRes = { data: [] };
+      let sessionsRes = { data: [] };
+      let homeworkRes = { data: [] };
+      let resourcesRes = { data: [] };
+      let invoicesRes = { data: [] };
+      let messagesRes = { data: [] };
+
+      try {
+        studentsRes = await supabaseClient.from('students').select('*').eq('student_email', email);
+      } catch {}
+      try {
+        parentsRes = await supabaseClient.from('parents').select('*').eq('email', email);
+      } catch {}
+
+      const parentIds = (parentsRes.data || []).map(p => p.id);
+      if (parentIds.length) {
+        try {
+          parentLinksRes = await supabaseClient.from('parent_students').select('*').in('parent_id', parentIds);
+        } catch {}
+      }
+
+      const studentIds = new Set([
+        ...(studentsRes.data || []).map(s => s.id),
+        ...(parentLinksRes.data || []).map(pl => pl.student_id)
       ]);
+      const studentIdArray = Array.from(studentIds);
 
-      [studentsRes, parentsRes, parentLinksRes, sessionsRes, sessionStudentsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes, activityRes, messagesRes].forEach(res => {
-        if (res.error) throw res.error;
-      });
+      if (studentIdArray.length) {
+        try {
+          sessionStudentsRes = await supabaseClient.from('session_students').select('*').in('student_id', studentIdArray);
+        } catch {}
+        const sessionIds = Array.from(new Set((sessionStudentsRes.data || []).map(ss => ss.session_id)));
+        if (sessionIds.length) {
+          try {
+            sessionsRes = await supabaseClient.from('sessions').select('*').in('id', sessionIds);
+          } catch {}
+        }
+        try {
+          homeworkRes = await supabaseClient.from('homework').select('*').in('student_id', studentIdArray);
+        } catch {}
+        try {
+          invoicesRes = await supabaseClient.from('invoices').select('*').in('student_id', studentIdArray);
+        } catch {}
+        try {
+          messagesRes = await supabaseClient.from('messages').select('*').in('student_id', studentIdArray);
+        } catch {}
+      }
+
+      // Resources tied to homework
+      const resourceIds = Array.from(new Set((homeworkRes.data || []).map(h => h.resource_id).filter(Boolean)));
+      if (resourceIds.length) {
+        try {
+          resourcesRes = await supabaseClient.from('resources').select('*').in('id', resourceIds);
+        } catch {}
+      }
+
+      // Map into state
+      merged.students = (studentsRes.data || []).map(s => ({
+        id: s.id,
+        name: s.name,
+        gradeLevel: s.grade_level ?? s.gradeLevel,
+        rate: s.rate,
+        subjects: s.subjects,
+        notes: s.notes,
+        studentEmail: s.student_email || '',
+        createdAt: s.created_at
+      }));
+      merged.parents = (parentsRes.data || []).map(p => ({
+        id: p.id,
+        email: (p.email || '').toLowerCase(),
+        name: p.name,
+        phone: p.phone,
+        notes: p.notes,
+        verified: p.verified
+      }));
+      merged.parentLinks = (parentLinksRes.data || []).map(pl => ({
+        id: pl.id,
+        parentId: pl.parent_id,
+        studentId: pl.student_id,
+        relationship: pl.relationship
+      }));
 
       const sessions = (sessionsRes.data || []).map(sess => {
-        const studentIds = (sessionStudentsRes.data || [])
+        const studentIdsForSess = (sessionStudentsRes.data || [])
           .filter(ss => ss.session_id === sess.id)
           .map(ss => cleanId(ss.student_id))
           .filter(Boolean);
@@ -2708,98 +3011,11 @@
           notes: sess.notes,
           completed: sess.completed,
           invoiceId: sess.invoice_id,
-          studentIds
+          studentIds: studentIdsForSess
         };
       });
-      const sessionsWithStudents = sessions.filter(s => (s.studentIds || []).length > 0);
+      merged.sessions = sessions.filter(s => (s.studentIds || []).length > 0);
 
-      // Fetch signed URLs for contracts if storage_path exists (ignore missing/forbidden)
-      const contracts = await Promise.all(
-        (contractsRes.data || []).map(async c => {
-          try {
-            if (c.storage_path && supabaseClient.storage) {
-              const { data, error } = await supabaseClient.storage.from('contracts').createSignedUrl(c.storage_path, 60 * 60 * 24);
-              if (!error && data?.signedUrl) {
-                return {
-                  id: c.id,
-                  studentId: c.student_id,
-                  fileName: c.file_name,
-                  storage_path: c.storage_path,
-                  status: c.status,
-                  notes: c.notes,
-                  uploadedAt: c.uploaded_at,
-                  signedUrl: data.signedUrl
-                };
-              }
-            }
-          } catch (err) {
-            console.warn('Contract signed URL fetch failed', err);
-          }
-          return {
-            id: c.id,
-            studentId: c.student_id,
-            fileName: c.file_name,
-            storage_path: c.storage_path,
-            status: c.status,
-            notes: c.notes,
-            uploadedAt: c.uploaded_at
-          };
-        })
-      );
-
-      const merged = deepClone(defaultState);
-      merged.students = (studentsRes.data || []).map(s => ({
-        id: s.id,
-        name: s.name,
-        gradeLevel: s.grade_level ?? s.gradeLevel,
-        rate: s.rate,
-        subjects: s.subjects,
-        notes: s.notes,
-        studentEmail: s.student_email || '',
-        createdAt: s.created_at
-      }));
-      merged.parents = (parentsRes?.data || []).map(p => ({
-        id: p.id,
-        email: (p.email || '').toLowerCase(),
-        name: p.name,
-        phone: p.phone,
-        notes: p.notes,
-        verified: p.verified
-      }));
-      merged.parentLinks = (parentLinksRes?.data || []).map(pl => ({
-        id: pl.id,
-        parentId: pl.parent_id,
-        studentId: pl.student_id,
-        relationship: pl.relationship
-      }));
-      merged.sessions = sessionsWithStudents;
-      const resources = await Promise.all(
-        (resourcesRes.data || []).map(async r => {
-          let signedUrl = '';
-          try {
-            if (r.storage_path && supabaseClient.storage) {
-              const { data, error } = await supabaseClient.storage.from('resources').createSignedUrl(r.storage_path, 60 * 60 * 24);
-              if (!error && data?.signedUrl) signedUrl = data.signedUrl;
-            }
-          } catch (err) {
-            console.warn('Resource signed URL fetch failed', err);
-          }
-          return {
-            id: r.id,
-            title: r.title,
-            subject: r.subject,
-            level: r.level,
-            tags: r.tags,
-            description: r.description,
-            createdAt: r.created_at,
-            favorite: r.favorite,
-            storage_path: r.storage_path,
-            fileName: r.file_name,
-            signedUrl
-          };
-        })
-      );
-      merged.resources = resources;
       merged.homework = (homeworkRes.data || []).map(h => ({
         id: h.id,
         studentId: h.student_id,
@@ -2808,16 +3024,21 @@
         dueDate: h.due_date,
         assignedDate: h.assigned_date
       }));
-      merged.documents = (documentsRes.data || []).map(d => ({
-        id: d.id,
-        studentId: d.student_id,
-        title: d.title,
-        status: d.status,
-        date: d.date,
-        notes: d.notes,
-        createdAt: d.created_at
+
+      merged.resources = (resourcesRes.data || []).map(r => ({
+        id: r.id,
+        title: r.title,
+        subject: r.subject,
+        level: r.level,
+        tags: r.tags,
+        description: r.description,
+        createdAt: r.created_at,
+        favorite: r.favorite,
+        storage_path: r.storage_path,
+        fileName: r.file_name,
+        signedUrl: r.signed_url || ''
       }));
-      merged.contracts = contracts;
+
       merged.invoices = (invoicesRes.data || []).map(inv => ({
         id: inv.id,
         studentId: inv.student_id,
@@ -2832,21 +3053,7 @@
         paid: inv.paid,
         notes: inv.notes
       }));
-      merged.studentTodos = (todosRes.data || []).map(t => ({
-        id: t.id,
-        studentId: t.student_id,
-        text: t.text,
-        dueDate: t.due_date,
-        done: t.done,
-        createdAt: t.created_at
-      }));
-      merged.studentCheckins = (checkinsRes.data || []).map(c => ({
-        id: c.id,
-        studentId: c.student_id,
-        text: c.text,
-        date: c.date,
-        createdAt: c.created_at
-      }));
+
       merged.messages = (messagesRes?.data || []).map(m => ({
         id: m.id,
         studentId: m.student_id,
@@ -2854,53 +3061,6 @@
         sender: m.sender,
         created_at: m.created_at
       }));
-      merged.activityLog = (activityRes?.data || []).map(a => ({
-        id: a.id,
-        action: a.action,
-        detail: a.detail,
-        created_at: a.created_at
-      }));
-      merged.settings = loadState().settings; // keep local settings
-
-      // Merge in any local resources not yet in Supabase so they don't disappear on reload/switch
-      const localState = loadState();
-      if (localState?.resources?.length) {
-        const remoteIds = new Set(merged.resources.map(r => cleanId(r.id)));
-        localState.resources.forEach(r => {
-          const id = cleanId(r.id);
-          if (!remoteIds.has(id)) {
-            merged.resources.push({
-              id,
-              title: r.title,
-              subject: r.subject,
-              level: r.level,
-              tags: r.tags,
-              description: r.description,
-              createdAt: r.createdAt,
-              favorite: r.favorite,
-              storage_path: r.storage_path,
-              fileName: r.fileName,
-              signedUrl: r.signedUrl,
-              dataUrl: r.dataUrl
-            });
-          }
-        });
-      }
-      // Merge local invoices/messages if rows are missing (e.g., legacy rows without user_id)
-      if (localState?.invoices?.length) {
-        const remoteIds = new Set(merged.invoices.map(i => cleanId(i.id)));
-        localState.invoices.forEach(inv => {
-          const id = cleanId(inv.id);
-          if (!remoteIds.has(id)) merged.invoices.push(inv);
-        });
-      }
-      if (localState?.messages?.length) {
-        const remoteIds = new Set(merged.messages.map(m => cleanId(m.id)));
-        localState.messages.forEach(msg => {
-          const id = cleanId(msg.id);
-          if (!remoteIds.has(id)) merged.messages.push(msg);
-        });
-      }
 
       sanitizeState(merged);
       normalizeIdsToUuid();
