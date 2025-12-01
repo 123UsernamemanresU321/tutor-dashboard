@@ -638,6 +638,10 @@
                     <div id="studentDetailName" class="text-base font-semibold"></div>
                     <div id="studentDetailMeta" class="text-[11px] text-slate-500"></div>
                   </div>
+                  <div class="flex items-center gap-2">
+                    <span id="studentContractBadge" class="px-2 py-1 text-[11px] rounded-lg bg-rose-100 text-rose-700 font-semibold">INVALID – CONTRACT NOT SIGNED</span>
+                    <button id="studentContractLinkBtn" data-owner-only class="px-2 py-1 text-[10px] rounded-lg border border-slate-300 hover:bg-slate-50">Copy parent link</button>
+                  </div>
                   <button id="editStudentBtn" data-owner-only class="px-2 py-1 text-[11px] rounded-lg border border-slate-300 hover:bg-slate-50">
                     Edit
                   </button>
@@ -728,6 +732,9 @@
           <button data-student-tab="messages" class="student-tab pb-1 text-slate-500">
             Messages
           </button>
+        </div>
+        <div id="studentUnsignedNotice" class="border border-rose-300 bg-rose-50 text-rose-800 text-[11px] rounded-lg px-3 py-2 hidden">
+          Contract not signed. Share the parent link so the guardian can sign. Some features may be limited until signing is complete.
         </div>
 
                 <div id="studentTab-timeline" class="student-tab-pane space-y-2 mt-2">
@@ -1081,6 +1088,9 @@
                 <p class="text-xs text-slate-500">Your schedule, homework, invoices, and resources.</p>
               </div>
             </div>
+            <div id="portalBlocker" class="hidden border border-rose-300 bg-rose-50 text-rose-800 rounded-lg px-3 py-2 text-xs">
+              INVALID – CONTRACT NOT SIGNED. Ask your parent/guardian to sign the contract to unlock this portal.
+            </div>
 
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
               <div class="card p-4 space-y-2">
@@ -1334,7 +1344,15 @@
         if (!Array.isArray(st[key])) st[key] = [];
       });
       if (!Array.isArray(st.activityLog)) st.activityLog = [];
-      st.students.forEach(s => { s.id = cleanId(s.id); s.studentEmail = (s.studentEmail || s.student_email || '').trim().toLowerCase(); });
+      st.students.forEach(s => {
+        s.id = cleanId(s.id);
+        s.studentEmail = (s.studentEmail || s.student_email || '').trim().toLowerCase();
+        s.contractSigned = !!s.contractSigned;
+        s.contractSignedAt = s.contractSignedAt || s.contract_signed_at || '';
+        s.contractVersion = s.contractVersion || s.contract_version || 'v1';
+        s.contractSignerName = s.contractSignerName || s.contract_signer_name || '';
+        s.contractSignerEmail = s.contractSignerEmail || s.contract_signer_email || '';
+      });
       st.parents.forEach(p => { p.id = cleanId(p.id); p.email = (p.email || '').trim().toLowerCase(); });
       st.parentLinks.forEach(pl => { pl.id = cleanId(pl.id); pl.parentId = cleanId(pl.parentId); pl.studentId = cleanId(pl.studentId); });
       st.sessions.forEach(s => {
@@ -1523,7 +1541,12 @@
         subjects: s.subjects,
         notes: s.notes,
         student_email: (s.studentEmail || '').trim(),
-        created_at: s.createdAt
+        created_at: s.createdAt,
+        contract_signed: !!s.contractSigned,
+        contract_signed_at: s.contractSignedAt || null,
+        contract_version: s.contractVersion || 'v1',
+        contract_signer_name: s.contractSignerName || null,
+        contract_signer_email: s.contractSignerEmail || null
       }));
       await upsertAndPrune('students', students, 'id');
 
@@ -2132,12 +2155,28 @@
       const hwUl = document.getElementById('portalHomework');
       const invUl = document.getElementById('portalInvoices');
       const resUl = document.getElementById('portalResources');
+      const portalBlocker = document.getElementById('portalBlocker');
       if (!student) {
         const msg = '<li class="text-slate-500 text-xs">No student profile linked to this account.</li>';
         if (sessionsUl) sessionsUl.innerHTML = msg;
         if (hwUl) hwUl.innerHTML = msg;
         if (invUl) invUl.innerHTML = msg;
         if (resUl) resUl.innerHTML = msg;
+        return;
+      }
+      // If contract not signed, show blocker and limit content
+      const signed = !!student.contractSigned;
+      if (portalBlocker) {
+        portalBlocker.classList.toggle('hidden', signed);
+      }
+      if (!signed) {
+        const msg = '<li class="text-slate-500 text-xs">Contract not signed yet.</li>';
+        if (sessionsUl) sessionsUl.innerHTML = msg;
+        if (hwUl) hwUl.innerHTML = msg;
+        if (invUl) invUl.innerHTML = msg;
+        if (resUl) resUl.innerHTML = msg;
+        const msgsList = document.getElementById('portalMessages');
+        if (msgsList) msgsList.innerHTML = msg;
         return;
       }
       const now = new Date();
@@ -2771,7 +2810,12 @@
           subjects: s.subjects,
           notes: s.notes,
           studentEmail: s.student_email || '',
-          createdAt: s.created_at
+          createdAt: s.created_at,
+          contractSigned: s.contract_signed,
+          contractSignedAt: s.contract_signed_at,
+          contractVersion: s.contract_version || 'v1',
+          contractSignerName: s.contract_signer_name,
+          contractSignerEmail: s.contract_signer_email
         }));
         merged.parents = (parentsRes?.data || []).map(p => ({
           id: p.id,
@@ -3003,7 +3047,12 @@
         subjects: s.subjects,
         notes: s.notes,
         studentEmail: s.student_email || '',
-        createdAt: s.created_at
+        createdAt: s.created_at,
+        contractSigned: s.contract_signed,
+        contractSignedAt: s.contract_signed_at,
+        contractVersion: s.contract_version || 'v1',
+        contractSignerName: s.contract_signer_name,
+        contractSignerEmail: s.contract_signer_email
       }));
       merged.parents = (parentsRes.data || []).map(p => ({
         id: p.id,
@@ -3251,6 +3300,18 @@
       if (presenceHeartbeat) clearInterval(presenceHeartbeat);
       presenceHeartbeat = null;
       presenceMap = new Map();
+    }
+
+    function copyContractLink(studentId) {
+      const url = new URL(window.location.href);
+      url.pathname = url.pathname.replace(/[^/]+$/, 'contract-sign.html');
+      url.search = `?student_id=${encodeURIComponent(studentId)}&v=v1`;
+      const link = url.toString();
+      navigator.clipboard?.writeText(link).then(() => {
+        alert('Parent signing link copied to clipboard.');
+      }).catch(() => {
+        prompt('Copy this link and send to the parent:', link);
+      });
     }
 
     function renderAllViews() {
@@ -3874,6 +3935,18 @@
       document.getElementById('studentDetailName').textContent = s.name;
       document.getElementById('studentDetailMeta').textContent =
         `${s.gradeLevel || ''} • ${s.subjects?.join(', ') || ''} • Rate: ${s.rate ? 'R ' + s.rate + '/h' : '—'}`;
+      const contractBadge = document.getElementById('studentContractBadge');
+      const contractLinkBtn = document.getElementById('studentContractLinkBtn');
+      if (contractBadge) {
+        const signed = !!s.contractSigned;
+        contractBadge.textContent = signed ? 'VALID – CONTRACT SIGNED' : 'INVALID – CONTRACT NOT SIGNED';
+        contractBadge.className = signed
+          ? 'px-2 py-1 text-[11px] rounded-lg bg-emerald-100 text-emerald-700 font-semibold'
+          : 'px-2 py-1 text-[11px] rounded-lg bg-rose-100 text-rose-700 font-semibold';
+      }
+      if (contractLinkBtn) {
+        contractLinkBtn.onclick = () => copyContractLink(s.id);
+      }
 
       const hours = getStudentSubjectHours(id);
       const total = hours.Physics + hours.Chemistry + hours.Maths || 1;
@@ -3901,6 +3974,11 @@
       const hwStats = getStudentHomeworkStats(id);
       document.getElementById('engagementHomework').textContent = `${hwStats.rate}%`;
       document.getElementById('engagementHomeworkProgress').style.width = `${hwStats.rate}%`;
+      // If contract not signed, show a blocking notice in detail tabs
+      const unsignedNotice = document.getElementById('studentUnsignedNotice');
+      if (unsignedNotice) {
+        unsignedNotice.classList.toggle('hidden', !!s.contractSigned);
+      }
 
       renderStudentTimeline(id);
       renderStudentSessions(id);
@@ -5106,7 +5184,12 @@ Best regards,
             rate: Number(form.rate.value || 0),
             subjects: form.subjects.value.split(',').map(s => s.trim()).filter(Boolean),
             notes: form.notes.value.trim(),
-            studentEmail: form.studentEmail.value.trim()
+            studentEmail: form.studentEmail.value.trim(),
+            contractSigned: student?.contractSigned || false,
+            contractSignedAt: student?.contractSignedAt || null,
+            contractVersion: student?.contractVersion || 'v1',
+            contractSignerName: student?.contractSignerName || '',
+            contractSignerEmail: student?.contractSignerEmail || ''
           };
           if (!newStudent.name) {
             alert('Name is required.');
