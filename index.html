@@ -634,18 +634,19 @@
               </div>
               <div id="studentDetail" class="hidden text-xs space-y-3">
                 <div class="flex items-center justify-between">
-                  <div>
-                    <div id="studentDetailName" class="text-base font-semibold"></div>
-                    <div id="studentDetailMeta" class="text-[11px] text-slate-500"></div>
-                    <div id="studentContractMeta" class="text-[10px] text-slate-500"></div>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span id="studentContractBadge" class="px-2 py-1 text-[11px] rounded-lg bg-rose-100 text-rose-700 font-semibold">INVALID – CONTRACT NOT SIGNED</span>
-                    <button id="studentContractLinkBtn" data-owner-only class="px-2 py-1 text-[10px] rounded-lg border border-slate-300 hover:bg-slate-50">Copy parent link</button>
-                  </div>
-                  <button id="editStudentBtn" data-owner-only class="px-2 py-1 text-[11px] rounded-lg border border-slate-300 hover:bg-slate-50">
-                    Edit
-                  </button>
+                <div>
+                  <div id="studentDetailName" class="text-base font-semibold"></div>
+                  <div id="studentDetailMeta" class="text-[11px] text-slate-500"></div>
+                  <div id="studentContractMeta" class="text-[10px] text-slate-500"></div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span id="studentContractBadge" class="px-2 py-1 text-[11px] rounded-lg bg-rose-100 text-rose-700 font-semibold">INVALID – CONTRACT NOT SIGNED</span>
+                  <button id="studentContractLinkBtn" data-owner-only class="px-2 py-1 text-[10px] rounded-lg border border-slate-300 hover:bg-slate-50">Copy parent link</button>
+                  <button id="studentContractDeleteBtn" data-owner-only class="px-2 py-1 text-[10px] rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50 hidden">Remove contract</button>
+                </div>
+                <button id="editStudentBtn" data-owner-only class="px-2 py-1 text-[11px] rounded-lg border border-slate-300 hover:bg-slate-50">
+                  Edit
+                </button>
                 </div>
 
                 <!-- Subject mix bar -->
@@ -1752,6 +1753,39 @@
       // Prune skipped to avoid accidental deletions; Supabase is source of truth.
     }
 
+    async function deleteContractForStudent(signatureId, studentId) {
+      // local cleanup
+      state.contractSignatures = state.contractSignatures.filter(cs => cs.id !== signatureId);
+      const stu = getStudentById(studentId);
+      if (stu) {
+        stu.contractSigned = false;
+        stu.contractSignedAt = null;
+        stu.contractSignerName = '';
+        stu.contractSignerEmail = '';
+        stu.lastContractId = '';
+      }
+      saveState();
+      renderStudentContracts(studentId);
+      renderStudentFinance(studentId);
+      renderStudentTimeline(studentId);
+      renderStudentsView();
+      // remote cleanup
+      if (isSupabaseReady()) {
+        try {
+          await supabaseClient.from('parent_contract_signatures').delete().eq('id', signatureId);
+          await supabaseClient.from('students').update({
+            contract_signed: false,
+            contract_signed_at: null,
+            contract_signer_name: null,
+            contract_signer_email: null,
+            last_contract_id: null
+          }).eq('id', studentId);
+        } catch (err) {
+          console.error('Contract delete failed', err);
+        }
+      }
+    }
+
     async function upsertInvoiceRemote(inv) {
       if (!isSupabaseReady()) return;
       const { error } = await supabaseClient.from('invoices').upsert({
@@ -2284,7 +2318,7 @@
           const contractLabel = signed ? 'VALID – CONTRACT SIGNED' : 'INVALID – CONTRACT NOT SIGNED';
           const contractClass = signed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700';
           return `
-            <li class="border border-slate-200 rounded-lg px-3 py-2 bg-white/80 space-y-1">
+            <li class="border border-slate-200 rounded-lg px-3 py-2 bg-white/80 space-y-1" data-student-id="${s.id}">
               <div class="flex items-center justify-between">
                 <div>
                   <div class="font-medium">${s.name}</div>
@@ -4024,6 +4058,7 @@
         `${s.gradeLevel || ''} • ${s.subjects?.join(', ') || ''} • Rate: ${s.rate ? 'R ' + s.rate + '/h' : '—'}`;
       const contractBadge = document.getElementById('studentContractBadge');
       const contractLinkBtn = document.getElementById('studentContractLinkBtn');
+      const contractDeleteBtn = document.getElementById('studentContractDeleteBtn');
       const contractMeta = document.getElementById('studentContractMeta');
       const latestSig = getLatestSignature(s.id);
       if (contractBadge) {
@@ -4032,6 +4067,14 @@
         contractBadge.className = signed
           ? 'px-2 py-1 text-[11px] rounded-lg bg-emerald-100 text-emerald-700 font-semibold'
           : 'px-2 py-1 text-[11px] rounded-lg bg-rose-100 text-rose-700 font-semibold';
+      }
+      if (contractDeleteBtn) {
+        contractDeleteBtn.classList.toggle('hidden', !latestSig);
+        contractDeleteBtn.onclick = () => {
+          if (!guardEdit()) return;
+          if (!latestSig) return;
+          deleteContractForStudent(latestSig.id, s.id);
+        };
       }
       if (contractMeta) {
         if (latestSig) {
