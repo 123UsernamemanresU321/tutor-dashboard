@@ -637,6 +637,7 @@
                   <div>
                     <div id="studentDetailName" class="text-base font-semibold"></div>
                     <div id="studentDetailMeta" class="text-[11px] text-slate-500"></div>
+                    <div id="studentContractMeta" class="text-[10px] text-slate-500"></div>
                   </div>
                   <div class="flex items-center gap-2">
                     <span id="studentContractBadge" class="px-2 py-1 text-[11px] rounded-lg bg-rose-100 text-rose-700 font-semibold">INVALID – CONTRACT NOT SIGNED</span>
@@ -1293,6 +1294,7 @@
       studentTodos: [],
       studentCheckins: [],
       contracts: [],
+      contractSignatures: [],
       messages: [],
       activityLog: [],
       settings: {
@@ -1352,6 +1354,7 @@
         s.contractVersion = s.contractVersion || s.contract_version || 'v1';
         s.contractSignerName = s.contractSignerName || s.contract_signer_name || '';
         s.contractSignerEmail = s.contractSignerEmail || s.contract_signer_email || '';
+        s.lastContractId = s.lastContractId || s.last_contract_id || '';
       });
       st.parents.forEach(p => { p.id = cleanId(p.id); p.email = (p.email || '').trim().toLowerCase(); });
       st.parentLinks.forEach(pl => { pl.id = cleanId(pl.id); pl.parentId = cleanId(pl.parentId); pl.studentId = cleanId(pl.studentId); });
@@ -1375,6 +1378,14 @@
       st.invoices.forEach(i => { i.id = cleanId(i.id); i.studentId = cleanId(i.studentId); });
       st.studentTodos.forEach(t => { t.id = cleanId(t.id); t.studentId = cleanId(t.studentId); });
       st.studentCheckins.forEach(c => { c.id = cleanId(c.id); c.studentId = cleanId(c.studentId); });
+      if (!Array.isArray(st.contractSignatures)) st.contractSignatures = [];
+      st.contractSignatures.forEach(cs => {
+        cs.id = cleanId(cs.id);
+        cs.studentId = cleanId(cs.studentId);
+        cs.contract_version = cs.contract_version || cs.contractVersion || 'v1';
+        cs.rendered_pdf_url = cs.rendered_pdf_url || cs.renderedPdfUrl || '';
+        cs.contract_text_snapshot = cs.contract_text_snapshot || cs.contractTextSnapshot || '';
+      });
       st.activityLog.forEach(a => { a.id = cleanId(a.id); });
       st.messages.forEach(m => { m.id = cleanId(m.id); m.studentId = cleanId(m.studentId); m.sender = (m.sender || '').trim(); });
       st.messages.forEach(m => { m.id = cleanId(m.id); m.studentId = cleanId(m.studentId); });
@@ -1394,6 +1405,7 @@
       state.homework.forEach(hw => { hw.id = forceUuid(hw.id); hw.studentId = forceUuid(hw.studentId); hw.resourceId = forceUuid(hw.resourceId); });
       state.documents.forEach(d => { d.id = forceUuid(d.id); d.studentId = forceUuid(d.studentId); });
       state.contracts.forEach(c => { c.id = forceUuid(c.id); c.studentId = forceUuid(c.studentId); });
+      state.contractSignatures.forEach(cs => { cs.id = forceUuid(cs.id); cs.studentId = forceUuid(cs.studentId); });
       // Do NOT force invoice IDs to UUIDs to preserve existing invoice identifiers in the DB.
       state.invoices.forEach(inv => { inv.id = cleanId(inv.id); inv.studentId = forceUuid(inv.studentId); });
       state.studentTodos.forEach(t => { t.id = forceUuid(t.id); t.studentId = forceUuid(t.studentId); });
@@ -1472,6 +1484,10 @@
         const sid = cleanId(c.studentId);
         c.studentId = maps.students.get(sid) || sid;
       });
+      state.contractSignatures.forEach(cs => {
+        const sid = cleanId(cs.studentId);
+        cs.studentId = maps.students.get(sid) || sid;
+      });
       state.invoices.forEach(inv => {
         const sid = cleanId(inv.studentId);
         inv.studentId = maps.students.get(sid) || sid;
@@ -1546,7 +1562,8 @@
         contract_signed_at: s.contractSignedAt || null,
         contract_version: s.contractVersion || 'v1',
         contract_signer_name: s.contractSignerName || null,
-        contract_signer_email: s.contractSignerEmail || null
+        contract_signer_email: s.contractSignerEmail || null,
+        last_contract_id: s.lastContractId || null
       }));
       await upsertAndPrune('students', students, 'id');
 
@@ -1869,7 +1886,7 @@
      ***********************/
     function setupRealtime() {
       if (!supabaseClient || !supabaseSession) return;
-      const tables = ['students','sessions','homework','invoices','messages','resources','documents','contracts','student_todos','student_checkins','presence'];
+      const tables = ['students','sessions','homework','invoices','messages','resources','documents','contracts','student_todos','student_checkins','parent_contract_signatures','presence'];
       tables.forEach(table => {
         supabaseClient
           .channel(`${table}-changes`)
@@ -2725,7 +2742,8 @@
           todosRes,
           checkinsRes,
           activityRes,
-          messagesRes
+          messagesRes,
+          contractSignaturesRes
         ] = await Promise.all([
           fetchTable('students'),
           fetchTable('parents'),
@@ -2740,10 +2758,11 @@
           fetchTable('student_todos'),
           fetchTable('student_checkins'),
           fetchTable('activity_log'),
-          fetchTable('messages')
+          fetchTable('messages'),
+          fetchTable('parent_contract_signatures')
         ]);
 
-        [studentsRes, parentsRes, parentLinksRes, sessionsRes, sessionStudentsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes, activityRes, messagesRes].forEach(res => {
+        [studentsRes, parentsRes, parentLinksRes, sessionsRes, sessionStudentsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes, activityRes, messagesRes, contractSignaturesRes].forEach(res => {
           if (res.error) throw res.error;
         });
 
@@ -2815,7 +2834,8 @@
           contractSignedAt: s.contract_signed_at,
           contractVersion: s.contract_version || 'v1',
           contractSignerName: s.contract_signer_name,
-          contractSignerEmail: s.contract_signer_email
+          contractSignerEmail: s.contract_signer_email,
+          lastContractId: s.last_contract_id
         }));
         merged.parents = (parentsRes?.data || []).map(p => ({
           id: p.id,
@@ -2919,7 +2939,7 @@
         detail: a.detail,
         created_at: a.created_at
       }));
-      merged.settings = loadState().settings; // keep local settings
+        merged.settings = loadState().settings; // keep local settings
 
       // Merge in any local resources not yet in Supabase so they don't disappear on reload/switch
       const localState = loadState();
@@ -2988,6 +3008,7 @@
       let resourcesRes = { data: [] };
       let invoicesRes = { data: [] };
       let messagesRes = { data: [] };
+      let contractSignaturesRes = { data: [] };
 
       try {
         studentsRes = await supabaseClient.from('students').select('*').eq('student_email', email);
@@ -3028,6 +3049,9 @@
         try {
           messagesRes = await supabaseClient.from('messages').select('*').in('student_id', studentIdArray);
         } catch {}
+        try {
+          contractSignaturesRes = await supabaseClient.from('parent_contract_signatures').select('*').in('student_id', studentIdArray);
+        } catch {}
       }
 
       // Resources tied to homework
@@ -3052,7 +3076,8 @@
         contractSignedAt: s.contract_signed_at,
         contractVersion: s.contract_version || 'v1',
         contractSignerName: s.contract_signer_name,
-        contractSignerEmail: s.contract_signer_email
+        contractSignerEmail: s.contract_signer_email,
+        lastContractId: s.last_contract_id
       }));
       merged.parents = (parentsRes.data || []).map(p => ({
         id: p.id,
@@ -3139,6 +3164,18 @@
         paid: inv.paid,
         notes: inv.notes
       }));
+      merged.contractSignatures = (contractSignaturesRes?.data || []).map(cs => ({
+        id: cs.id,
+        studentId: cs.student_id,
+        parentName: cs.parent_name,
+        parentEmail: cs.parent_email,
+        signedAt: cs.signed_at,
+        contractVersion: cs.contract_version || 'v1',
+        contractTextSnapshot: cs.contract_text_snapshot,
+        renderedPdfUrl: cs.rendered_pdf_url,
+        signatureMethod: cs.signature_method,
+        parentIp: cs.parent_ip
+      }));
 
       merged.messages = (messagesRes?.data || []).map(m => ({
         id: m.id,
@@ -3146,6 +3183,18 @@
         text: m.text,
         sender: m.sender,
         created_at: m.created_at
+      }));
+      merged.contractSignatures = (contractSignaturesRes?.data || []).map(cs => ({
+        id: cs.id,
+        studentId: cs.student_id,
+        parentName: cs.parent_name,
+        parentEmail: cs.parent_email,
+        signedAt: cs.signed_at,
+        contractVersion: cs.contract_version || 'v1',
+        contractTextSnapshot: cs.contract_text_snapshot,
+        renderedPdfUrl: cs.rendered_pdf_url,
+        signatureMethod: cs.signature_method,
+        parentIp: cs.parent_ip
       }));
 
       sanitizeState(merged);
@@ -3695,6 +3744,13 @@
       return links.map(pl => getStudentById(pl.studentId)).filter(Boolean);
     }
 
+    function getLatestSignature(studentId) {
+      const sigs = state.contractSignatures
+        .filter(cs => cs.studentId === studentId)
+        .sort((a, b) => new Date(b.signedAt || 0) - new Date(a.signedAt || 0));
+      return sigs[0] || null;
+    }
+
     async function deleteParentAndLinks(parentId) {
       // Local
       state.parents = state.parents.filter(p => p.id !== parentId);
@@ -3937,12 +3993,21 @@
         `${s.gradeLevel || ''} • ${s.subjects?.join(', ') || ''} • Rate: ${s.rate ? 'R ' + s.rate + '/h' : '—'}`;
       const contractBadge = document.getElementById('studentContractBadge');
       const contractLinkBtn = document.getElementById('studentContractLinkBtn');
+      const contractMeta = document.getElementById('studentContractMeta');
+      const latestSig = getLatestSignature(s.id);
       if (contractBadge) {
         const signed = !!s.contractSigned;
         contractBadge.textContent = signed ? 'VALID – CONTRACT SIGNED' : 'INVALID – CONTRACT NOT SIGNED';
         contractBadge.className = signed
           ? 'px-2 py-1 text-[11px] rounded-lg bg-emerald-100 text-emerald-700 font-semibold'
           : 'px-2 py-1 text-[11px] rounded-lg bg-rose-100 text-rose-700 font-semibold';
+      }
+      if (contractMeta) {
+        if (latestSig) {
+          contractMeta.innerHTML = `Signed by ${latestSig.parentName || 'Parent'} on ${latestSig.signedAt ? new Date(latestSig.signedAt).toLocaleString() : ''} • Version ${latestSig.contractVersion || 'v1'} ${latestSig.renderedPdfUrl ? `<a href="${latestSig.renderedPdfUrl}" target="_blank" rel="noopener" class="underline text-indigo-600">View signed copy</a>` : ''}`;
+        } else {
+          contractMeta.textContent = 'No signed contract on file.';
+        }
       }
       if (contractLinkBtn) {
         contractLinkBtn.onclick = () => copyContractLink(s.id);
