@@ -44,12 +44,30 @@
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Check your email</h1>
-    <p>We’ve sent a confirmation link to your inbox. Please click it to verify your email and activate your account.</p>
-    <p>If you don’t see it, check your spam or promotions folder.</p>
-    <a class="button" href="./login.html">Go to sign in</a>
-    <small>After confirming, return here to sign in.</small>
+  <div class="card" id="card">
+    <h1 id="title">Check your email</h1>
+    <p id="msg1">We’ve sent a confirmation link to your inbox. Please click it to verify your email and activate your account.</p>
+    <p id="msg2">If you don’t see it, check your spam or promotions folder.</p>
+    <a class="button" href="./login.html" id="cta">Go to sign in</a>
+    <small id="meta">After confirming, return here to sign in.</small>
   </div>
+
+  <script>
+    // If arriving from the confirmation link (hash contains access_token), show "Email confirmed"
+    (function() {
+      const hash = window.location.hash || '';
+      if (!hash.startsWith('#')) return;
+      const params = new URLSearchParams(hash.slice(1));
+      if (params.get('access_token')) {
+        document.getElementById('title').textContent = 'Email confirmed';
+        document.getElementById('msg1').textContent = 'Your email is verified. You can now sign in.';
+        document.getElementById('msg2').textContent = 'If you run into issues signing in, request a password reset.';
+        const cta = document.getElementById('cta');
+        cta.textContent = 'Proceed to sign in';
+        // Clean the hash to avoid leaking tokens
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    })();
+  </script>
 </body>
 </html>
