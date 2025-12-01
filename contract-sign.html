@@ -20,9 +20,8 @@
     <div id="status" class="status"></div>
     <h1 style="margin:0 0 0.25rem 0;">Tutoring Contract</h1>
     <p class="muted" id="studentName">Loading student…</p>
-    <div id="contractText" style="border:1px solid #e2e8f0; border-radius:12px; padding:1rem; max-height:260px; overflow-y:auto; background:#f8fafc; margin-top:0.5rem;">
-      <p><strong>Contract version v1</strong></p>
-      <p>This agreement confirms that the parent/guardian authorizes tutoring for the student and will honor scheduling and payment terms. Cancellations with less than 24h notice may be charged. Materials are for personal academic use only.</p>
+    <div style="border:1px solid #e2e8f0; border-radius:12px; padding:0.5rem; max-height:420px; overflow:hidden; background:#f8fafc; margin-top:0.5rem;">
+      <iframe src="./Final_Tutor_Contract.pdf" title="Tutoring Contract PDF" style="width:100%; height:400px; border:0;"></iframe>
     </div>
 
     <form id="signForm">
@@ -42,9 +41,11 @@
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const studentId = new URLSearchParams(location.search).get('student_id');
     const version = new URLSearchParams(location.search).get('v') || 'v1';
+    const pdfPath = './Final_Tutor_Contract.pdf';
     const statusEl = document.getElementById('status');
     const msgEl = document.getElementById('message');
     const form = document.getElementById('signForm');
+    let studentNameForText = '';
 
     if (!studentId) {
       statusEl.textContent = 'Missing student_id in the link.';
@@ -60,10 +61,22 @@
         form.style.display = 'none';
         return;
       }
-      document.getElementById('studentName').textContent = `Student: ${data.name}`;
+      studentNameForText = data.name;
+      document.getElementById('studentName').textContent = `Student: ${studentNameForText}`;
       if (data.contract_signed) {
         statusEl.textContent = 'Already signed';
       }
+    }
+
+    async function fetchPdfBase64() {
+      const resp = await fetch(pdfPath);
+      const buffer = await resp.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
     }
 
     form.onsubmit = async (e) => {
@@ -77,10 +90,21 @@
       }
       msgEl.textContent = 'Signing...';
       try {
+        const pdfBase64 = await fetchPdfBase64().catch(() => '');
+        const contractTextSnapshot = `Signed PDF: Final_Tutor_Contract.pdf • Version ${version} • Student: ${studentNameForText} • Signed by: ${name} (${email})`;
         const resp = await fetch(`${SUPABASE_URL}/functions/v1/sign-contract`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ student_id: studentId, name, email, version })
+          body: JSON.stringify({
+            student_id: studentId,
+            name,
+            email,
+            version,
+            signature_method: 'online click-to-sign',
+            contract_text_snapshot: contractTextSnapshot,
+            pdf_base64: pdfBase64,
+            pdf_name: 'signed_contract.pdf'
+          })
         });
         const json = await resp.json();
         if (!resp.ok || !json?.success) throw new Error(json?.error || 'Failed to sign.');
