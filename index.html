@@ -1338,6 +1338,7 @@
       st.sessions.forEach(s => {
         s.id = cleanId(s.id);
         s.studentIds = (s.studentIds || []).map(cleanId);
+        s.invoiceId = cleanId(s.invoiceId);
       });
       st.resources.forEach(r => {
         r.id = cleanId(r.id);
@@ -1368,7 +1369,7 @@
       state.students.forEach(s => { s.id = forceUuid(s.id); });
       state.parents.forEach(p => { p.id = forceUuid(p.id); });
       state.parentLinks.forEach(pl => { pl.id = forceUuid(pl.id); pl.parentId = forceUuid(pl.parentId); pl.studentId = forceUuid(pl.studentId); });
-      state.sessions.forEach(sess => { sess.id = forceUuid(sess.id); sess.studentIds = (sess.studentIds || []).map(forceUuid); });
+      state.sessions.forEach(sess => { sess.id = forceUuid(sess.id); sess.studentIds = (sess.studentIds || []).map(forceUuid); sess.invoiceId = cleanId(sess.invoiceId); });
       state.resources.forEach(r => { r.id = forceUuid(r.id); });
       state.homework.forEach(hw => { hw.id = forceUuid(hw.id); hw.studentId = forceUuid(hw.studentId); hw.resourceId = forceUuid(hw.resourceId); });
       state.documents.forEach(d => { d.id = forceUuid(d.id); d.studentId = forceUuid(d.studentId); });
@@ -1540,7 +1541,8 @@
         subject: sess.subject,
         topic: sess.topic,
         notes: sess.notes,
-        completed: sess.completed
+        completed: sess.completed,
+        invoice_id: cleanId(sess.invoiceId)
       }));
       await upsertAndPrune('sessions', sessions, 'id');
 
@@ -2701,6 +2703,7 @@
           topic: sess.topic,
           notes: sess.notes,
           completed: sess.completed,
+          invoiceId: sess.invoice_id,
           studentIds
         };
       });
@@ -4594,16 +4597,21 @@
 
       const unbilledList = document.getElementById('unbilledList');
       if (unbilledList) {
-        const unbilled = state.students.map(s => {
-          const invs = state.invoices.filter(inv => inv.studentId === s.id);
-          const lastInvoiceDate = invs.length
-            ? new Date(Math.max(...invs.map(inv => new Date(inv.issueDate || inv.dueDate || 0))))
-            : new Date(0);
-          const sessionsAfter = state.sessions.filter(sess => sess.studentIds.includes(s.id) && new Date(sess.date) > lastInvoiceDate);
-          const hours = sessionsAfter.reduce((acc, sess) => acc + Number(sess.durationHours || 0), 0);
-          const amount = hours * (Number(s.rate) || 0);
-          return { student: s, hours, amount, lastInvoiceDate: lastInvoiceDate.getFullYear() > 1970 ? lastInvoiceDate.toISOString().slice(0,10) : 'No invoices yet' };
-        }).filter(item => item.hours > 0.01)
+        const unbilledSessions = state.sessions.filter(sess => !sess.invoiceId && sess.completed);
+        const grouped = {};
+        unbilledSessions.forEach(sess => {
+          (sess.studentIds || []).forEach(sid => {
+            if (!grouped[sid]) grouped[sid] = [];
+            grouped[sid].push(sess);
+          });
+        });
+        const unbilled = Object.entries(grouped).map(([sid, sessList]) => {
+          const student = getStudentById(sid);
+          const hours = sessList.reduce((acc, s) => acc + Number(s.durationHours || 0), 0);
+          const amount = hours * (Number(student?.rate) || 0);
+          const lastDate = sessList.length ? sessList.sort((a,b) => new Date(b.date) - new Date(a.date))[0].date : 'n/a';
+          return { student, hours, amount, lastDate };
+        }).filter(item => item.student)
           .sort((a, b) => b.amount - a.amount)
           .slice(0, 6);
         if (!unbilled.length) {
@@ -4613,7 +4621,7 @@
             <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80 flex justify-between items-center">
               <div>
                 <div class="font-medium">${item.student.name}</div>
-                <div class="text-[10px] text-slate-500">${item.hours.toFixed(1)}h since ${item.lastInvoiceDate}</div>
+                <div class="text-[10px] text-slate-500">${item.hours.toFixed(1)}h unbilled • Last ${item.lastDate}</div>
               </div>
               <div class="text-right text-[11px] font-semibold">R ${item.amount.toFixed(0)}</div>
             </li>
@@ -5339,6 +5347,11 @@ Best regards,
             </select>
           </div>
           <div>
+            <label class="block text-[11px] mb-1">Select sessions to bill</label>
+            <div id="invoiceSessions" class="border border-slate-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1 text-xs"></div>
+            <p class="text-[10px] text-slate-500">Sessions for this student; already billed sessions are disabled.</p>
+          </div>
+          <div>
             <label class="block text-[11px] mb-1">Title</label>
             <input name="title" value="${doc?.title || ''}"
                    class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
@@ -5532,6 +5545,29 @@ Best regards,
       `;
       openModal(html, () => {
         const form = document.getElementById('invoiceForm');
+        const sessionBox = form.querySelector('#invoiceSessions');
+
+        const renderSessionChoices = () => {
+          const studentId = form.studentId.value;
+          const selectedExisting = new Set([...form.querySelectorAll('input[name="sessionIds"]:checked')].map(i => i.value));
+          const eligible = state.sessions.filter(s => s.studentIds.includes(studentId));
+          if (!eligible.length) {
+            sessionBox.innerHTML = '<div class="text-[10px] text-slate-500">No sessions for this student.</div>';
+            return;
+          }
+          sessionBox.innerHTML = eligible.map(s => {
+            const billedElsewhere = !!s.invoiceId && s.invoiceId !== (inv?.id || '');
+            const checked = selectedExisting.has(s.id) || s.invoiceId === inv?.id;
+            const detail = `${s.date} ${s.startTime || ''} • ${s.subject} • ${s.durationHours || 1}h`;
+            return `<label class="flex items-center gap-2 text-[11px] ${billedElsewhere ? 'opacity-50' : ''}">
+              <input type="checkbox" name="sessionIds" value="${s.id}" ${checked && !billedElsewhere ? 'checked' : ''} ${billedElsewhere ? 'disabled' : ''}>
+              <span>${detail}</span>
+              ${billedElsewhere ? '<span class="text-amber-600 text-[10px]">(already billed)</span>' : ''}
+            </label>`;
+          }).join('');
+        };
+        renderSessionChoices();
+        form.studentId.onchange = renderSessionChoices;
 
         function computeTotalFromFees() {
           const base = Number(form.baseAmount.value || form.total.value || 0);
@@ -5557,6 +5593,7 @@ Best regards,
 
         form.onsubmit = async (e) => {
           e.preventDefault();
+          const selectedSessionIds = new Set([...form.querySelectorAll('input[name="sessionIds"]:checked')].map(i => i.value));
           const newInv = {
             id: form.id.value.trim(),
             studentId: form.studentId.value,
@@ -5583,6 +5620,15 @@ Best regards,
             if (isSupabaseReady()) {
               await upsertInvoiceRemote(newInv);
             }
+            // relink sessions to this invoice
+            state.sessions.forEach(s => {
+              if (s.invoiceId === inv?.id && !selectedSessionIds.has(s.id)) {
+                s.invoiceId = '';
+              }
+              if (selectedSessionIds.has(s.id)) {
+                s.invoiceId = newInv.id;
+              }
+            });
             if (isEdit) {
               const idx = state.invoices.findIndex(i => i.id === inv.id);
               state.invoices[idx] = newInv;
@@ -5622,6 +5668,7 @@ Best regards,
               if (isSupabaseReady()) {
                 await deleteInvoiceRemote(inv.id);
               }
+              state.sessions.forEach(s => { if (s.invoiceId === inv.id) s.invoiceId = ''; });
               state.invoices = state.invoices.filter(i => i.id !== inv.id);
               saveState();
               closeModal();
