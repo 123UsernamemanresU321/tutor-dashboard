@@ -4070,7 +4070,7 @@
           : 'px-2 py-1 text-[11px] rounded-lg bg-rose-100 text-rose-700 font-semibold';
       }
       if (contractDeleteBtn) {
-        contractDeleteBtn.classList.toggle('hidden', !latestSig);
+        contractDeleteBtn.classList.toggle('hidden', !latestSig || parentMode);
         contractDeleteBtn.onclick = () => {
           if (!guardEdit()) return;
           if (!latestSig) return;
