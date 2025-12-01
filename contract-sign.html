@@ -26,6 +26,7 @@
   <form id="signForm">
   <div class="page" id="contractPage">
     <div id="status" class="status"></div>
+    <div id="studentName" class="muted"></div>
     <h1>Tutoring Services Agreement (Minor Tutor Version)</h1>
     <p class="muted">Please read the full agreement and complete the fields inline. When done, click “Sign & Download PDF”.</p>
 
@@ -519,15 +520,16 @@ Date: ___________________________________
     }
 
     async function loadStudent() {
-      const { data, error } = await supabaseClient.from('students').select('name,contract_signed').eq('id', studentId).single();
-      if (error || !data) {
-        statusEl.textContent = 'Student not found.';
-        form.style.display = 'none';
-        return;
-      }
-      studentNameForText = data.name;
-      document.getElementById('studentName').textContent = `Student: ${studentNameForText}`;
-      form.student_name.value = studentNameForText;
+    const { data, error } = await supabaseClient.from('students').select('name,contract_signed').eq('id', studentId).single();
+    if (error || !data) {
+      statusEl.textContent = 'Student not found.';
+      form.style.display = 'none';
+      return;
+    }
+    studentNameForText = data.name;
+    const studentNameEl = document.getElementById('studentName');
+    if (studentNameEl) studentNameEl.textContent = `Student: ${studentNameForText}`;
+    form.student_name.value = studentNameForText;
       const today = new Date().toISOString().slice(0,10);
       ['date','date_guardian','date_parent'].forEach(n => {
         const el = document.querySelector(`[name="${n}"]`);
