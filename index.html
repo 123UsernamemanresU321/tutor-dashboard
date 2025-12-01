@@ -1919,7 +1919,7 @@
         targetView = 'portal';
       }
       if (parentMode) {
-        const allowed = new Set(['parent-portal','dashboard','students','schedule','resources','finance','reports','profile','settings']);
+        const allowed = new Set(['parent-portal','profile','settings']);
         if (!allowed.has(targetView)) targetView = 'parent-portal';
       }
       document.getElementById('view-' + targetView)?.classList.remove('hidden');
@@ -2675,12 +2675,12 @@
       const navStudents = document.querySelector('.nav-btn[data-view="students"]');
       const navSchedule = document.querySelector('.nav-btn[data-view="schedule"]');
       const navResources = document.querySelector('.nav-btn[data-view="resources"]');
-      if (navFinance) navFinance.classList.toggle('hidden', studentMode);
-      if (navReports) navReports.classList.toggle('hidden', studentMode);
-      if (navDashboard) navDashboard.classList.toggle('hidden', studentMode);
-      if (navStudents) navStudents.classList.remove('hidden');
-      if (navSchedule) navSchedule.classList.remove('hidden');
-      if (navResources) navResources.classList.remove('hidden');
+      if (navFinance) navFinance.classList.toggle('hidden', studentMode || parentMode);
+      if (navReports) navReports.classList.toggle('hidden', studentMode || parentMode);
+      if (navDashboard) navDashboard.classList.toggle('hidden', studentMode || parentMode);
+      if (navStudents) navStudents.classList.toggle('hidden', parentMode);
+      if (navSchedule) navSchedule.classList.toggle('hidden', parentMode);
+      if (navResources) navResources.classList.toggle('hidden', parentMode);
       if (studentMode) switchView('portal');
       if (parentMode) switchView('parent-portal');
     }
