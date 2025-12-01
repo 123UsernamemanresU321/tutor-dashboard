@@ -1919,7 +1919,7 @@
         targetView = 'portal';
       }
       if (parentMode) {
-        const allowed = new Set(['parent-portal','profile','settings']);
+        const allowed = new Set(['parent-portal','students','schedule','resources','profile','settings']);
         if (!allowed.has(targetView)) targetView = 'parent-portal';
       }
       document.getElementById('view-' + targetView)?.classList.remove('hidden');
@@ -2307,6 +2307,13 @@
       const resUl = document.getElementById('parentResources');
       const invUl = document.getElementById('parentInvoices');
       const msgsUl = document.getElementById('parentMessages');
+      // allow parent to click into student profile
+      const studentsList = document.getElementById('parentStudentsList');
+      if (studentsList) {
+        studentsList.querySelectorAll('[data-student-id]').forEach(li => {
+          li.addEventListener('click', () => selectStudent(li.dataset.studentId));
+        });
+      }
       const childIds = new Set(students.map(s => s.id));
 
       const now = new Date();
@@ -2695,9 +2702,9 @@
       if (navFinance) navFinance.classList.toggle('hidden', studentMode || parentMode);
       if (navReports) navReports.classList.toggle('hidden', studentMode || parentMode);
       if (navDashboard) navDashboard.classList.toggle('hidden', studentMode || parentMode);
-      if (navStudents) navStudents.classList.toggle('hidden', parentMode);
-      if (navSchedule) navSchedule.classList.toggle('hidden', parentMode);
-      if (navResources) navResources.classList.toggle('hidden', parentMode);
+      if (navStudents) navStudents.classList.toggle('hidden', studentMode); // show for owner & parent
+      if (navSchedule) navSchedule.classList.toggle('hidden', studentMode); // show for owner & parent
+      if (navResources) navResources.classList.toggle('hidden', studentMode); // show for owner & parent
       if (studentMode) switchView('portal');
       if (parentMode) switchView('parent-portal');
     }
