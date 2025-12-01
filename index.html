@@ -1374,7 +1374,7 @@
       st.contracts.forEach(c => {
         c.id = cleanId(c.id);
         c.studentId = cleanId(c.studentId);
-        c.storage_path = stripBucketPrefix(c.storage_path, 'contracts');
+        c.storage_path = stripBucketPrefix(stripBucketPrefix(c.storage_path, 'signed_contracts'), 'contracts');
       });
       st.invoices.forEach(i => { i.id = cleanId(i.id); i.studentId = cleanId(i.studentId); });
       st.studentTodos.forEach(t => { t.id = cleanId(t.id); t.studentId = cleanId(t.studentId); });
@@ -2860,14 +2860,16 @@
         const contracts = await Promise.all(
           (contractsRes.data || []).map(async c => {
             try {
-              if (c.storage_path && supabaseClient.storage) {
-                const { data, error } = await supabaseClient.storage.from('contracts').createSignedUrl(c.storage_path, 60 * 60 * 24);
+              const bucket = (c.storage_path || '').startsWith('signed_contracts/') ? 'signed_contracts' : 'contracts';
+              const path = stripBucketPrefix(c.storage_path, bucket);
+              if (path && supabaseClient.storage) {
+                const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 60 * 60 * 24);
                 if (!error && data?.signedUrl) {
                   return {
                     id: c.id,
                     studentId: c.student_id,
                     fileName: c.file_name,
-                    storage_path: c.storage_path,
+                    storage_path: path,
                     status: c.status,
                     notes: c.notes,
                     uploadedAt: c.uploaded_at,
@@ -3079,6 +3081,7 @@
       let invoicesRes = { data: [] };
       let messagesRes = { data: [] };
       let contractSignaturesRes = { data: [] };
+      let contractsRes = { data: [] };
 
       try {
         studentsRes = await supabaseClient.from('students').select('*').eq('student_email', email);
@@ -3128,6 +3131,9 @@
         } catch {}
         try {
           contractSignaturesRes = await supabaseClient.from('parent_contract_signatures').select('*').in('student_id', studentIdArray);
+        } catch {}
+        try {
+          contractsRes = await supabaseClient.from('contracts').select('*').in('student_id', studentIdArray);
         } catch {}
       }
 
@@ -3253,6 +3259,31 @@
         signatureMethod: cs.signature_method,
         parentIp: cs.parent_ip
       }));
+      merged.contracts = await Promise.all(
+        (contractsRes.data || []).map(async c => {
+          let signedUrl = '';
+          try {
+            const bucket = (c.storage_path || '').startsWith('signed_contracts/') ? 'signed_contracts' : 'contracts';
+            const path = stripBucketPrefix(c.storage_path, bucket);
+            if (path && supabaseClient.storage) {
+              const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 60 * 60 * 24);
+              if (!error && data?.signedUrl) signedUrl = data.signedUrl;
+            }
+          } catch (err) {
+            console.warn('Contract signed URL fetch failed (student/parent)', err);
+          }
+          return {
+            id: c.id,
+            studentId: c.student_id,
+            fileName: c.file_name,
+            storage_path: c.storage_path,
+            status: c.status,
+            notes: c.notes,
+            uploadedAt: c.uploaded_at,
+            signedUrl
+          };
+        })
+      );
 
       merged.messages = (messagesRes?.data || []).map(m => ({
         id: m.id,
