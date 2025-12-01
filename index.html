@@ -1755,7 +1755,13 @@
 
     async function deleteContractForStudent(signatureId, studentId) {
       // local cleanup
-      state.contractSignatures = state.contractSignatures.filter(cs => cs.id !== signatureId);
+      if (signatureId) {
+        state.contractSignatures = state.contractSignatures.filter(cs => cs.id !== signatureId);
+        state.contracts = state.contracts.filter(c => c.id !== signatureId);
+      } else {
+        state.contractSignatures = state.contractSignatures.filter(cs => cs.studentId !== studentId);
+        state.contracts = state.contracts.filter(c => c.studentId !== studentId);
+      }
       const stu = getStudentById(studentId);
       if (stu) {
         stu.contractSigned = false;
@@ -1772,8 +1778,13 @@
       // remote cleanup
       if (isSupabaseReady()) {
         try {
-          await supabaseClient.from('parent_contract_signatures').delete().eq('id', signatureId);
-          await supabaseClient.from('contracts').delete().eq('id', signatureId);
+          if (signatureId) {
+            await supabaseClient.from('parent_contract_signatures').delete().eq('id', signatureId);
+            await supabaseClient.from('contracts').delete().eq('id', signatureId);
+          } else {
+            await supabaseClient.from('parent_contract_signatures').delete().eq('student_id', studentId);
+            await supabaseClient.from('contracts').delete().eq('student_id', studentId);
+          }
           await supabaseClient.from('students').update({
             contract_signed: false,
             contract_signed_at: null,
@@ -4062,6 +4073,7 @@
       const contractDeleteBtn = document.getElementById('studentContractDeleteBtn');
       const contractMeta = document.getElementById('studentContractMeta');
       const latestSig = getLatestSignature(s.id);
+      const contractEntry = state.contracts.find(c => c.studentId === s.id && c.status === 'Signed') || null;
       if (contractBadge) {
         const signed = !!s.contractSigned;
         contractBadge.textContent = signed ? 'VALID – CONTRACT SIGNED' : 'INVALID – CONTRACT NOT SIGNED';
@@ -4070,16 +4082,19 @@
           : 'px-2 py-1 text-[11px] rounded-lg bg-rose-100 text-rose-700 font-semibold';
       }
       if (contractDeleteBtn) {
-        contractDeleteBtn.classList.toggle('hidden', !latestSig || parentMode);
+        const hasContract = !!latestSig || !!contractEntry;
+        contractDeleteBtn.classList.toggle('hidden', !hasContract || parentMode);
         contractDeleteBtn.onclick = () => {
           if (!guardEdit()) return;
-          if (!latestSig) return;
-          deleteContractForStudent(latestSig.id, s.id);
+          const targetId = latestSig?.id || contractEntry?.id;
+          deleteContractForStudent(targetId, s.id);
         };
       }
       if (contractMeta) {
         if (latestSig) {
           contractMeta.innerHTML = `Signed by ${latestSig.parentName || 'Parent'} on ${latestSig.signedAt ? new Date(latestSig.signedAt).toLocaleString() : ''} • Version ${latestSig.contractVersion || 'v1'} ${latestSig.renderedPdfUrl ? `<a href="${latestSig.renderedPdfUrl}" target="_blank" rel="noopener" class="underline text-indigo-600">View signed copy</a>` : ''}`;
+        } else if (contractEntry?.signedUrl) {
+          contractMeta.innerHTML = `Signed contract on file. <a href="${contractEntry.signedUrl}" target="_blank" rel="noopener" class="underline text-indigo-600">View signed copy</a>`;
         } else {
           contractMeta.textContent = 'No signed contract on file.';
         }
