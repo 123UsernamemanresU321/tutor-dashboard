@@ -29,7 +29,9 @@
       <input name="name" required>
       <label>Email</label>
       <input name="email" type="email" required>
-      <label class="muted"><input type="checkbox" name="confirm" required style="width:auto; margin-right:6px;"> I confirm I am the parent or legal guardian, and I agree to this contract.</label>
+      <label>Signature (type your full name)</label>
+      <input name="signature" required>
+      <label class="muted"><input type="checkbox" name="confirm" required style="width:auto; margin-right:6px;"> I confirm I am the parent or legal guardian, I have read the contract, and I agree to be legally bound by it.</label>
       <button type="submit" style="margin-top:1rem;">Sign Contract</button>
     </form>
     <div id="message" class="muted" style="margin-top:0.75rem;"></div>
@@ -94,7 +96,11 @@
         const contractTextSnapshot = `Signed PDF: Final_Tutor_Contract.pdf • Version ${version} • Student: ${studentNameForText} • Signed by: ${name} (${email})`;
         const resp = await fetch(`${SUPABASE_URL}/functions/v1/sign-contract`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          },
           body: JSON.stringify({
             student_id: studentId,
             name,
@@ -103,7 +109,8 @@
             signature_method: 'online click-to-sign',
             contract_text_snapshot: contractTextSnapshot,
             pdf_base64: pdfBase64,
-            pdf_name: 'signed_contract.pdf'
+            pdf_name: 'signed_contract.pdf',
+            signature_text: form.signature.value.trim()
           })
         });
         const json = await resp.json();
