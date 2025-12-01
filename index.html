@@ -3030,6 +3030,13 @@
       ]);
       const studentIdArray = Array.from(studentIds);
 
+      // If this is a parent with linked students, fetch those student rows
+      if (studentIdArray.length && !(studentsRes.data || []).length) {
+        try {
+          studentsRes = await supabaseClient.from('students').select('*').in('id', studentIdArray);
+        } catch {}
+      }
+
       if (studentIdArray.length) {
         try {
           sessionStudentsRes = await supabaseClient.from('session_students').select('*').in('student_id', studentIdArray);
