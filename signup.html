@@ -51,7 +51,7 @@
       <div class="mt-3">
         <label>Password</label>
         <input type="password" name="password" required autocomplete="new-password" minlength="12">
-        <div class="hint">Use at least 12 characters; include letters, numbers, and symbols.</div>
+        <div class="hint">Use at least 12 characters; include letters, numbers, and a symbol.</div>
       </div>
       <div class="mt-3">
         <label>Confirm password</label>
@@ -95,6 +95,7 @@
 
     const form = document.getElementById('signupForm');
     const msg = document.getElementById('msg');
+    const strongPassword = (pwd) => /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,}$/.test(pwd);
     form.onsubmit = async (e) => {
       e.preventDefault();
       msg.textContent = '';
@@ -103,6 +104,10 @@
       const confirm = form.confirm.value.trim();
       if (password !== confirm) {
         msg.textContent = 'Passwords do not match.';
+        return;
+      }
+      if (!strongPassword(password)) {
+        msg.textContent = 'Use at least 12 characters with letters, numbers, and at least one symbol.';
         return;
       }
       if (!form.consent.checked) {
