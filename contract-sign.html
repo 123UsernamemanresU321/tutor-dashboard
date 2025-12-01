@@ -631,8 +631,12 @@ Date: ___________________________________
             user_agent: navigator.userAgent || ''
           })
         });
-        const json = await resp.json();
-        if (!resp.ok || !json?.success) throw new Error(json?.error || 'Failed to sign.');
+        const text = await resp.text();
+        let json = {};
+        try { json = text ? JSON.parse(text) : {}; } catch {}
+        if (!resp.ok || !json?.success) {
+          throw new Error(json?.error || text || `Failed with status ${resp.status}`);
+        }
         msgEl.textContent = 'Signed! You may close this window.';
         statusEl.textContent = 'VALID – CONTRACT SIGNED';
         statusEl.style.color = '#16a34a';
