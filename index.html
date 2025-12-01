@@ -1704,7 +1704,10 @@
       // Upsert rows
       if (rows.length) {
         const { error } = await supabaseClient.from(table).upsert(rows);
-      if (error) throw error;
+      if (error) {
+        console.error(`Upsert failed for ${table}`, error);
+        throw error;
+      }
       }
       // Prune skipped to avoid accidental deletions; Supabase is source of truth.
     }
@@ -2866,43 +2869,51 @@
           sender: m.sender,
           created_at: m.created_at
         }));
-        merged.activityLog = (activityRes?.data || []).map(a => ({
-          id: a.id,
-          action: a.action,
-          detail: a.detail,
-          created_at: a.created_at
-        }));
-        merged.settings = loadState().settings; // keep local settings
+      merged.activityLog = (activityRes?.data || []).map(a => ({
+        id: a.id,
+        action: a.action,
+        detail: a.detail,
+        created_at: a.created_at
+      }));
+      merged.settings = loadState().settings; // keep local settings
 
-        // Merge in any local resources not yet in Supabase so they don't disappear on reload/switch
-        const localState = loadState();
-        if (localState?.resources?.length) {
-          const remoteIds = new Set(merged.resources.map(r => cleanId(r.id)));
-          localState.resources.forEach(r => {
-            const id = cleanId(r.id);
-            if (!remoteIds.has(id)) {
-              merged.resources.push({
-                id,
-                title: r.title,
-                subject: r.subject,
-                level: r.level,
-                tags: r.tags,
-                description: r.description,
-                createdAt: r.createdAt,
-                favorite: r.favorite,
-                storage_path: r.storage_path,
-                fileName: r.fileName,
-                signedUrl: r.signedUrl,
-                dataUrl: r.dataUrl
-              });
-            }
-          });
-        }
-        // Merge local invoices/messages if rows are missing (e.g., legacy rows without user_id)
-        if (localState?.invoices?.length) {
-          const remoteIds = new Set(merged.invoices.map(i => cleanId(i.id)));
-          localState.invoices.forEach(inv => {
-            const id = cleanId(inv.id);
+      // Merge in any local resources not yet in Supabase so they don't disappear on reload/switch
+      const localState = loadState();
+      if (localState?.resources?.length) {
+        const remoteIds = new Set(merged.resources.map(r => cleanId(r.id)));
+        localState.resources.forEach(r => {
+          const id = cleanId(r.id);
+          if (!remoteIds.has(id)) {
+            merged.resources.push({
+              id,
+              title: r.title,
+              subject: r.subject,
+              level: r.level,
+              tags: r.tags,
+              description: r.description,
+              createdAt: r.createdAt,
+              favorite: r.favorite,
+              storage_path: r.storage_path,
+              fileName: r.fileName,
+              signedUrl: r.signedUrl,
+              dataUrl: r.dataUrl
+            });
+          }
+        });
+      }
+      // Merge local homework if missing remotely (e.g., if an upsert failed due to RLS)
+      if (localState?.homework?.length) {
+        const remoteIds = new Set(merged.homework.map(h => cleanId(h.id)));
+        localState.homework.forEach(hw => {
+          const id = cleanId(hw.id);
+          if (!remoteIds.has(id)) merged.homework.push(hw);
+        });
+      }
+      // Merge local invoices/messages if rows are missing (e.g., legacy rows without user_id)
+      if (localState?.invoices?.length) {
+        const remoteIds = new Set(merged.invoices.map(i => cleanId(i.id)));
+        localState.invoices.forEach(inv => {
+          const id = cleanId(inv.id);
             if (!remoteIds.has(id)) merged.invoices.push(inv);
           });
         }
