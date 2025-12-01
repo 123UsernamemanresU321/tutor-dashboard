@@ -65,21 +65,20 @@
     </ul>
 
     <p class="section-title">2. SCOPE OF SERVICES</p>
-    <p>The Minor Tutor will provide academic tutoring in <input class="field-inline" name="subjects" data-field value="Physics, Chemistry, Mathematics"> including: explaining concepts, exam prep, practice questions, and study skills. The Tutor does not guarantee specific marks or provide other professional services.</p>
+    <p>The Minor Tutor will provide academic tutoring in Maths, Physics, Chemistry including: explaining concepts, exam prep, practice questions, and study skills. The Tutor does not guarantee specific marks or provide other professional services.</p>
 
     <p class="section-title">3. LESSON FORMAT & LOCATION</p>
     <p>Sessions may be online or in-person (Student home at <input class="field-inline" name="address" data-field> or mutually agreed location). Client ensures a safe environment and adult presence for in-person; suitable device/internet for online.</p>
 
     <p class="section-title">4. SCHEDULE, ATTENDANCE & PUNCTUALITY</p>
-    <p>Sessions normally last <input class="field-inline" name="duration" data-field value="60 minutes"> at agreed times. If the Tutor is late, time is extended/credited; if the Student is late, the Session still ends on time.</p>
+    <p>Sessions normally last 60 minutes at agreed times. If the Tutor is late, time is extended/credited; if the Student is late, the Session still ends on time.</p>
 
     <p class="section-title">5. FEES, INVOICING & PAYMENT</p>
-    <p>Standard rate: <input class="field-inline" name="rate" data-field value="R ---"> per <input class="field-inline" name="rate_unit" data-field value="60"> minutes. Invoices issued <input class="field-inline" name="invoice_cycle" data-field value="monthly in arrears">, payable within <input class="field-inline" name="invoice_days" data-field value="7"> days.</p>
-    <p>Payments by EFT to: Account name <input class="field-inline" name="account_name" data-field>, Bank <input class="field-inline" name="bank" data-field>, Account no. <input class="field-inline" name="account_no" data-field>, Branch code <input class="field-inline" name="branch" data-field>, Reference: Student surname + invoice number.</p>
-    <p>Late payments may incur <input class="field-inline" name="late_fee" data-field value="5%"> per month and suspension of sessions.</p>
+    <p>Standard rate: ZAR 200 per 60-minute Session. Invoices issued monthly in advance, payable by the date of the lesson; if unpaid by the lesson date, all further lessons are terminated until paid. Payment instructions will be provided on each invoice; reference: Student surname + invoice number.</p>
+    <p>Late payments may incur reasonable fees and suspension of sessions.</p>
 
     <p class="section-title">6. CANCELLATIONS & RESCHEDULING</p>
-    <p>Client may cancel/reschedule with ≥24h notice (no fee; subject to availability). &lt;24h or no-show: full fee payable, no automatic make-up. Tutor cancellations: notice + reschedule or credit/refund. Make-ups within <input class="field-inline" name="makeup_weeks" data-field value="8"> weeks; max <input class="field-inline" name="makeup_limit" data-field value="2"> reschedules.</p>
+    <p>Client may cancel/reschedule with ≥24h notice (no fee; subject to availability). &lt;24h or no-show: full fee payable, no automatic make-up. Tutor cancellations: notice + reschedule or credit/refund. Make-ups to be rescheduled and attended within 8 weeks; maximum 2 reschedules.</p>
 
     <p class="section-title">7. HOLIDAYS & EXAM SEASONS</p>
     <p>Schedule confirmed in advance. Prepaid packages valid <input class="field-inline" name="package_months" data-field value="6"> months unless agreed otherwise.</p>
@@ -112,7 +111,7 @@
     <p>No public use of student name/photo without permission; anonymised examples only with consent.</p>
 
     <p class="section-title">17. RATE CHANGES</p>
-    <p>Notice of <input class="field-inline" name="rate_notice" data-field value="30"> days for fee changes.</p>
+    <p>Tutor will notify at least 30 days before any rate change.</p>
 
     <p class="section-title">18. FORCE MAJEURE</p>
     <p>No liability for uncontrollable events; obligations paused; reschedule in good faith.</p>
@@ -164,7 +163,6 @@
     const statusEl = document.getElementById('status');
     const msgEl = document.getElementById('message');
     const form = document.getElementById('signForm');
-    const contractTextBox = document.getElementById('contractText');
     let studentNameForText = '';
     const contractTemplate = `
 TUTORING SERVICES AGREEMENT (Minor Tutor Version)
@@ -489,6 +487,34 @@ Date: ___________________________________
       statusEl.textContent = 'Ready to sign';
     }
 
+    function getFieldsFromInputs() {
+      const get = (name) => (document.querySelector(`[name="${name}"]`)?.value || '').trim();
+      const today = new Date().toISOString().slice(0,10);
+      return {
+        date: get('date') || today,
+        guardian_name: get('guardian_name'),
+        guardian_id: get('guardian_id'),
+        guardian_email: get('guardian_email'),
+        guardian_phone: get('guardian_phone'),
+        tutor_name: get('tutor_name') || get('guardian_name'),
+        tutor_email: get('tutor_email') || get('guardian_email'),
+        parent_name: get('parent_name'),
+        parent_id: get('parent_id'),
+        parent_email: get('parent_email'),
+        parent_phone: get('parent_phone'),
+        student_name: get('student_name'),
+        student_dob: get('student_dob'),
+        student_school: get('student_school'),
+        address: get('address'),
+        relationship: get('relationship'),
+        guardian_signature: get('guardian_signature'),
+        parent_signature: get('parent_signature'),
+        date_guardian: get('date_guardian') || today,
+        date_parent: get('date_parent') || today,
+        signature: get('parent_signature')
+      };
+    }
+
     async function loadStudent() {
       const { data, error } = await supabaseClient.from('students').select('name,contract_signed').eq('id', studentId).single();
       if (error || !data) {
@@ -499,64 +525,49 @@ Date: ___________________________________
       studentNameForText = data.name;
       document.getElementById('studentName').textContent = `Student: ${studentNameForText}`;
       form.student_name.value = studentNameForText;
+      const today = new Date().toISOString().slice(0,10);
+      ['date','date_guardian','date_parent'].forEach(n => {
+        const el = document.querySelector(`[name="${n}"]`);
+        if (el && !el.value) el.value = today;
+      });
       if (data.contract_signed) {
         statusEl.textContent = 'Already signed';
       }
-      renderPreview();
     }
 
     function buildContractSnapshot(fields) {
-      const today = new Date().toISOString().slice(0,10);
       return contractTemplate
-        .replaceAll('[date]', today)
+        .replaceAll('[date]', fields.date)
         .replaceAll('[Guardian full name]', fields.guardian_name)
         .replaceAll('[Guardian email]', fields.guardian_email)
         .replaceAll('[Guardian phone]', fields.guardian_phone || '')
-        .replaceAll('[Parent/Guardian full name]', fields.name)
-        .replaceAll('[Parent email]', fields.email)
-        .replaceAll('[Parent phone]', fields.phone || '')
+        .replaceAll('[optional]', fields.guardian_id || '')
+        .replaceAll('[Tutor full name]', fields.tutor_name || fields.guardian_name)
+        .replaceAll('[Tutor email, optional]', fields.tutor_email || fields.guardian_email)
+        .replaceAll('[Parent/Guardian full name]', fields.parent_name)
+        .replaceAll('[Parent email]', fields.parent_email)
+        .replaceAll('[Parent phone]', fields.parent_phone || '')
         .replaceAll('[Parent ID / Passport No.]', fields.parent_id || '')
         .replaceAll('[Student full name]', fields.student_name)
         .replaceAll('[Student DOB]', fields.student_dob)
         .replaceAll('[School]', fields.student_school)
         .replaceAll('[relationship]', fields.relationship || '')
-        .replaceAll('[Tutor full name]', fields.guardian_name)
-        .replaceAll('[Tutor email, optional]', fields.guardian_email)
-        .replaceAll('[subjects - e.g. Physics, Chemistry, Mathematics]', 'Physics, Chemistry, Mathematics')
-        .replaceAll('[duration, e.g. 60 minutes]', '60 minutes')
-        .replaceAll('[Rxxx]', 'R ---')
-        .replaceAll('[60/90]', '60')
-        .replaceAll('[x]', '')
-        .replaceAll('[7/10/14]', '7')
-        .replaceAll('[Account name]', '')
-        .replaceAll('[Bank]', '')
-        .replaceAll('[xxx]', '')
-        .replaceAll('[e.g. 5%]', '5%')
-        .replaceAll('[address]', '')
-        .replaceAll('[subjects - e.g. Physics, Chemistry, Mathematics]', 'Physics, Chemistry, Mathematics')
-        .replaceAll('[Student]', fields.student_name)
-        .replaceAll('[x]', '');
+        .replaceAll('[address]', fields.address || '')
+        .replaceAll('[Guardian signature typed/online]', fields.guardian_signature || '')
+        .replaceAll('[Parent signature typed/online]', fields.parent_signature || '')
+        .replaceAll('[date]', fields.date_parent || fields.date);
     }
-
-    function renderPreview() {
-      const fields = getFieldsFromInputs();
-      contractTextBox.textContent = buildContractSnapshot(fields);
-    }
-
-    ['input','change'].forEach(ev => {
-      form.addEventListener(ev, renderPreview);
-    });
 
     form.onsubmit = async (e) => {
       e.preventDefault();
       if (!studentId) return;
       const fields = getFieldsFromInputs();
-      if (!fields.name || !fields.email || !fields.student_name || !fields.student_dob || !fields.student_school || !form.confirm.checked || !fields.signature) {
+      if (!fields.parent_name || !fields.parent_email || !fields.student_name || !fields.student_dob || !fields.student_school || !form.confirm.checked || !fields.signature) {
         msgEl.textContent = 'Please fill all fields and confirm.';
         return;
       }
-      const name = fields.name;
-      const email = fields.email;
+      const name = fields.parent_name;
+      const email = fields.parent_email;
       msgEl.textContent = 'Signing...';
       try {
         const contractTextSnapshot = buildContractSnapshot(fields);
@@ -583,8 +594,8 @@ Date: ___________________________________
             contract_text_snapshot: contractTextSnapshot,
             pdf_base64: pdfBase64,
             pdf_name: 'signed_contract.pdf',
-            signature_text: form.signature.value.trim(),
-            parent_phone: fields.phone,
+            signature_text: fields.parent_signature,
+            parent_phone: fields.parent_phone,
             parent_id: fields.parent_id,
             student_name: fields.student_name,
             student_dob: fields.student_dob,
@@ -603,7 +614,6 @@ Date: ___________________________________
     };
 
     loadStudent();
-    renderPreview();
   </script>
 </body>
 </html>
