@@ -5,6 +5,7 @@
   <title>Sign Tutoring Contract</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #0f172a; padding: 1.5rem; }
     .card { max-width: 720px; margin: 0 auto; background: white; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.5rem; box-shadow: 0 20px 60px -40px rgba(15,23,42,0.4);}
@@ -492,6 +493,13 @@ Date: ___________________________________
           signature: form.signature.value.trim()
         };
         const contractTextSnapshot = buildContractSnapshot(fields);
+        // Generate PDF from the full contract text
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+        const lines = doc.splitTextToSize(contractTextSnapshot, 520);
+        doc.text(lines, 40, 40);
+        const pdfDataUri = doc.output('datauristring');
+        const pdfBase64 = pdfDataUri.split(',')[1];
         const resp = await fetch(`${SUPABASE_URL}/functions/v1/sign-contract`, {
           method: 'POST',
           headers: {
@@ -506,7 +514,7 @@ Date: ___________________________________
             version,
             signature_method: 'online click-to-sign',
             contract_text_snapshot: contractTextSnapshot,
-            pdf_base64: '',
+            pdf_base64: pdfBase64,
             pdf_name: 'signed_contract.pdf',
             signature_text: form.signature.value.trim(),
             parent_phone: fields.phone,
