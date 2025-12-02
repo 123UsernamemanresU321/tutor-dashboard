@@ -639,7 +639,7 @@
                   <div id="studentDetailMeta" class="text-[11px] text-slate-500"></div>
                   <div id="studentContractMeta" class="text-[10px] text-slate-500"></div>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2">
                   <span id="studentContractBadge" class="px-2 py-1 text-[11px] rounded-lg bg-rose-100 text-rose-700 font-semibold">INVALID – CONTRACT NOT SIGNED</span>
                   <button id="studentContractLinkBtn" data-owner-only class="px-2 py-1 text-[10px] rounded-lg border border-slate-300 hover:bg-slate-50">Copy parent link</button>
                   <button id="studentContractDeleteBtn" data-owner-only class="px-2 py-1 text-[10px] rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50 hidden">Remove contract</button>
@@ -1919,6 +1919,17 @@
       });
     }
 
+    function renderAiMarkup(el, text) {
+      if (!el) return;
+      const safe = (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const html = safe
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/__(.+?)__/g, '<u>$1</u>')
+        .replace(/_(.+?)_/g, '<em>$1</em>')
+        .replace(/~~(.+?)~~/g, '<s>$1</s>');
+      el.innerHTML = html;
+    }
+
     /****************
      * INITIAL SETUP *
      ****************/
@@ -2427,7 +2438,7 @@
               .filter(r => resourceIds.has(r.id))
               .map(r => ({ title: r.title, subject: r.subject, tags: r.tags, description: r.description }));
             const answer = await callLLM('study_helper', { question, recentSessions, resources });
-            aiOut.textContent = answer || 'No answer returned.';
+            renderAiMarkup(aiOut, answer || 'No answer returned.');
           } catch (err) {
             aiOut.textContent = err?.message || 'AI helper failed.';
           } finally {
@@ -2569,57 +2580,57 @@
       const btn = document.getElementById(`btn-inv-${invoiceId}`);
       const out = document.getElementById(`ai-invoice-${invoiceId}`);
       if (btn) { btn.disabled = true; btn.textContent = 'Explaining…'; }
-      if (out) out.textContent = '';
-      try {
-        const inv = state.invoices.find(i => i.id === invoiceId);
-        if (!inv) throw new Error('Invoice not found');
-        const sessions = state.sessions
-          .filter(s => s.studentIds.includes(inv.studentId))
-          .map(s => ({
-            date: s.date,
-            subject: s.subject,
-            topic: s.topic,
-            duration: s.durationHours
-          }));
+        if (out) out.textContent = '';
+        try {
+          const inv = state.invoices.find(i => i.id === invoiceId);
+          if (!inv) throw new Error('Invoice not found');
+          const sessions = state.sessions
+            .filter(s => s.studentIds.includes(inv.studentId))
+            .map(s => ({
+              date: s.date,
+              subject: s.subject,
+              topic: s.topic,
+              duration: s.durationHours
+            }));
         const text = await callLLM('invoice_explainer', { invoice: inv, sessions });
-        if (out) out.textContent = text;
-      } catch (err) {
+        if (out) renderAiMarkup(out, text);
+        } catch (err) {
         if (out) out.textContent = err?.message || 'AI failed.';
-      } finally {
-        if (btn) { btn.disabled = false; btn.textContent = 'Explain with AI'; }
+        } finally {
+          if (btn) { btn.disabled = false; btn.textContent = 'Explain with AI'; }
+        }
       }
-    }
 
     async function parentSummaryAI(studentId) {
       const btn = document.getElementById(`btn-summary-${studentId}`);
       const out = document.getElementById(`ai-summary-${studentId}`);
       if (btn) { btn.disabled = true; btn.textContent = 'Summarizing…'; }
-      if (out) out.textContent = '';
-      try {
-        const stu = getStudentById(studentId);
-        if (!stu) throw new Error('Student not found');
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - 30);
+        if (out) out.textContent = '';
+        try {
+          const stu = getStudentById(studentId);
+          if (!stu) throw new Error('Student not found');
+          const cutoff = new Date();
+          cutoff.setDate(cutoff.getDate() - 30);
         const sessions = state.sessions
           .filter(s => s.studentIds.includes(studentId))
           .filter(s => new Date(s.date) >= cutoff)
           .map(s => ({ date: s.date, subject: s.subject, topic: s.topic, notes: s.notes }));
-        const homework = state.homework
-          .filter(h => h.studentId === studentId)
-          .map(h => ({ resource: getResourceById(h.resourceId)?.title || 'Homework', status: h.status, due: h.dueDate }));
-        const text = await callLLM('progress_summary', {
-          student: { name: stu.name, grade: stu.gradeLevel, subjects: stu.subjects },
-          range: 'last 30 days',
-          sessions,
-          homework
-        });
-        if (out) out.textContent = text;
-      } catch (err) {
+          const homework = state.homework
+            .filter(h => h.studentId === studentId)
+            .map(h => ({ resource: getResourceById(h.resourceId)?.title || 'Homework', status: h.status, due: h.dueDate }));
+          const text = await callLLM('progress_summary', {
+            student: { name: stu.name, grade: stu.gradeLevel, subjects: stu.subjects },
+            range: 'last 30 days',
+            sessions,
+            homework
+          });
+        if (out) renderAiMarkup(out, text);
+        } catch (err) {
         if (out) out.textContent = err?.message || 'AI failed.';
-      } finally {
-        if (btn) { btn.disabled = false; btn.textContent = 'AI summary (30d)'; }
+        } finally {
+          if (btn) { btn.disabled = false; btn.textContent = 'AI summary (30d)'; }
+        }
       }
-    }
 
     function getAvailableStudentEmails(currentEmail = '') {
       const assigned = new Set(
