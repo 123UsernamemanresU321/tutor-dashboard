@@ -4667,10 +4667,39 @@
       const c = state.contracts.find(ct => ct.id === contractId);
       if (!c) return;
       c.status = status;
+      // Update student contract flags when toggling status
+      const stu = getStudentById(c.studentId);
+      if (stu) {
+        if (status === 'Signed') {
+          stu.contractSigned = true;
+          stu.contractSignedAt = new Date().toISOString();
+          stu.lastContractId = contractId;
+        } else {
+          stu.contractSigned = false;
+          stu.contractSignedAt = null;
+          stu.contractSignerName = '';
+          stu.contractSignerEmail = '';
+          stu.lastContractId = null;
+        }
+      }
       saveState();
       if (selectedStudentId) {
         renderStudentContracts(selectedStudentId);
         renderStudentTimeline(selectedStudentId);
+        renderStudentsView();
+      }
+      // Persist to Supabase
+      if (isSupabaseReady()) {
+        supabaseClient.from('contracts').update({ status }).eq('id', contractId).catch(err => {
+          console.warn('Contract status update failed', err);
+        });
+        if (stu) {
+          supabaseClient.from('students').update({
+            contract_signed: status === 'Signed',
+            contract_signed_at: status === 'Signed' ? stu.contractSignedAt : null,
+            last_contract_id: status === 'Signed' ? contractId : null
+          }).eq('id', stu.id).catch(err => console.warn('Student contract flag update failed', err));
+        }
       }
     }
 
