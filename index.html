@@ -1812,6 +1812,15 @@
       // remote cleanup
       if (isSupabaseReady()) {
         try {
+          // Call backend function to ensure storage + rows are removed
+          try {
+            await supabaseClient.functions.invoke('delete-contract', {
+              body: { contract_id: signatureId || undefined, student_id: studentId },
+              headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
+            });
+          } catch (err) {
+            console.warn('delete-contract function failed; falling back to direct deletes', err);
+          }
           if (signatureId) {
             await supabaseClient.from('parent_contract_signatures').delete().eq('id', signatureId);
             await supabaseClient.from('contracts').delete().eq('id', signatureId);
