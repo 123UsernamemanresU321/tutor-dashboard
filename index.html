@@ -5117,6 +5117,41 @@
       return h*60 + m;
     }
 
+    function hasPaidInvoiceForDate(studentId, dateStr) {
+      const target = new Date(dateStr);
+      return state.invoices.some(inv => {
+        if (inv.studentId !== studentId || !inv.paid) return false;
+        const startOk = !inv.service_period_start || new Date(inv.service_period_start) <= target;
+        const endOk = !inv.service_period_end || new Date(inv.service_period_end) >= target;
+        return startOk && endOk;
+      });
+    }
+
+    function guardSessionCreation(studentIds, dateStr) {
+      if (!studentIds.length) {
+        alert('Select at least one student.');
+        return false;
+      }
+      for (const sid of studentIds) {
+        const stu = getStudentById(sid);
+        if (!stu?.contractSigned) {
+          alert('Contract must be signed before scheduling.');
+          return false;
+        }
+        if (!hasPaidInvoiceForDate(sid, dateStr)) {
+          alert('No paid invoice covers this session date. Please ensure the invoice is paid first.');
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function guardSessionCompletion(sess) {
+      if (!sess.invoiceId) return false;
+      const inv = state.invoices.find(i => i.id === sess.invoiceId);
+      return !!(inv && inv.paid);
+    }
+
     function downloadIcsFile() {
       const lines = [];
       lines.push('BEGIN:VCALENDAR');
@@ -5171,6 +5206,10 @@
       `, () => {
         document.getElementById('sessionMarkCompletedBtn').onclick = () => {
           if (!guardEdit()) return;
+          if (!guardSessionCompletion(sess)) {
+            alert('Cannot mark complete: the linked invoice is not paid.');
+            return;
+          }
           sess.completed = true;
           saveState();
           closeModal();
@@ -5833,6 +5872,7 @@ Best regards,
             alert('Select at least one student.');
             return;
           }
+          if (!guardSessionCreation(selectedIds, form.date.value)) return;
           const newSession = {
             id: session?.id || generateId('sess'),
             studentIds: selectedIds,
