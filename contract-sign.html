@@ -578,15 +578,18 @@ Date: ___________________________________
 
     async function generatePdfFromPage(pageEl) {
       await new Promise((r) => requestAnimationFrame(r));
-      const canvas = await html2canvas(pageEl, { scale: 2, useCORS: true, logging: false });
-      const imgData = canvas.toDataURL('image/png');
+      // Keep scale modest to avoid huge payloads that can exhaust Edge function compute
+      const scale = Math.min(1, 1200 / (pageEl.clientWidth || 1200));
+      const canvas = await html2canvas(pageEl, { scale, useCORS: true, logging: false });
+      // Use JPEG with compression to further shrink payload
+      const imgData = canvas.toDataURL('image/jpeg', 0.78);
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF({
         orientation: 'p',
         unit: 'px',
         format: [canvas.width, canvas.height]
       });
-      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
       return pdf.output('datauristring').split(',')[1];
     }
 
