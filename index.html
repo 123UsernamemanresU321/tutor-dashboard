@@ -1606,7 +1606,7 @@
         invoice_id: cleanId(sess.invoiceId)
       }));
       try {
-        await upsertAndPrune('sessions', sessions, 'id');
+      await upsertAndPrune('lesson_sessions', sessions, 'id');
       } catch (err) {
         console.warn('Sessions sync failed (check schema for invoice_id column):', err?.message || err);
       }
@@ -2045,7 +2045,7 @@
      ***********************/
     function setupRealtime() {
       if (!supabaseClient || !supabaseSession) return;
-      const tables = ['students','sessions','homework','invoices','messages','resources','documents','contracts','student_todos','student_checkins','parent_contract_signatures','presence'];
+      const tables = ['students','lesson_sessions','homework','invoices','messages','resources','documents','contracts','student_todos','student_checkins','parent_contract_signatures','presence'];
       tables.forEach(table => {
         supabaseClient
           .channel(`${table}-changes`)
@@ -2702,7 +2702,7 @@
           console.warn('Remote parent_students delete failed', err);
         }
         if (sessionsToRemove.length) {
-          await supabaseClient.from('sessions').delete().in('id', sessionsToRemove);
+        await supabaseClient.from('lesson_sessions').delete().in('id', sessionsToRemove);
         }
         // Finally delete student
         await supabaseClient.from('students').delete().eq('id', studentId);
@@ -3026,7 +3026,7 @@
           fetchTable('students'),
           fetchTable('parents'),
           fetchTable('parent_students'),
-          fetchTable('sessions'),
+          fetchTable('lesson_sessions'),
           fetchTable('session_students'),
           fetchTable('resources'),
           fetchTable('homework'),
@@ -3324,7 +3324,7 @@
         const sessionIds = Array.from(new Set((sessionStudentsRes.data || []).map(ss => ss.session_id)));
         if (sessionIds.length) {
           try {
-            sessionsRes = await supabaseClient.from('sessions').select('*').in('id', sessionIds);
+          sessionsRes = await supabaseClient.from('lesson_sessions').select('*').in('id', sessionIds);
           } catch {}
         }
         try {
@@ -5907,7 +5907,7 @@ Best regards,
       if (isSupabaseReady()) {
         const { error: linkErr } = await supabaseClient.from('session_students').delete().eq('session_id', sessionId);
         if (linkErr) throw linkErr;
-        const { error: sessErr } = await supabaseClient.from('sessions').delete().eq('id', sessionId);
+        const { error: sessErr } = await supabaseClient.from('lesson_sessions').delete().eq('id', sessionId);
         if (sessErr) throw sessErr;
       }
     }
