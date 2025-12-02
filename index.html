@@ -1987,6 +1987,8 @@
       window.deleteTodo = deleteTodo;
       window.openContractUpload = openContractUpload;
       window.markContractStatus = markContractStatus;
+      window.explainInvoiceAI = explainInvoiceAI;
+      window.parentSummaryAI = parentSummaryAI;
       setupRealtime();
     });
 
@@ -2420,9 +2422,11 @@
               <div class="text-[10px] text-slate-500">${s.subjects?.join(', ') || 'Subjects not set'}</div>
               <div class="text-[10px] text-slate-500">Email: ${s.studentEmail || '—'}</div>
               <div class="text-[10px] text-slate-500">${sig ? `Signed by ${sig.parentName || 'Parent'} on ${sig.signedAt ? new Date(sig.signedAt).toLocaleDateString() : ''}` : 'No signed contract yet.'}</div>
-              <div class="flex items-center gap-2 text-[10px]">
+              <div class="flex flex-wrap items-center gap-2 text-[10px]">
                 <button class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50" onclick="copyContractLink('${s.id}')">Copy contract link</button>
+                <button id="btn-summary-${s.id}" class="px-2 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50" onclick="parentSummaryAI('${s.id}')">AI summary (30d)</button>
               </div>
+              <div id="ai-summary-${s.id}" class="text-[10px] text-slate-600 whitespace-pre-wrap"></div>
             </li>
           `;
         }).join('') : '<li class="text-slate-500 text-xs">No linked students.</li>';
@@ -2491,6 +2495,10 @@
           return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
             <div class="font-medium">Invoice ${inv.id}</div>
             <div class="text-[10px] text-slate-500">${s?.name || ''} • Issued ${inv.issueDate || 'n/a'} • Due ${inv.dueDate || 'n/a'} • R ${Number(inv.total||0).toFixed(2)} • ${inv.paid ? 'Paid' : 'Unpaid'}</div>
+            <div class="flex flex-wrap gap-2 mt-1 text-[10px]">
+              <button id="btn-inv-${inv.id}" class="px-2 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50" onclick="explainInvoiceAI('${inv.id}')">Explain with AI</button>
+            </div>
+            <div id="ai-invoice-${inv.id}" class="text-[10px] text-slate-600 whitespace-pre-wrap"></div>
           </li>`;
         }).join('') : '<li class="text-slate-500 text-xs">No invoices yet.</li>';
       }
@@ -2509,6 +2517,62 @@
             <div>${m.text}</div>
           </li>`;
         }).join('') : '<li class="text-slate-500 text-xs">No messages yet.</li>';
+      }
+    }
+
+    async function explainInvoiceAI(invoiceId) {
+      const btn = document.getElementById(`btn-inv-${invoiceId}`);
+      const out = document.getElementById(`ai-invoice-${invoiceId}`);
+      if (btn) { btn.disabled = true; btn.textContent = 'Explaining…'; }
+      if (out) out.textContent = '';
+      try {
+        const inv = state.invoices.find(i => i.id === invoiceId);
+        if (!inv) throw new Error('Invoice not found');
+        const sessions = state.sessions
+          .filter(s => s.studentIds.includes(inv.studentId))
+          .map(s => ({
+            date: s.date,
+            subject: s.subject,
+            topic: s.topic,
+            duration: s.durationHours
+          }));
+        const text = await callLLM('invoice_explainer', { invoice: inv, sessions });
+        if (out) out.textContent = text;
+      } catch (err) {
+        if (out) out.textContent = err?.message || 'AI failed.';
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Explain with AI'; }
+      }
+    }
+
+    async function parentSummaryAI(studentId) {
+      const btn = document.getElementById(`btn-summary-${studentId}`);
+      const out = document.getElementById(`ai-summary-${studentId}`);
+      if (btn) { btn.disabled = true; btn.textContent = 'Summarizing…'; }
+      if (out) out.textContent = '';
+      try {
+        const stu = getStudentById(studentId);
+        if (!stu) throw new Error('Student not found');
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 30);
+        const sessions = state.sessions
+          .filter(s => s.studentIds.includes(studentId))
+          .filter(s => new Date(s.date) >= cutoff)
+          .map(s => ({ date: s.date, subject: s.subject, topic: s.topic, notes: s.notes }));
+        const homework = state.homework
+          .filter(h => h.studentId === studentId)
+          .map(h => ({ resource: getResourceById(h.resourceId)?.title || 'Homework', status: h.status, due: h.dueDate }));
+        const text = await callLLM('progress_summary', {
+          student: { name: stu.name, grade: stu.gradeLevel, subjects: stu.subjects },
+          range: 'last 30 days',
+          sessions,
+          homework
+        });
+        if (out) out.textContent = text;
+      } catch (err) {
+        if (out) out.textContent = err?.message || 'AI failed.';
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'AI summary (30d)'; }
       }
     }
 
