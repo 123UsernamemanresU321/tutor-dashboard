@@ -4105,6 +4105,7 @@
       const contractMeta = document.getElementById('studentContractMeta');
       const latestSig = getLatestSignature(s.id);
       const contractEntry = state.contracts.find(c => c.studentId === s.id && c.status === 'Signed') || null;
+      const hasContract = !!latestSig || !!contractEntry || !!s.contractSigned;
       if (contractBadge) {
         const signed = !!s.contractSigned;
         contractBadge.textContent = signed ? 'VALID – CONTRACT SIGNED' : 'INVALID – CONTRACT NOT SIGNED';
@@ -4113,11 +4114,10 @@
           : 'px-2 py-1 text-[11px] rounded-lg bg-rose-100 text-rose-700 font-semibold';
       }
       if (contractDeleteBtn) {
-        const hasContract = !!latestSig || !!contractEntry;
         contractDeleteBtn.classList.toggle('hidden', !hasContract || parentMode);
         contractDeleteBtn.onclick = () => {
           if (!guardEdit()) return;
-          const targetId = latestSig?.id || contractEntry?.id;
+          const targetId = latestSig?.id || contractEntry?.id || s.lastContractId || '';
           deleteContractForStudent(targetId, s.id);
         };
       }
