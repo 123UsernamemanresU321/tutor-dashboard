@@ -3480,10 +3480,8 @@
     }
 
     function copyContractLink(studentId) {
-      const url = new URL(window.location.href);
-      url.pathname = url.pathname.replace(/[^/]+$/, 'contract-sign.html');
-      url.search = `?student_id=${encodeURIComponent(studentId)}&v=v1`;
-      const link = url.toString();
+      const basePath = window.location.pathname.replace(/[^/]*$/, '');
+      const link = `${window.location.origin}${basePath}contract-sign.html?student_id=${encodeURIComponent(studentId)}&v=v1`;
       navigator.clipboard?.writeText(link).then(() => {
         alert('Parent signing link copied to clipboard.');
       }).catch(() => {
