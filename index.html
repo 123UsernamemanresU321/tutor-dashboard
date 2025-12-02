@@ -767,7 +767,12 @@
         <div id="studentTab-messages" class="student-tab-pane hidden mt-2">
           <div class="flex items-center justify-between mb-1">
             <h4 class="text-[11px] font-semibold">Messages</h4>
-            <span class="hint">Owner & student thread</span>
+            <div class="flex items-center gap-2">
+              <span class="hint">Owner & student thread</span>
+              <button id="studentMessageAiBtn" data-owner-only class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50">
+                Draft with AI
+              </button>
+            </div>
           </div>
           <ul id="studentMessagesList" class="space-y-1 text-[11px] max-h-64 overflow-y-auto scrollbar-thin"></ul>
           <form id="studentMessageForm" class="mt-2 space-y-1 text-[11px]">
@@ -1253,6 +1258,7 @@
      ***********************/
     const SUPABASE_URL = 'https://wdsqnbebutuhwckjpwqf.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkc3FuYmVidXR1aHdja2pwd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxMDE1NzcsImV4cCI6MjA3OTY3NzU3N30.pJglpTaZouSQFUVCbQONHK1UsB9CgWewKQCIV13NOEM';
+    const FUNCTIONS_URL = SUPABASE_URL + '/functions/v1';
     const OWNER_EMAIL = 'erichuang.shangjing@outlook.com';
     // If true, try Supabase Storage uploads; if false, always fall back to local data URL to avoid 400/RLS spam until backend is fixed.
     const ALLOW_STORAGE_UPLOADS = true;
@@ -1850,6 +1856,55 @@
 
     function generateId(prefix) {
       return prefix + '_' + Math.random().toString(36).slice(2, 10);
+    }
+
+    /****************
+     * AI HELPERS   *
+     ****************/
+    async function callLLM(mode, payload) {
+      if (!supabaseAvailable) throw new Error('Supabase not configured.');
+      const token = supabaseSession?.access_token || SUPABASE_ANON_KEY;
+      const res = await fetch(`${FUNCTIONS_URL}/call-llm`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ mode, payload })
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.error || `LLM request failed (${res.status})`);
+      }
+      return json.content || '';
+    }
+
+    async function suggestLessonPlan(studentId, subject, level, examDate = '') {
+      const student = getStudentById(studentId) || {};
+      const pastSessions = state.sessions
+        .filter(s => s.studentIds.includes(studentId))
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .slice(0, 5)
+        .map(s => ({ date: s.date, topic: s.topic, notes: s.notes }));
+      return callLLM('lesson_plan', {
+        student: { name: student.name, grade: student.gradeLevel, subjects: student.subjects },
+        subject: subject || (student.subjects || [])[0] || 'General',
+        level: level || student.gradeLevel || 'N/A',
+        examDate,
+        pastSessions,
+        constraints: { durationMinutes: 75 }
+      });
+    }
+
+    async function draftMessageAI(opts) {
+      return callLLM('draft_message', {
+        tone: opts.tone || 'friendly and professional',
+        purpose: opts.purpose || 'progress update',
+        bullets: opts.bullets || [],
+        audience: opts.audience || 'parent',
+        context: opts.context || ''
+      });
     }
 
     /****************
@@ -4295,6 +4350,40 @@
           msgForm.reset();
         };
       }
+      const msgAiBtn = document.getElementById('studentMessageAiBtn');
+      if (msgAiBtn) {
+        msgAiBtn.onclick = async () => {
+          if (!guardEdit()) return;
+          const textarea = msgForm?.messageText;
+          const recent = state.sessions
+            .filter(sess => sess.studentIds.includes(id))
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
+            .slice(0, 3)
+            .map(sess => `${sess.date}: ${sess.subject} – ${sess.topic || ''}`);
+          const ctxParts = [
+            `Student: ${s.name || ''}`,
+            `Grade: ${s.gradeLevel || 'n/a'}`,
+            `Subjects: ${(s.subjects || []).join(', ') || 'n/a'}`,
+            `Recent sessions: ${recent.join(' | ') || 'none'}`,
+          ];
+          msgAiBtn.disabled = true;
+          msgAiBtn.textContent = 'Drafting…';
+          try {
+            const draft = await draftMessageAI({
+              purpose: 'progress update',
+              audience: 'student',
+              tone: 'friendly and clear',
+              context: ctxParts.join('; ')
+            });
+            if (textarea) textarea.value = draft;
+          } catch (err) {
+            alert(err?.message || 'AI drafting failed.');
+          } finally {
+            msgAiBtn.disabled = false;
+            msgAiBtn.textContent = 'Draft with AI';
+          }
+        };
+      }
     }
 
     function renderStudentTimeline(studentId) {
@@ -5501,6 +5590,12 @@ Best regards,
       const isEdit = !!session;
       const html = `
         <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit session' : 'Add session'}</h2>
+        <div class="flex items-center gap-2 mb-2">
+          <button type="button" id="aiSuggestPlanBtn" class="px-2 py-1 rounded-lg border border-indigo-300 text-[10px] text-indigo-700 hover:bg-indigo-50" data-owner-only>
+            Suggest lesson plan (AI)
+          </button>
+          <span class="hint">Owner only</span>
+        </div>
         <form id="sessionForm" class="space-y-2">
           <div>
             <label class="block text-[11px] mb-1">Students</label>
@@ -5645,6 +5740,31 @@ Best regards,
               console.error(err);
               alert('Delete failed. See console for details.');
             });
+          };
+        }
+
+        const aiBtn = document.getElementById('aiSuggestPlanBtn');
+        if (aiBtn) {
+          aiBtn.onclick = async () => {
+            const firstChecked = form.querySelector('input[name="studentIds"]:checked')?.value || selectedStudentId || selectedIds?.[0];
+            if (!firstChecked) {
+              alert('Select a student first.');
+              return;
+            }
+            aiBtn.disabled = true;
+            const prev = aiBtn.textContent;
+            aiBtn.textContent = 'Generating...';
+            try {
+              const plan = await suggestLessonPlan(firstChecked, form.subject.value, 'N/A', form.date.value);
+              form.notes.value = (plan || '').trim();
+              alert('AI lesson plan added to Notes. Please review/edit before saving.');
+            } catch (err) {
+              console.error(err);
+              alert('AI suggestion failed: ' + (err?.message || err));
+            } finally {
+              aiBtn.disabled = false;
+              aiBtn.textContent = prev;
+            }
           };
         }
       });
