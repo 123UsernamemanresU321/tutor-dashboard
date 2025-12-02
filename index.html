@@ -4485,26 +4485,44 @@
       const contracts = state.contracts
         .filter(c => c.studentId === studentId)
         .sort((a, b) => new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0));
+      // If no contract record but a signature exists with a rendered URL, surface it as a synthetic entry
+      const sig = getLatestSignature(studentId);
+      if (sig && !contracts.find(c => c.id === sig.id)) {
+        contracts.unshift({
+          id: sig.id,
+          studentId,
+          fileName: 'signed_contract.pdf',
+          status: 'Signed',
+          uploadedAt: sig.signedAt || '',
+          signedUrl: sig.renderedPdfUrl || sig.rendered_pdf_url || ''
+        });
+      }
       if (!contracts.length) {
         list.innerHTML = '<li class="text-slate-500">No contracts uploaded yet.</li>';
         return;
       }
-      list.innerHTML = contracts.map(c => `
+      list.innerHTML = contracts.map(c => {
+        const hasFile = !!c.signedUrl;
+        const viewLink = hasFile ? `<a class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" href="${c.signedUrl}" target="_blank" rel="noopener">View</a>` : '';
+        const downloadLink = hasFile ? `<a class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" href="${c.signedUrl}" download="${c.fileName || 'contract.pdf'}">Download</a>` : '';
+        return `
         <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80 flex justify-between items-center">
           <div>
             <div class="font-medium flex items-center gap-1">${c.fileName || 'Contract'} <span class="text-[10px] px-2 py-0.5 rounded-full ${c.status === 'Signed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${c.status || 'Pending'}</span></div>
             <div class="text-[10px] text-slate-500">Uploaded ${c.uploadedAt || ''}</div>
+            ${!hasFile ? '<div class="text-[10px] text-amber-600">Signed file not available yet; refresh or re-sign if needed.</div>' : ''}
           </div>
           <div class="flex gap-1">
-            ${c.signedUrl ? `<a class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" href="${c.signedUrl}" target="_blank">Open</a>` : ''}
-            ${c.dataUrl ? `<a class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" href="${c.dataUrl}" download="${c.fileName || 'contract'}" target="_blank">Open</a>` : ''}
+            ${viewLink}
+            ${downloadLink}
             <button data-owner-only class="text-[10px] px-2 py-0.5 rounded-lg border border-emerald-300 text-emerald-700"
                     onclick="if(guardEdit()) markContractStatus('${c.id}', '${c.status === 'Signed' ? 'Pending' : 'Signed'}')">
               ${c.status === 'Signed' ? 'Mark pending' : 'Mark signed'}
             </button>
           </div>
         </li>
-      `).join('');
+      `;
+      }).join('');
     }
 
     function renderStudentCheckins(studentId) {
