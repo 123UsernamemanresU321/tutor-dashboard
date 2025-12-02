@@ -2877,25 +2877,23 @@
         const sessionsWithStudents = sessions.filter(s => (s.studentIds || []).length > 0);
 
         // Fetch signed URLs for contracts if storage_path exists (ignore missing/forbidden)
+        const getSignedUrlWithFallback = async (pathRaw) => {
+          const tryBuckets = ['signed_contracts', 'contracts'];
+          for (const bucket of tryBuckets) {
+            const path = stripBucketPrefix(pathRaw, bucket);
+            if (!path || !supabaseClient.storage) continue;
+            const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 60 * 60 * 24);
+            if (!error && data?.signedUrl) return data.signedUrl;
+          }
+          return '';
+        };
+
         const contracts = await Promise.all(
           (contractsRes.data || []).map(async c => {
+            let signedUrl = '';
             try {
-              const bucket = (c.storage_path || '').startsWith('signed_contracts/') ? 'signed_contracts' : 'contracts';
-              const path = stripBucketPrefix(c.storage_path, bucket);
-              if (path && supabaseClient.storage) {
-                const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 60 * 60 * 24);
-                if (!error && data?.signedUrl) {
-                  return {
-                    id: c.id,
-                    studentId: c.student_id,
-                    fileName: c.file_name,
-                    storage_path: path,
-                    status: c.status,
-                    notes: c.notes,
-                    uploadedAt: c.uploaded_at,
-                    signedUrl: data.signedUrl
-                  };
-                }
+              if (c.storage_path) {
+                signedUrl = await getSignedUrlWithFallback(c.storage_path);
               }
             } catch (err) {
               console.warn('Contract signed URL fetch failed', err);
@@ -2907,7 +2905,8 @@
               storage_path: c.storage_path,
               status: c.status,
               notes: c.notes,
-              uploadedAt: c.uploaded_at
+              uploadedAt: c.uploaded_at,
+              signedUrl
             };
           })
         );
@@ -3279,15 +3278,23 @@
         signatureMethod: cs.signature_method,
         parentIp: cs.parent_ip
       }));
+      const getSignedUrlWithFallback = async (pathRaw) => {
+        const tryBuckets = ['signed_contracts', 'contracts'];
+        for (const bucket of tryBuckets) {
+          const path = stripBucketPrefix(pathRaw, bucket);
+          if (!path || !supabaseClient.storage) continue;
+          const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 60 * 60 * 24);
+          if (!error && data?.signedUrl) return data.signedUrl;
+        }
+        return '';
+      };
+
       merged.contracts = await Promise.all(
         (contractsRes.data || []).map(async c => {
           let signedUrl = '';
           try {
-            const bucket = (c.storage_path || '').startsWith('signed_contracts/') ? 'signed_contracts' : 'contracts';
-            const path = stripBucketPrefix(c.storage_path, bucket);
-            if (path && supabaseClient.storage) {
-              const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 60 * 60 * 24);
-              if (!error && data?.signedUrl) signedUrl = data.signedUrl;
+            if (c.storage_path) {
+              signedUrl = await getSignedUrlWithFallback(c.storage_path);
             }
           } catch (err) {
             console.warn('Contract signed URL fetch failed (student/parent)', err);
