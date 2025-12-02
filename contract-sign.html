@@ -580,7 +580,7 @@ Date: ___________________________________
       await new Promise((r) => requestAnimationFrame(r));
       // Keep scale modest to avoid huge payloads that can exhaust Edge function compute
       const scale = Math.min(1, 1200 / (pageEl.clientWidth || 1200));
-      const canvas = await html2canvas(pageEl, { scale, useCORS: true, logging: false });
+      const canvas = await html2canvas(pageEl, { scale, useCORS: true, logging: false, backgroundColor: '#ffffff' });
       // Use JPEG with compression to further shrink payload
       const imgData = canvas.toDataURL('image/jpeg', 0.78);
       const { jsPDF } = window.jspdf;
@@ -589,6 +589,9 @@ Date: ___________________________________
         unit: 'px',
         format: [canvas.width, canvas.height]
       });
+      // fill white background to avoid dark artifacts
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, canvas.width, canvas.height, 'F');
       pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
       return pdf.output('datauristring').split(',')[1];
     }
