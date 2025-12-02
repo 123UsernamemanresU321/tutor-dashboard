@@ -576,26 +576,6 @@ Date: ___________________________________
         .replaceAll('[date]', fields.date_parent || fields.date);
     }
 
-    async function generatePdfFromPage(pageEl) {
-      await new Promise((r) => requestAnimationFrame(r));
-      // Keep scale modest to avoid huge payloads that can exhaust Edge function compute
-      const scale = Math.min(1, 1200 / (pageEl.clientWidth || 1200));
-      const canvas = await html2canvas(pageEl, { scale, useCORS: true, logging: false, backgroundColor: '#ffffff' });
-      // Use JPEG with compression to further shrink payload
-      const imgData = canvas.toDataURL('image/jpeg', 0.78);
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({
-        orientation: 'p',
-        unit: 'px',
-        format: [canvas.width, canvas.height]
-      });
-      // fill white background to avoid dark artifacts
-      pdf.setFillColor(255, 255, 255);
-      pdf.rect(0, 0, canvas.width, canvas.height, 'F');
-      pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
-      return pdf.output('datauristring').split(',')[1];
-    }
-
     form.onsubmit = async (e) => {
       e.preventDefault();
       if (!studentId) return;
@@ -609,8 +589,6 @@ Date: ___________________________________
       msgEl.textContent = 'Signing...';
       try {
         const contractTextSnapshot = buildContractSnapshot(fields);
-        const pageEl = document.getElementById('contractPage');
-        const pdfBase64 = await generatePdfFromPage(pageEl);
         const resp = await fetch(`${SUPABASE_URL}/functions/v1/sign-contract`, {
           method: 'POST',
           headers: {
@@ -625,7 +603,7 @@ Date: ___________________________________
             version,
             signature_method: 'online click-to-sign',
             contract_text_snapshot: contractTextSnapshot,
-            pdf_base64: pdfBase64,
+            pdf_base64: '', // server generates PDF
             pdf_name: 'signed_contract.pdf',
             signature_text: fields.parent_signature,
             parent_phone: fields.parent_phone,
