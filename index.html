@@ -1121,23 +1121,35 @@
                 </div>
                 <ul id="portalInvoices" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
               </div>
-        <div class="card p-4 space-y-2">
-          <div class="flex items-center justify-between">
-            <h3 class="text-sm font-semibold">Resources</h3>
-            <span class="hint">Assigned to you</span>
+              <div class="card p-4 space-y-2">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-sm font-semibold">Resources</h3>
+                  <span class="hint">Assigned to you</span>
+                </div>
+                <ul id="portalResources" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+              <div class="card p-4 space-y-2">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-sm font-semibold">Messages</h3>
+                  <span class="hint">Tutor ↔ Student</span>
+                </div>
+                <ul id="portalMessages" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+              <div class="card p-4 space-y-2">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-sm font-semibold">AI Study Helper</h3>
+                  <span class="hint">Uses recent lessons/resources</span>
+                </div>
+                <textarea id="portalAiQuestion" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]" placeholder="Ask a question about your lessons or resources"></textarea>
+                <div class="flex items-center gap-2">
+                  <button id="portalAiAskBtn" class="px-3 py-1 rounded-lg bg-indigo-600 text-white text-xs">Ask</button>
+                  <span id="portalAiStatus" class="text-[10px] text-slate-500"></span>
+                </div>
+                <div id="portalAiAnswer" class="text-[11px] text-slate-700 whitespace-pre-wrap"></div>
+              </div>
+            </div>
           </div>
-          <ul id="portalResources" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
-        </div>
-        <div class="card p-4 space-y-2">
-          <div class="flex items-center justify-between">
-            <h3 class="text-sm font-semibold">Messages</h3>
-            <span class="hint">Tutor ↔ Student</span>
-          </div>
-          <ul id="portalMessages" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
-        </div>
-      </div>
-    </div>
-  </section>
+        </section>
 
         <!-- Reports -->
         <section id="view-reports" class="view hidden">
@@ -2390,6 +2402,39 @@
             <div>${m.text}</div>
           </li>
         `).join('') : '<li class="text-slate-500 text-xs">No messages yet.</li>';
+      }
+
+      // AI Study Helper wiring
+      const aiBtn = document.getElementById('portalAiAskBtn');
+      const aiQ = document.getElementById('portalAiQuestion');
+      const aiOut = document.getElementById('portalAiAnswer');
+      const aiStatus = document.getElementById('portalAiStatus');
+      if (aiBtn && aiQ && aiOut) {
+        aiBtn.onclick = async () => {
+          const question = aiQ.value.trim();
+          if (!question) return;
+          aiBtn.disabled = true;
+          aiStatus.textContent = 'Thinking…';
+          aiOut.textContent = '';
+          try {
+            const recentSessions = state.sessions
+              .filter(s => s.studentIds.includes(student.id))
+              .sort((a, b) => new Date(b.date) - new Date(a.date))
+              .slice(0, 5)
+              .map(s => ({ date: s.date, subject: s.subject, topic: s.topic, notes: s.notes }));
+            const resourceIds = new Set(state.homework.filter(h => h.studentId === student.id).map(h => h.resourceId));
+            const resources = state.resources
+              .filter(r => resourceIds.has(r.id))
+              .map(r => ({ title: r.title, subject: r.subject, tags: r.tags, description: r.description }));
+            const answer = await callLLM('study_helper', { question, recentSessions, resources });
+            aiOut.textContent = answer || 'No answer returned.';
+          } catch (err) {
+            aiOut.textContent = err?.message || 'AI helper failed.';
+          } finally {
+            aiBtn.disabled = false;
+            aiStatus.textContent = '';
+          }
+        };
       }
     }
 
