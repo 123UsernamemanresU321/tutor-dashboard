@@ -1758,11 +1758,15 @@
       const targets = signatureId
         ? state.contracts.filter(c => c.id === signatureId || c.studentId === studentId)
         : state.contracts.filter(c => c.studentId === studentId);
+      // Try deleting from both buckets because storage_path may be stored without bucket prefix
       const storageObjects = targets
-        .map(c => {
-          const bucket = (c.storage_path || '').startsWith('signed_contracts/') ? 'signed_contracts' : 'contracts';
-          const path = stripBucketPrefix(c.storage_path, bucket);
-          return path ? { bucket, path } : null;
+        .flatMap(c => {
+          const raw = c.storage_path || '';
+          const possible = ['signed_contracts', 'contracts'].map(bucket => {
+            const path = stripBucketPrefix(raw, bucket);
+            return path ? { bucket, path } : null;
+          }).filter(Boolean);
+          return possible;
         })
         .filter(Boolean);
 
