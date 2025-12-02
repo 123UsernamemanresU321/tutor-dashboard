@@ -1754,6 +1754,18 @@
     }
 
     async function deleteContractForStudent(signatureId, studentId) {
+      // identify storage objects to remove
+      const targets = signatureId
+        ? state.contracts.filter(c => c.id === signatureId || c.studentId === studentId)
+        : state.contracts.filter(c => c.studentId === studentId);
+      const storageObjects = targets
+        .map(c => {
+          const bucket = (c.storage_path || '').startsWith('signed_contracts/') ? 'signed_contracts' : 'contracts';
+          const path = stripBucketPrefix(c.storage_path, bucket);
+          return path ? { bucket, path } : null;
+        })
+        .filter(Boolean);
+
       // local cleanup
       if (signatureId) {
         state.contractSignatures = state.contractSignatures.filter(cs => cs.id !== signatureId);
@@ -1784,6 +1796,14 @@
           } else {
             await supabaseClient.from('parent_contract_signatures').delete().eq('student_id', studentId);
             await supabaseClient.from('contracts').delete().eq('student_id', studentId);
+          }
+          // remove storage objects if paths exist
+          for (const obj of storageObjects) {
+            try {
+              await supabaseClient.storage.from(obj.bucket).remove([obj.path]);
+            } catch (err) {
+              console.warn('Storage delete failed', err);
+            }
           }
           await supabaseClient.from('students').update({
             contract_signed: false,
