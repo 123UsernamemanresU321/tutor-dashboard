@@ -1240,31 +1240,41 @@
 
   <!-- Landing Page -->
   <div id="landingPage" class="fixed inset-0 z-50 bg-gradient-to-br from-indigo-50 via-white to-cyan-50 text-slate-900 hidden overflow-y-auto">
-    <div class="max-w-5xl mx-auto px-6 py-12">
-      <header class="flex items-center justify-between mb-10">
+    <div class="max-w-6xl mx-auto px-6 py-12 space-y-12">
+      <header class="flex items-center justify-between">
         <div class="text-xl font-bold text-indigo-700">Tutor Control Center</div>
         <div class="flex gap-3">
           <a href="./login.html" class="px-4 py-2 rounded-full border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-sm font-semibold">Sign in</a>
           <a href="./signup.html" class="px-4 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold">Get started</a>
         </div>
       </header>
-      <div class="grid md:grid-cols-2 gap-10 items-center">
-        <div class="space-y-4">
-          <p class="text-indigo-600 text-xs font-semibold tracking-wide uppercase">Physics • Chemistry • Maths</p>
-          <h1 class="text-3xl md:text-4xl font-bold leading-tight">A private tutoring hub for students and parents.</h1>
-          <p class="text-slate-600 text-sm md:text-base">Schedule lessons, track invoices (paid one month in advance), share resources, and keep contracts signed and stored securely. Students and parents each see a tailored portal.</p>
+
+      <!-- Hero -->
+      <div class="grid lg:grid-cols-2 gap-10 items-center">
+        <div class="space-y-5">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/70 border border-indigo-100 text-xs font-semibold text-indigo-700">
+            Shangjing Huang • Physics • Chemistry • Maths
+          </div>
+          <h1 class="text-3xl md:text-4xl font-bold leading-tight">A comprehensive tutoring hub for students, parents, and the tutor.</h1>
+          <p class="text-slate-600 text-sm md:text-base">Schedule prepaid sessions, keep contracts signed and downloadable, track homework and resources, and give parents a transparent view of progress and invoices.</p>
           <div class="flex flex-wrap gap-3">
             <a href="./signup.html" class="px-4 py-2 rounded-full bg-slate-900 text-white hover:bg-slate-800 text-sm font-semibold">Create account</a>
             <a href="./login.html" class="px-4 py-2 rounded-full border border-slate-300 text-sm font-semibold hover:bg-slate-100">I already have an account</a>
           </div>
-          <ul class="text-slate-700 text-sm space-y-2 mt-4">
-            <li>• Parent & student portals with contract gating</li>
-            <li>• Prepaid monthly invoicing and balances</li>
-            <li>• Secure contracts with view/download links</li>
-            <li>• AI helpers for study, parent summaries, and lesson plans</li>
-          </ul>
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div class="p-3 rounded-xl border border-slate-200 bg-white/70">
+              <p class="text-[11px] text-slate-500">Prepaid billing</p>
+              <p class="text-base font-semibold">1 month in advance</p>
+              <p class="text-[11px] text-slate-500">Sessions only after payment</p>
+            </div>
+            <div class="p-3 rounded-xl border border-slate-200 bg-white/70">
+              <p class="text-[11px] text-slate-500">Contract control</p>
+              <p class="text-base font-semibold">Share • Sign • Download</p>
+              <p class="text-[11px] text-slate-500">Parent link + portal access</p>
+            </div>
+          </div>
         </div>
-        <div class="bg-white/70 backdrop-blur shadow-xl border border-indigo-100 rounded-3xl p-6 space-y-4">
+        <div class="bg-white/80 backdrop-blur shadow-2xl border border-indigo-100 rounded-3xl p-6 space-y-4">
           <div class="flex items-center justify-between">
             <div>
               <p class="text-xs text-slate-500">Live overview</p>
@@ -1274,30 +1284,104 @@
           </div>
           <div class="grid grid-cols-2 gap-3 text-sm">
             <div class="p-3 rounded-xl border border-slate-200 bg-slate-50">
-              <p class="text-[11px] text-slate-500">Contracts</p>
-              <p class="text-base font-semibold">SIGNED / PENDING</p>
-              <p class="text-[11px] text-emerald-600">Share, sign, download</p>
+              <p class="text-[11px] text-slate-500">Parents</p>
+              <p class="text-base font-semibold">Invoices & Contracts</p>
+              <p class="text-[11px] text-slate-500">Download & pay in advance</p>
             </div>
             <div class="p-3 rounded-xl border border-slate-200 bg-slate-50">
-              <p class="text-[11px] text-slate-500">Invoices</p>
-              <p class="text-base font-semibold">Prepaid Monthly</p>
-              <p class="text-[11px] text-slate-500">One month in advance</p>
+              <p class="text-[11px] text-slate-500">Students</p>
+              <p class="text-base font-semibold">Homework & Resources</p>
+              <p class="text-[11px] text-slate-500">AI study helper included</p>
             </div>
             <div class="p-3 rounded-xl border border-slate-200 bg-slate-50">
-              <p class="text-[11px] text-slate-500">Sessions</p>
-              <p class="text-base font-semibold">Schedule & track</p>
-              <p class="text-[11px] text-slate-500">Locked until contract & payment</p>
+              <p class="text-[11px] text-slate-500">Tutor view</p>
+              <p class="text-base font-semibold">Scheduling & KPIs</p>
+              <p class="text-[11px] text-slate-500">No session without contract+payment</p>
             </div>
             <div class="p-3 rounded-xl border border-slate-200 bg-slate-50">
               <p class="text-[11px] text-slate-500">AI Assistance</p>
-              <p class="text-base font-semibold">Study & Summaries</p>
+              <p class="text-base font-semibold">Invoices • Summaries • Plans</p>
               <p class="text-[11px] text-slate-500">Tutor voice: Shangjing Huang</p>
             </div>
           </div>
-          <div class="flex items-center gap-3 text-[11px] text-slate-500">
+          <div class="flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
             <span class="h-2 w-2 rounded-full bg-emerald-500"></span>Secure Supabase backend
-            <span class="h-2 w-2 rounded-full bg-indigo-500 ml-4"></span>Role-aware portals
+            <span class="h-2 w-2 rounded-full bg-indigo-500"></span>Role-aware portals
+            <span class="h-2 w-2 rounded-full bg-cyan-500"></span>Signed contracts stored safely
           </div>
+        </div>
+      </div>
+
+      <!-- Features -->
+      <div class="space-y-4">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold text-indigo-600 uppercase tracking-wide">Features</span>
+          <span class="text-[11px] text-slate-500">What you get inside</span>
+        </div>
+        <div class="grid md:grid-cols-3 gap-4">
+          <div class="p-4 rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <p class="text-sm font-semibold">Contract-first safety</p>
+            <p class="text-[12px] text-slate-600 mt-1">Parent link signing, PDF stored, view/download, and student portals lock until signed.</p>
+          </div>
+          <div class="p-4 rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <p class="text-sm font-semibold">Prepaid monthly invoicing</p>
+            <p class="text-[12px] text-slate-600 mt-1">Invoices are one month in advance; sessions and completion are gated by payment.</p>
+          </div>
+          <div class="p-4 rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <p class="text-sm font-semibold">Scheduling & attendance</p>
+            <p class="text-[12px] text-slate-600 mt-1">Create sessions only when contract and payment are valid; clash detection included.</p>
+          </div>
+          <div class="p-4 rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <p class="text-sm font-semibold">Resources & homework</p>
+            <p class="text-[12px] text-slate-600 mt-1">Assign resources/homework to students and parents; download links with signed URLs.</p>
+          </div>
+          <div class="p-4 rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <p class="text-sm font-semibold">Parent portal transparency</p>
+            <p class="text-[12px] text-slate-600 mt-1">Parents see linked students, sessions, invoices, messages, and contract status.</p>
+          </div>
+          <div class="p-4 rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <p class="text-sm font-semibold">AI, but personal</p>
+            <p class="text-[12px] text-slate-600 mt-1">Invoice explanations, progress summaries, study helper, and lesson plans in the tutor’s voice.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- How it works -->
+      <div class="space-y-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold text-indigo-600 uppercase tracking-wide">How it works</span>
+          <span class="text-[11px] text-slate-500">Simple onboarding</span>
+        </div>
+        <div class="grid md:grid-cols-4 gap-3 text-sm">
+          <div class="p-3 rounded-xl border border-slate-200 bg-white shadow-sm">
+            <p class="font-semibold">1) Invite</p>
+            <p class="text-[12px] text-slate-600">Add student/parent, share contract link.</p>
+          </div>
+          <div class="p-3 rounded-xl border border-slate-200 bg-white shadow-sm">
+            <p class="font-semibold">2) Sign</p>
+            <p class="text-[12px] text-slate-600">Guardian signs online; PDF saved.</p>
+          </div>
+          <div class="p-3 rounded-xl border border-slate-200 bg-white shadow-sm">
+            <p class="font-semibold">3) Pay in advance</p>
+            <p class="text-[12px] text-slate-600">Invoice one month ahead; sessions unlock on payment.</p>
+          </div>
+          <div class="p-3 rounded-xl border border-slate-200 bg-white shadow-sm">
+            <p class="font-semibold">4) Teach & track</p>
+            <p class="text-[12px] text-slate-600">Schedule, assign work, AI summaries, transparent portals.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Final CTA -->
+      <div class="flex flex-col md:flex-row items-center justify-between gap-4 bg-indigo-600 text-white rounded-3xl px-6 py-5 shadow-lg">
+        <div>
+          <p class="text-sm uppercase tracking-wide text-indigo-100">Ready to start?</p>
+          <p class="text-lg font-semibold">Create your account or sign in to continue.</p>
+          <p class="text-[12px] text-indigo-100">Contracts signed, invoices prepaid, sessions secure.</p>
+        </div>
+        <div class="flex gap-3">
+          <a href="./signup.html" class="px-4 py-2 rounded-full bg-white text-indigo-700 hover:bg-indigo-100 text-sm font-semibold">Get started</a>
+          <a href="./login.html" class="px-4 py-2 rounded-full border border-indigo-200 text-white hover:bg-indigo-500 text-sm font-semibold">Sign in</a>
         </div>
       </div>
     </div>
