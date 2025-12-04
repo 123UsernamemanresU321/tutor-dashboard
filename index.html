@@ -2215,6 +2215,8 @@
           }
           supabaseSession = null;
           toggleAuthOverlay(true);
+          // Always drop back to landing on sign-out
+          window.location.href = './index.html';
         };
       }
 
