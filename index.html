@@ -1100,6 +1100,27 @@
               INVALID – CONTRACT NOT SIGNED. Ask your parent/guardian to sign the contract to unlock this portal.
             </div>
 
+            <!-- Student ↔ Parent linking -->
+            <div class="card p-4 space-y-3">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-sm font-semibold">Parent linking</h3>
+                  <p class="text-[11px] text-slate-500">Share this link code with your parent. Approve their request when it appears below.</p>
+                </div>
+                <button id="regenLinkCodeBtn" class="text-[11px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50">Regenerate code</button>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="font-mono text-base bg-slate-100 px-3 py-2 rounded-lg" id="studentLinkCodeValue">—</div>
+                <span id="studentLinkStatus" class="text-[11px] text-slate-600"></span>
+              </div>
+              <div>
+                <h4 class="text-[11px] font-semibold mb-1">Pending parent requests</h4>
+                <ul id="studentLinkRequests" class="space-y-1 text-[11px]"></ul>
+                <div id="studentLinkEmpty" class="text-[11px] text-slate-500">No pending requests.</div>
+              </div>
+              <div id="studentGateSummary" class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 hidden"></div>
+            </div>
+
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
               <div class="card p-4 space-y-2">
                 <div class="flex items-center justify-between">
@@ -1201,6 +1222,15 @@
                 <h2 class="text-lg font-semibold">Parent portal</h2>
                 <p class="text-xs text-slate-500">Linked students, schedules, homework, invoices, and messages.</p>
               </div>
+            </div>
+            <div class="card p-4 space-y-2">
+              <h3 class="text-sm font-semibold">Link to your child</h3>
+              <form id="parentLinkForm" class="flex flex-col sm:flex-row gap-2 text-xs">
+                <input id="parentLinkCodeInput" type="text" class="border border-slate-300 rounded-lg px-3 py-2 flex-1" placeholder="Enter student link code" required>
+                <button type="submit" class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700">Request link</button>
+              </form>
+              <div id="parentLinkMsg" class="text-[11px] text-slate-600"></div>
+              <div id="parentLinkStatuses" class="text-[11px] text-slate-700 space-y-2"></div>
             </div>
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
               <div class="card p-4 space-y-2">
@@ -1326,6 +1356,15 @@
   </div>
 
   <script>
+    /************************************************************
+     * ONBOARDING & ACCESS FLOW (ASCII DOC)
+     *
+     * Student sign up -> profiles(role=student) -> students row with link_code
+     * Parent sign up  -> profiles(role=parent)  -> parents row
+     * Parent enters link_code -> parent_students row (pending)
+     * Student approves -> parent_students.status=active
+     * Contract signed by parent + invoice paid => sessions unlocked
+     ************************************************************/
     /***********************
      * STATE & PERSISTENCE *
      ***********************/
@@ -2522,6 +2561,93 @@
           }
         };
       }
+
+      // Parent linking card rendering for student
+      const linkCodeEl = document.getElementById('studentLinkCodeValue');
+      const linkStatusEl = document.getElementById('studentLinkStatus');
+      const linkRequestsEl = document.getElementById('studentLinkRequests');
+      const linkEmptyEl = document.getElementById('studentLinkEmpty');
+      const gateSummaryEl = document.getElementById('studentGateSummary');
+      const regenBtn = document.getElementById('regenLinkCodeBtn');
+      if (linkCodeEl) linkCodeEl.textContent = student.link_code || student.linkCode || '—';
+      if (regenBtn) {
+        regenBtn.onclick = async () => {
+          const newCode = generateLinkCode(12);
+          student.link_code = newCode;
+          student.linkCode = newCode;
+          const st = state.students.find(s => s.id === student.id);
+          if (st) { st.linkCode = newCode; st.link_code = newCode; }
+          saveState();
+          if (isSupabaseReady()) {
+            await supabaseClient.from('students').update({ link_code: newCode }).eq('id', student.id);
+          }
+          if (linkCodeEl) linkCodeEl.textContent = newCode;
+          alert('New link code generated.');
+        };
+      }
+      const myLinks = state.parentLinks.filter(pl => pl.studentId === student.id || pl.student_id === student.id);
+      const pending = myLinks.filter(l => (l.status || '').toLowerCase().includes('pending'));
+      const active = myLinks.filter(l => ['active','approved'].includes((l.status || '').toLowerCase()));
+      if (linkStatusEl) {
+        linkStatusEl.textContent = active.length ? `Linked to ${active.length} parent(s)` : pending.length ? 'Link pending approval' : 'No parent linked';
+      }
+      if (linkRequestsEl && linkEmptyEl) {
+        if (!pending.length) {
+          linkEmptyEl.classList.remove('hidden');
+          linkRequestsEl.innerHTML = '';
+        } else {
+          linkEmptyEl.classList.add('hidden');
+          linkRequestsEl.innerHTML = pending.map(l => {
+            const p = state.parents.find(px => px.id === (l.parentId || l.parent_id));
+            return `<div class=\"flex items-center justify-between border border-slate-200 rounded-lg px-2 py-1\">
+              <div class=\"text-[11px]\">
+                <div class=\"font-semibold\">${p?.name || 'Parent'}</div>
+                <div class=\"text-slate-500\">${p?.email || ''}</div>
+              </div>
+              <div class=\"flex gap-2\">
+                <button class=\"text-[11px] px-2 py-1 rounded-lg border border-emerald-300 text-emerald-700\" data-approve=\"${l.id}\">Approve</button>
+                <button class=\"text-[11px] px-2 py-1 rounded-lg border border-rose-300 text-rose-700\" data-reject=\"${l.id}\">Reject</button>
+              </div>
+            </div>`;
+          }).join('');
+          linkRequestsEl.querySelectorAll('[data-approve]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const id = btn.getAttribute('data-approve');
+              if (isSupabaseReady()) {
+                await supabaseClient.from('parent_students').update({ status: 'active', responded_at: new Date().toISOString() }).eq('id', id);
+              }
+              const link = state.parentLinks.find(pl => pl.id === id);
+              if (link) link.status = 'active';
+              saveState();
+              renderStudentPortal();
+              renderParentPortal();
+            });
+          });
+          linkRequestsEl.querySelectorAll('[data-reject]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const id = btn.getAttribute('data-reject');
+              if (isSupabaseReady()) {
+                await supabaseClient.from('parent_students').update({ status: 'rejected', responded_at: new Date().toISOString() }).eq('id', id);
+              }
+              const link = state.parentLinks.find(pl => pl.id === id);
+              if (link) link.status = 'rejected';
+              saveState();
+              renderStudentPortal();
+              renderParentPortal();
+            });
+          });
+        }
+      }
+      if (gateSummaryEl) {
+        const contractSigned = !!student.contractSigned || !!student.contract_signed_at;
+        const hasActiveLink = !!active.length;
+        const paidInvoice = state.invoices.some(inv => inv.studentId === student.id && (inv.paid || inv.status === 'paid' || inv.is_paid === true));
+        const msgs = [];
+        if (!hasActiveLink) msgs.push('No linked parent yet.');
+        if (!contractSigned) msgs.push('Contract not signed.');
+        if (!paidInvoice) msgs.push('Invoice unpaid.');
+        gateSummaryEl.textContent = msgs.length ? msgs.join(' ') : 'All clear: sessions unlocked.';
+      }
     }
 
     function getChildrenForParent() {
@@ -2534,6 +2660,58 @@
     function renderParentPortal() {
       const parent = getParentProfileBySession();
       const students = getChildrenForParent();
+      const parentLinks = state.parentLinks.filter(pl => pl.parentId === parent?.id);
+      const linkForm = document.getElementById('parentLinkForm');
+      const linkInput = document.getElementById('parentLinkCodeInput');
+      const linkMsg = document.getElementById('parentLinkMsg');
+      const linkStatuses = document.getElementById('parentLinkStatuses');
+      if (linkForm && linkInput) {
+        linkForm.onsubmit = async (e) => {
+          e.preventDefault();
+          const code = linkInput.value.trim();
+          if (!code) return;
+          linkMsg.textContent = 'Sending request...';
+          try {
+            if (!isSupabaseReady() || !parent) throw new Error('Sign in first.');
+            const { data: studentRows, error: sErr } = await supabaseClient.from('students').select('id').eq('link_code', code);
+            if (sErr) throw sErr;
+            if (!studentRows || !studentRows.length) {
+              linkMsg.textContent = 'No student found for that code.';
+              return;
+            }
+            const studentId = studentRows[0].id;
+            await supabaseClient.from('parent_students').upsert({
+              parent_id: parent.id,
+              student_id: studentId,
+              status: 'pending',
+              requested_at: new Date().toISOString(),
+              created_by: supabaseSession?.user?.id || null
+            }, { onConflict: 'parent_id,student_id' });
+            linkMsg.textContent = 'Link request sent. Waiting for student approval.';
+            linkInput.value = '';
+            await tryLoadRemoteThenLocal();
+            renderParentPortal();
+          } catch (err) {
+            console.error(err);
+            linkMsg.textContent = err?.message || 'Request failed.';
+          }
+        };
+      }
+      if (linkStatuses) {
+        linkStatuses.innerHTML = parentLinks.length ? parentLinks.map(l => {
+          const stu = getStudentById(l.studentId);
+          const status = (l.status || 'pending').toLowerCase();
+          const badge = status === 'active' || status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                        status === 'rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700';
+          return `<div class="flex items-center justify-between border border-slate-200 rounded-lg px-2 py-1">
+            <div class="text-[11px]">
+              <div class="font-semibold">${stu?.name || 'Student'}</div>
+              <div class="text-slate-500">${status}</div>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] ${badge}">${status}</span>
+          </div>`;
+        }).join('') : '<div class="text-[11px] text-slate-500">No link requests yet.</div>';
+      }
       const sList = document.getElementById('parentStudentsList');
       if (sList) {
         sList.innerHTML = students.length ? students.map(s => {
@@ -2989,6 +3167,25 @@
       return (supabaseSession?.user?.email || '').trim().toLowerCase();
     }
 
+    function getLoggedInStudent() {
+      const email = getSessionEmail();
+      return state.students.find(s => (s.studentEmail || '').toLowerCase() === email);
+    }
+
+    function getLoggedInParent() {
+      const email = getSessionEmail();
+      return state.parents.find(p => (p.email || '').toLowerCase() === email);
+    }
+
+    function generateLinkCode(len = 10) {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let out = '';
+      for (let i = 0; i < len; i++) {
+        out += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return out;
+    }
+
     function getParentProfileBySession() {
       const email = getSessionEmail();
       return state.parents.find(p => p.email === email);
@@ -3005,7 +3202,8 @@
         return;
       }
       const parentProfile = supabaseAvailable ? getParentProfileBySession() : null;
-      studentMode = supabaseAvailable ? (!isOwner() && !!getSessionEmail() && !parentProfile) : false;
+      const studentProfile = supabaseAvailable ? getLoggedInStudent() : null;
+      studentMode = supabaseAvailable ? (!isOwner() && !!studentProfile) : false;
       parentMode = supabaseAvailable ? (!isOwner() && !!parentProfile) : false;
       readOnlyMode = studentMode || parentMode || (supabaseAvailable ? !isOwner() : false);
       const banner = document.getElementById('readOnlyBanner');
