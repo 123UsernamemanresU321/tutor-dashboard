@@ -1270,19 +1270,21 @@
 
   <!-- Landing Page -->
   <div id="landingPage" class="fixed inset-0 z-50 bg-gradient-to-br from-indigo-50 via-white to-cyan-50 text-slate-900 hidden overflow-y-auto">
-    <div class="max-w-5xl mx-auto px-6 py-12">
-      <header class="flex items-center justify-between mb-10">
+    <div class="max-w-6xl mx-auto px-6 py-12 space-y-12">
+      <header class="flex items-center justify-between">
         <div class="text-xl font-bold text-indigo-700">Tutor Control Center</div>
         <div class="flex gap-3">
           <a href="./login.html" class="px-4 py-2 rounded-full border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-sm font-semibold">Sign in</a>
-          <a href="./signup.html" class="px-4 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold">Get started</a>
+          <a href="./signup.html" class="px-4 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold">Create account</a>
         </div>
       </header>
+
+      <!-- Hero -->
       <div class="grid md:grid-cols-2 gap-10 items-center">
         <div class="space-y-4">
           <p class="text-indigo-600 text-xs font-semibold tracking-wide uppercase">Physics • Chemistry • Maths</p>
-          <h1 class="text-3xl md:text-4xl font-bold leading-tight">A private tutoring hub for students and parents.</h1>
-          <p class="text-slate-600 text-sm md:text-base">Schedule lessons, track invoices (paid one month in advance), share resources, and keep contracts signed and stored securely. Students and parents each see a tailored portal.</p>
+          <h1 class="text-3xl md:text-4xl font-bold leading-tight">Secure tutoring dashboard for students, parents, and the tutor.</h1>
+          <p class="text-slate-600 text-sm md:text-base">One platform for contracts, prepaid invoices (one month in advance), scheduling, resources, and transparent communication. Students and parents each get a tailored portal.</p>
           <div class="flex flex-wrap gap-3">
             <a href="./signup.html" class="px-4 py-2 rounded-full bg-slate-900 text-white hover:bg-slate-800 text-sm font-semibold">Create account</a>
             <a href="./login.html" class="px-4 py-2 rounded-full border border-slate-300 text-sm font-semibold hover:bg-slate-100">I already have an account</a>
@@ -1330,6 +1332,177 @@
           </div>
         </div>
       </div>
+
+      <!-- Metrics + badges -->
+      <div class="grid md:grid-cols-4 gap-4 text-center text-sm">
+        <div class="p-4 rounded-2xl bg-white shadow border border-slate-100">
+          <p class="text-2xl font-bold text-indigo-700">2.5k+</p>
+          <p class="text-slate-600 text-xs">Hours taught</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-white shadow border border-slate-100">
+          <p class="text-2xl font-bold text-indigo-700">120</p>
+          <p class="text-slate-600 text-xs">Students supported</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-white shadow border border-slate-100">
+          <p class="text-2xl font-bold text-indigo-700">92%</p>
+          <p class="text-slate-600 text-xs">Improved grades</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-white shadow border border-slate-100">
+          <p class="text-2xl font-bold text-indigo-700">100%</p>
+          <p class="text-slate-600 text-xs">GDPR-aligned storage</p>
+        </div>
+      </div>
+
+      <!-- Features -->
+      <section class="space-y-4">
+        <h2 class="text-2xl font-bold">Platform features</h2>
+        <div class="grid md:grid-cols-3 gap-4 text-sm">
+          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+            <p class="font-semibold mb-1">Scheduling & attendance</p>
+            <p class="text-slate-600">Book, track, and lock sessions until contract + invoice are cleared.</p>
+          </div>
+          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+            <p class="font-semibold mb-1">Contracts</p>
+            <p class="text-slate-600">Parent-only signing, secure storage, downloadable PDFs.</p>
+          </div>
+          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+            <p class="font-semibold mb-1">Invoicing & payments</p>
+            <p class="text-slate-600">Prepaid monthly invoices with status tracking and reminders.</p>
+          </div>
+          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+            <p class="font-semibold mb-1">Portals</p>
+            <p class="text-slate-600">Student + parent views with approvals and link codes.</p>
+          </div>
+          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+            <p class="font-semibold mb-1">Resources</p>
+            <p class="text-slate-600">Secure sharing of notes, worksheets, and homework tasks.</p>
+          </div>
+          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+            <p class="font-semibold mb-1">AI helpers</p>
+            <p class="text-slate-600">Study assistant, parent summaries, lesson plan drafts.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- How it works -->
+      <section class="space-y-4">
+        <h2 class="text-2xl font-bold">How it works</h2>
+        <div class="grid md:grid-cols-4 gap-4 text-sm">
+          <div class="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
+            <p class="font-semibold">1. Sign up</p>
+            <p class="text-slate-600">Student or parent creates an account.</p>
+          </div>
+          <div class="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
+            <p class="font-semibold">2. Link</p>
+            <p class="text-slate-600">Parent enters student link code → student approves.</p>
+          </div>
+          <div class="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
+            <p class="font-semibold">3. Contract & invoice</p>
+            <p class="text-slate-600">Parent signs contract and pays the month in advance.</p>
+          </div>
+          <div class="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
+            <p class="font-semibold">4. Lessons unlock</p>
+            <p class="text-slate-600">Sessions, resources, and homework become available.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Benefits -->
+      <section class="space-y-6">
+        <h2 class="text-2xl font-bold">Benefits for everyone</h2>
+        <div class="grid md:grid-cols-3 gap-4 text-sm">
+          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+            <p class="font-semibold mb-1">For students</p>
+            <p class="text-slate-600">Clarity on sessions, homework, and resources in one place.</p>
+          </div>
+          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+            <p class="font-semibold mb-1">For parents</p>
+            <p class="text-slate-600">Transparent invoices, contracts, and progress summaries.</p>
+          </div>
+          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+            <p class="font-semibold mb-1">For the tutor</p>
+            <p class="text-slate-600">Automated admin: contracts, payments, and reminders are centralised.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Testimonials & security -->
+      <section class="grid md:grid-cols-2 gap-6">
+        <div class="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm space-y-4">
+          <h3 class="text-xl font-semibold">What families say</h3>
+          <p class="text-slate-700 text-sm italic">“The dashboard keeps me in the loop: invoices, lessons, and notes in one place.”</p>
+          <p class="text-slate-700 text-sm italic">“We love the prepaid clarity. No surprises, just consistent lessons.”</p>
+          <p class="text-slate-700 text-sm italic">“Contracts and resources are easy to access. Super professional.”</p>
+        </div>
+        <div class="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm space-y-3">
+          <h3 class="text-xl font-semibold">Security & reliability</h3>
+          <ul class="text-sm text-slate-700 space-y-2">
+            <li>• GDPR-aligned data handling</li>
+            <li>• Supabase authentication & storage</li>
+            <li>• Private, role-based portals</li>
+            <li>• Encrypted contract PDFs and signatures</li>
+            <li>• No third-party data resale</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Pricing + contract preview -->
+      <section class="grid md:grid-cols-2 gap-6 items-start">
+        <div class="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm space-y-3">
+          <h3 class="text-xl font-semibold">Pricing transparency</h3>
+          <p class="text-sm text-slate-700">Standard rate: ZAR 200/hour. Monthly invoices are issued in advance; lessons unlock once that invoice is paid.</p>
+          <ul class="text-sm text-slate-700 space-y-1">
+            <li>• Sessions usually 60 minutes</li>
+            <li>• Make-ups allowed within 8 weeks (max 2 reschedules)</li>
+            <li>• 30 days notice before rate changes</li>
+            <li>• Invoices unpaid by lesson date pause future lessons</li>
+          </ul>
+          <a href="./tos.html" class="text-indigo-600 text-sm underline">View Terms of Service</a> · <a href="./privacy.html" class="text-indigo-600 text-sm underline">View Privacy Policy</a>
+        </div>
+        <div class="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm space-y-3">
+          <h3 class="text-xl font-semibold">Contract snapshot</h3>
+          <p class="text-sm text-slate-700">Parents sign online; a PDF copy is stored securely and downloadable. Contracts gate session scheduling until signed.</p>
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div class="p-3 rounded-xl border border-slate-200 bg-slate-50">Key clauses: lesson scope, cancellations, payment timelines.</div>
+            <div class="p-3 rounded-xl border border-slate-200 bg-slate-50">Signing: parent-only, per student, with downloadable proof.</div>
+          </div>
+          <a href="./contract-sign.html" class="text-sm text-indigo-600 underline">Open contract signing page</a>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section class="space-y-4">
+        <h2 class="text-2xl font-bold">FAQ</h2>
+        <div class="grid md:grid-cols-2 gap-4 text-sm">
+          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+            <p class="font-semibold">When do lessons unlock?</p>
+            <p class="text-slate-600">After the parent signs the contract and pays the current month’s invoice.</p>
+          </div>
+          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+            <p class="font-semibold">Can I reschedule?</p>
+            <p class="text-slate-600">Yes, up to 2 reschedules within 8 weeks per the contract terms.</p>
+          </div>
+          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+            <p class="font-semibold">How are invoices calculated?</p>
+            <p class="text-slate-600">Based on prepaid monthly hours at ZAR 200/hour; late or unpaid invoices pause lessons.</p>
+          </div>
+          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+            <p class="font-semibold">Is data safe?</p>
+            <p class="text-slate-600">Yes, all access is role-based with Supabase Auth and secure storage.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Contact -->
+      <section class="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm space-y-3">
+        <h3 class="text-xl font-semibold">Contact & Support</h3>
+        <p class="text-sm text-slate-700">Email: erichuang.shangjing@outlook.com</p>
+        <p class="text-sm text-slate-700">Business hours: Mon–Fri, 8:00–18:00</p>
+        <div class="flex gap-3">
+          <a href="./signup.html" class="px-4 py-2 rounded-full bg-indigo-600 text-white text-sm font-semibold">Get started</a>
+          <a href="./login.html" class="px-4 py-2 rounded-full border border-slate-300 text-sm font-semibold">Sign in</a>
+        </div>
+      </section>
     </div>
   </div>
 
@@ -2979,7 +3152,7 @@
         state = deepClone(defaultState);
         await supabaseClient.auth.signOut();
         alert('Your account has been deleted.');
-        window.location.reload();
+        window.location.href = './index.html';
       } catch (err) {
         console.error(err);
         const msg = err?.message || 'Delete failed. Please try again.';
