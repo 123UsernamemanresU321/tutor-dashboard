@@ -127,6 +127,10 @@
     }
     window.hcaptchaOnLoad = hcaptchaOnLoad;
 
+    // Grab form and helper refs early
+    const form = document.getElementById('signupForm');
+    const msg = document.getElementById('msg');
+
     // toggle extra fields when role changes
     const roleExtras = document.querySelectorAll('.role-extra');
     form.addEventListener('change', (e) => {
@@ -146,8 +150,6 @@
       return out;
     }
 
-    const form = document.getElementById('signupForm');
-    const msg = document.getElementById('msg');
     const strongPassword = (pwd) => /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,}$/.test(pwd);
     form.onsubmit = async (e) => {
       e.preventDefault();
