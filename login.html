@@ -227,7 +227,7 @@
         });
         if (error) {
           const ctx = error?.context || {};
-          const details = ctx.error || ctx.message || error.message || 'Login failed.';
+          const details = ctx.error || ctx.message || data?.error || error.message || 'Login failed.';
           throw new Error(details);
         }
         if (!data?.access_token || !data?.refresh_token) {
