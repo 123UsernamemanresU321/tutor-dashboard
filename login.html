@@ -286,7 +286,11 @@
         const { data, error } = await supabaseClient.functions.invoke('login-with-code', {
           body: { code: cleanCode, role }
         });
-        if (error) throw error;
+        if (error) {
+          const ctx = error?.context || {};
+          const details = ctx.error || ctx.message || error.message || 'Login failed.';
+          throw new Error(details);
+        }
         if (!data?.access_token || !data?.refresh_token) {
           throw new Error(data?.error || 'Login failed. Ask your tutor for a new code.');
         }
