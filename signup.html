@@ -156,6 +156,21 @@
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkc3FuYmVidXR1aHdja2pwd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxMDE1NzcsImV4cCI6MjA3OTY3NzU3N30.pJglpTaZouSQFUVCbQONHK1UsB9CgWewKQCIV13NOEM';
     const HCAPTCHA_SITEKEY = '3ff631fc-4c9c-43ee-a486-3232939eedb2';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const SIGNUP_DISABLED = true;
+
+    if (SIGNUP_DISABLED) {
+      document.addEventListener('DOMContentLoaded', () => {
+        const card = document.querySelector('.card');
+        if (card) {
+          card.innerHTML = `
+            <h1>Sign-up disabled</h1>
+            <p class="text-sm">Students and parents now log in with a code from the tutor. Use the sign-in page to enter your code.</p>
+            <a href="./login.html" class="primary mt-4" style="display:block;text-align:center;text-decoration:none;">Go to sign in</a>
+          `;
+        }
+        setTimeout(() => { window.location.href = './login.html'; }, 2600);
+      });
+    } else {
     let hcaptchaWidgetId = null;
     let hcaptchaToken = '';
     let inviteData = null;
@@ -344,6 +359,7 @@
         hcaptchaToken = '';
       }
     };
+    }
   </script>
 </body>
 
