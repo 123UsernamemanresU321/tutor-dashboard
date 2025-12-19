@@ -177,6 +177,33 @@
       parent: null,
       student: null
     };
+    const captchaTokens = { owner: '', parent: '', student: '' };
+    const safeGetResponse = (widgetId) => {
+      try {
+        if (!window.hcaptcha || widgetId === null || widgetId === undefined) return '';
+        return hcaptcha.getResponse(widgetId) || '';
+      } catch (_err) {
+        return '';
+      }
+    };
+
+    // Silence noisy "output" reference errors Safari sometimes surfaces from hCaptcha iframes
+    const suppressOutputError = (msg = '') => String(msg).toLowerCase().includes('output');
+    window.addEventListener('error', (event) => {
+      if (suppressOutputError(event.message)) {
+        event.preventDefault();
+        return true;
+      }
+      return false;
+    });
+    window.addEventListener('unhandledrejection', (event) => {
+      const reason = String(event.reason?.message || event.reason || '').toLowerCase();
+      if (suppressOutputError(reason)) {
+        event.preventDefault();
+        return true;
+      }
+      return false;
+    });
 
     // Tabs logic
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -202,13 +229,13 @@
 
         // Render if not already rendered
         const ownerBox = document.getElementById('hcaptchaContainer');
-        if (ownerBox && !ownerBox.innerHTML) widgets.owner = hcaptcha.render(ownerBox, { sitekey: HCAPTCHA_SITEKEY });
+        if (ownerBox && !ownerBox.innerHTML) widgets.owner = hcaptcha.render(ownerBox, { sitekey: HCAPTCHA_SITEKEY, callback: (t) => { captchaTokens.owner = t; } });
 
         const parentBox = document.getElementById('hcaptchaContainerParent');
-        if (parentBox && !parentBox.innerHTML) widgets.parent = hcaptcha.render(parentBox, { sitekey: HCAPTCHA_SITEKEY });
+        if (parentBox && !parentBox.innerHTML) widgets.parent = hcaptcha.render(parentBox, { sitekey: HCAPTCHA_SITEKEY, callback: (t) => { captchaTokens.parent = t; } });
 
         const studentBox = document.getElementById('hcaptchaContainerStudent');
-        if (studentBox && !studentBox.innerHTML) widgets.student = hcaptcha.render(studentBox, { sitekey: HCAPTCHA_SITEKEY });
+        if (studentBox && !studentBox.innerHTML) widgets.student = hcaptcha.render(studentBox, { sitekey: HCAPTCHA_SITEKEY, callback: (t) => { captchaTokens.student = t; } });
 
       } catch (e) {
         console.warn('Captcha render warning:', e);
@@ -229,13 +256,11 @@
       const password = ownerForm.password.value.trim();
 
       try {
-        const token = hcaptcha.getResponse(widgets.owner);
-        if (!token) throw new Error('Please complete hCaptcha.');
-
+        const token = safeGetResponse(widgets.owner);
         const { error } = await supabaseClient.auth.signInWithPassword({
           email,
           password,
-          options: { captchaToken: token }
+          options: token ? { captchaToken: token } : {}
         });
         if (error) throw error;
         window.location.href = './index.html';
@@ -258,16 +283,20 @@
       const loginEmail = `${cleanCode.toLowerCase()}${CODE_EMAIL_SUFFIX}`;
 
       try {
-        if (!token) throw new Error('Please complete hCaptcha.');
+        // If hCaptcha failed to yield a token (CSP/adblock), still attempt login and let Supabase respond
+        const captchaToken = token || captchaTokens[role] || '';
 
         const { error } = await supabaseClient.auth.signInWithPassword({
           email: loginEmail,
           password: cleanCode,
-          options: { captchaToken: token }
+          options: captchaToken ? { captchaToken } : {}
         });
 
         if (error) {
-          throw new Error('Invalid or expired code. Ask your tutor for a new one.');
+          const msgText = error.message?.toLowerCase().includes('captcha')
+            ? 'Captcha was blocked. Please allow js.hcaptcha.com in your browser and try again.'
+            : 'Invalid or expired code. Ask your tutor for a new one.';
+          throw new Error(msgText);
         }
 
         // Login Success
@@ -282,13 +311,13 @@
 
     document.getElementById('studentForm').onsubmit = (e) => {
       e.preventDefault();
-      const token = hcaptcha.getResponse(widgets.student);
+      const token = safeGetResponse(widgets.student);
       handleCodeLogin(e.target.code.value, 'student', token, widgets.student);
     };
 
     document.getElementById('parentForm').onsubmit = (e) => {
       e.preventDefault();
-      const token = hcaptcha.getResponse(widgets.parent);
+      const token = safeGetResponse(widgets.parent);
       handleCodeLogin(e.target.code.value, 'parent', token, widgets.parent);
     };
 
