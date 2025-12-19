@@ -2950,6 +2950,13 @@
 
       // Remote cleanup if signed in
       if (isSupabaseReady()) {
+        // Fetch login_code before deleting to also remove auth user
+        let loginCodeToDelete = '';
+        try {
+          const { data } = await supabaseClient.from('students').select('login_code').eq('id', studentId).single();
+          loginCodeToDelete = data?.login_code || '';
+        } catch { }
+
         // Remove join rows
         await supabaseClient.from('session_students').delete().eq('student_id', studentId);
         // Delete dependents
@@ -2970,6 +2977,18 @@
         }
         // Finally delete student
         await supabaseClient.from('students').delete().eq('id', studentId);
+
+        // Delete auth user by code if present
+        if (loginCodeToDelete) {
+          try {
+            await supabaseClient.functions.invoke('delete-account', {
+              body: { login_code: loginCodeToDelete },
+              headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
+            });
+          } catch (err) {
+            console.warn('Auth user delete by code failed', err);
+          }
+        }
       }
     }
 
@@ -4554,12 +4573,18 @@
 
     async function deleteParentAndLinks(parentId) {
       // Local
+      const parent = getParentById(parentId);
       state.parents = state.parents.filter(p => p.id !== parentId);
       state.parentLinks = state.parentLinks.filter(pl => pl.parentId !== parentId);
       saveState();
       renderParentsList();
       // Remote
       if (isSupabaseReady()) {
+        let loginCodeToDelete = '';
+        try {
+          const { data } = await supabaseClient.from('parents').select('login_code').eq('id', parentId).single();
+          loginCodeToDelete = data?.login_code || '';
+        } catch { }
         try {
           await supabaseClient.from('parent_students').delete().eq('parent_id', parentId);
         } catch (err) {
@@ -4569,6 +4594,16 @@
           await supabaseClient.from('parents').delete().eq('id', parentId);
         } catch (err) {
           console.warn('Remote parents delete failed', err);
+        }
+        if (loginCodeToDelete) {
+          try {
+            await supabaseClient.functions.invoke('delete-account', {
+              body: { login_code: loginCodeToDelete },
+              headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
+            });
+          } catch (err) {
+            console.warn('Auth user delete by code failed', err);
+          }
         }
       }
     }
