@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>Sign in – Tutor Dashboard</title>
@@ -17,28 +18,87 @@
       padding: 24px;
       color: #0f172a;
     }
+
     .card {
       background: #fff;
       border-radius: 16px;
       padding: 24px;
       width: 100%;
       max-width: 420px;
-      box-shadow: 0 20px 60px -34px rgba(15,23,42,0.25), 0 0 0 1px rgba(148,163,184,0.15);
+      box-shadow: 0 20px 60px -34px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(148, 163, 184, 0.15);
     }
-    h1 { margin: 0 0 12px; font-size: 22px; }
-    label { display:block; font-size:12px; margin-bottom:4px; color:#475569; }
-    input { width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:10px; font-size:13px; }
-    button { width:100%; padding:10px; border:none; border-radius:12px; font-size:13px; font-weight:600; cursor:pointer; }
-    .primary { background:#0f172a; color:#fff; }
-    .secondary { background:#fff; color:#0f172a; border:1px solid #cbd5e1; }
-    .text-sm { font-size:12px; color:#475569; }
-    .mt-2 { margin-top:8px; }
-    .mt-3 { margin-top:12px; }
-    .mt-4 { margin-top:16px; }
-    .hint { font-size:11px; color:#94a3b8; }
-    .error { color:#b91c1c; font-size:12px; margin-top:8px; }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 22px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      margin-bottom: 4px;
+      color: #475569;
+    }
+
+    input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 13px;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .primary {
+      background: #0f172a;
+      color: #fff;
+    }
+
+    .secondary {
+      background: #fff;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
+    }
+
+    .text-sm {
+      font-size: 12px;
+      color: #475569;
+    }
+
+    .mt-2 {
+      margin-top: 8px;
+    }
+
+    .mt-3 {
+      margin-top: 12px;
+    }
+
+    .mt-4 {
+      margin-top: 16px;
+    }
+
+    .hint {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .error {
+      color: #b91c1c;
+      font-size: 12px;
+      margin-top: 8px;
+    }
   </style>
 </head>
+
 <body>
   <div class="card">
     <h1>Sign in</h1>
@@ -60,7 +120,7 @@
       <button type="submit" class="primary mt-4">Sign in</button>
     </form>
     <button id="forgotBtn" class="secondary mt-2">Forgot password</button>
-    <div class="text-sm mt-2">Need an account? <a href="./signup.html">Sign up</a></div>
+    <div class="text-sm mt-2">Have an invite code? <a href="./signup.html">Redeem here</a></div>
     <div id="msg" class="error"></div>
   </div>
 
@@ -137,4 +197,5 @@
     };
   </script>
 </body>
+
 </html>
