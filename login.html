@@ -5,17 +5,13 @@
   <meta charset="UTF-8">
   <title>Sign in – Tutor Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- CSP for hCaptcha and Supabase -->
+  <!-- Relaxed CSP for hCaptcha/Supabase compatibility -->
   <meta http-equiv="Content-Security-Policy" content="
-    default-src 'self';
-    script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://js.hcaptcha.com https://*.hcaptcha.com;
-    style-src 'self' 'unsafe-inline' https://*.hcaptcha.com;
-    frame-src 'self' https://*.hcaptcha.com;
+    default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:;
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://js.hcaptcha.com https://*.hcaptcha.com;
     connect-src 'self' https://*.hcaptcha.com https://*.supabase.co https://wdsqnbebutuhwckjpwqf.supabase.co;
-    img-src 'self' data: https://*.hcaptcha.com;
   ">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Load hCaptcha without immediate callback to avoid race conditions -->
   <script src="https://js.hcaptcha.com/1/api.js?render=explicit" async defer></script>
   <style>
     body {
@@ -228,6 +224,12 @@
     initCaptchas();
     window.addEventListener('load', initCaptchas);
 
+    // State to track if we need to sign up (first time) vs sign in
+    let requestMode = {
+      parent: 'login', // 'login' or 'signup'
+      student: 'login'
+    };
+
     const ownerForm = document.getElementById('ownerForm');
     const msg = document.getElementById('msg');
 
@@ -254,9 +256,15 @@
       }
     };
 
-    // Code Auth Logic (Student & Parent)
+    /**
+     * Handles the Code Login Flow with potential Signup fallback
+     * @param {string} code - The access code
+     * @param {string} role - 'student' or 'parent'
+     * @param {string} token - The hCaptcha token
+     * @param {string} widgetId - The widget ID to reset if needed
+     */
     async function handleCodeLogin(code, role, token, widgetId) {
-      msg.textContent = 'Verifying code...';
+      msg.textContent = 'Verifying...';
       const cleanCode = code.trim().toUpperCase();
       const dummyEmail = `${cleanCode}@tutor.app`;
       const dummyPassword = cleanCode;
@@ -264,37 +272,37 @@
       try {
         if (!token) throw new Error('Please complete hCaptcha.');
 
-        // 1. Try to login
-        let { data, error } = await supabaseClient.auth.signInWithPassword({
-          email: dummyEmail,
-          password: dummyPassword,
-          options: { captchaToken: token }
-        });
+        const mode = requestMode[role]; // 'login' or 'signup'
 
-        // 2. If login fails (user doesn't exist yet), try to Sign Up (Lazy Creation)
-        if (error && error.message.includes('Invalid login')) {
-          msg.textContent = 'Setting up secure access...';
-          // Note: Captcha token is one-time use. We might need to ask user to solve again?
-          // OR usually Supabase handles the token check on the first blocking call.
-          // If signIn used the token and failed, the token *might* be consumed.
-          // However, 'Invalid login' is a credential check, Supabase might verify captcha first.
-          // If token consumed, we need a NEW token for SignUp.
-          // This creates a UX issue: "Solve captcha, Login fails -> Solve captcha again to SignUp".
-          // BUT: If the user doesn't exist, signIn SHOULD fail.
-          // Strategy: Try SignUp FIRST?
-          // No, if they exist, SignUp fails.
-          // Strategy: Just reset captcha and explain "First time setup: please verify again"?
+        if (mode === 'login') {
+          // Attempt Login
+          const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email: dummyEmail,
+            password: dummyPassword,
+            options: { captchaToken: token }
+          });
 
-          // Let's try reusing the token (unlikely to work) or catching specific error.
-          // BETTER STRATEGY to avoid Double Captcha: 
-          // Use a special RPC to check existence? No.
-          // Just let the user Click again?
-          // Let's reset captcha and ask user to try again if it was a "New User" flow?
-          // Or assume validation error.
+          if (error) {
+            // Check for "Invalid login credentials" implying user doesn't exist yet
+            const isCredError = error.message.includes('Invalid login') || error.message.includes('credentials');
 
-          // Let's try reusing the token just in case Supabase didn't consume it on credential failure.
-          // If that fails, we prompt.
+            if (isCredError) {
+              // Switch to Signup Mode
+              console.log('User not found, switching to signup flow');
+              requestMode[role] = 'signup';
+              msg.innerHTML = '<span class="text-indigo-600">First time access detected.<br>Please solve the captcha again to activate your secure account.</span>';
+              if (widgetId !== null) hcaptcha.reset(widgetId);
+              return; // Stop here, wait for user to re-submit
+            }
+            throw error; // Other errors (network, etc)
+          }
 
+          // Login Success
+          window.location.href = './index.html';
+
+        } else {
+          // Attempt Signup (Active Mode)
+          msg.textContent = 'Activating account...';
           const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
             email: dummyEmail,
             password: dummyPassword,
@@ -304,25 +312,18 @@
             }
           });
 
-          if (signUpError) {
-            if (signUpError.message.includes('captcha')) {
-              throw new Error('Please verify captcha again for account creation.');
-            }
-            // "User already registered" should not happen if signIn failed unless password wrong.
-            throw signUpError;
-          }
+          if (signUpError) throw signUpError;
 
+          // Signup Success
           window.location.href = './index.html';
-          return;
         }
-
-        if (error) throw error;
-        window.location.href = './index.html';
 
       } catch (err) {
         console.error(err);
-        msg.textContent = err.message || 'Invalid code or access failed.';
+        msg.textContent = err.message || 'Access failed. Please try again.';
         if (widgetId !== null) hcaptcha.reset(widgetId);
+        // Reset mode on error so they can try fresh
+        requestMode[role] = 'login';
       }
     }
 
