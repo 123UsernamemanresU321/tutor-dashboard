@@ -248,6 +248,9 @@
           const details = ctx.error || ctx.message || data?.error || error.message || 'Login failed.';
           throw new Error(details);
         }
+        if (data?.success === false) {
+          throw new Error(data?.error || 'Invalid code');
+        }
         if (!data?.access_token || !data?.refresh_token) {
           throw new Error(data?.error || 'Login failed. Ask your tutor for a new code.');
         }
