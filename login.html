@@ -167,6 +167,24 @@
     const CODE_EMAIL_SUFFIX = '@codes.tutor';
 
 
+    // Silence noisy "output" reference errors some browsers surface
+    const suppressOutputError = (msg = '') => String(msg).toLowerCase().includes('output');
+    window.addEventListener('error', (event) => {
+      if (suppressOutputError(event.message)) {
+        event.preventDefault();
+        return true;
+      }
+      return false;
+    });
+    window.addEventListener('unhandledrejection', (event) => {
+      const reason = String(event.reason?.message || event.reason || '').toLowerCase();
+      if (suppressOutputError(reason)) {
+        event.preventDefault();
+        return true;
+      }
+      return false;
+    });
+
     // Tabs logic
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
