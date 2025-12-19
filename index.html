@@ -6338,22 +6338,22 @@ Best regards,
             if (!confirm('You have not generated a login code. The student will not be able to log in. Continue?')) return;
           }
 
-          if (isEdit) {
-            const idx = state.students.findIndex(s => s.id === student.id);
-            state.students[idx] = newStudent;
-            logActivity('Updated student', newStudent.name);
-          } else {
-            state.students.push(newStudent);
-            logActivity('Added student', newStudent.name);
-          }
-          saveState();
-          closeModal();
-          renderStudentsView();
+        if (isEdit) {
+          const idx = state.students.findIndex(s => s.id === student.id);
+          state.students[idx] = newStudent;
+          logActivity('Updated student', newStudent.name);
+        } else {
+          state.students.push(newStudent);
+          logActivity('Added student', newStudent.name);
+        }
+        saveState();
+        closeModal();
+        renderStudentsView();
 
-          // Provision Supabase auth account for code-based login
-          if (newStudent.loginCode && isSupabaseReady() && isOwner()) {
-            provisionLoginCode('student', newStudent.loginCode, { studentId: newStudent.id, fullName: newStudent.name });
-          }
+        // Provision Supabase auth account for code-based login
+        if (newStudent.loginCode && isSupabaseReady() && isOwner()) {
+          provisionLoginCode('student', newStudent.loginCode, { studentId: newStudent.id, fullName: newStudent.name });
+        }
         };
         if (isEdit) {
           document.getElementById('deleteStudentBtn').onclick = () => {
