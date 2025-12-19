@@ -271,41 +271,38 @@
     };
 
     /**
-     * Handles the Code Login Flow with potential Signup fallback
+     * Handles the Code Login Flow using the service-edge function (no captcha required)
      * @param {string} code - The access code
      * @param {string} role - 'student' or 'parent'
-     * @param {string} token - The hCaptcha token
+     * @param {string} token - The hCaptcha token (unused fallback)
      * @param {string} widgetId - The widget ID to reset if needed
      */
     async function handleCodeLogin(code, role, token, widgetId) {
       msg.textContent = 'Verifying code...';
       const cleanCode = code.trim().toUpperCase();
-      const loginEmail = `${cleanCode.toLowerCase()}${CODE_EMAIL_SUFFIX}`;
 
       try {
-        // If hCaptcha failed to yield a token (CSP/adblock), still attempt login and let Supabase respond
-        const captchaToken = token || captchaTokens[role] || '';
-
-        const { error } = await supabaseClient.auth.signInWithPassword({
-          email: loginEmail,
-          password: cleanCode,
-          options: captchaToken ? { captchaToken } : {}
+        // Call edge function to mint a session with service role (bypasses captcha)
+        const { data, error } = await supabaseClient.functions.invoke('login-with-code', {
+          body: { code: cleanCode, role }
         });
-
-        if (error) {
-          const msgText = error.message?.toLowerCase().includes('captcha')
-            ? 'Captcha was blocked. Please allow js.hcaptcha.com in your browser and try again.'
-            : 'Invalid or expired code. Ask your tutor for a new one.';
-          throw new Error(msgText);
+        if (error) throw error;
+        if (!data?.access_token || !data?.refresh_token) {
+          throw new Error(data?.error || 'Login failed. Ask your tutor for a new code.');
         }
 
-        // Login Success
-        window.location.href = './index.html';
+        const { error: setErr } = await supabaseClient.auth.setSession({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token
+        });
+        if (setErr) throw setErr;
 
+        window.location.href = './index.html';
       } catch (err) {
         console.error(err);
-        msg.textContent = err.message || 'Access failed. Please try again.';
-        if (widgetId !== null) hcaptcha.reset(widgetId);
+        const message = err?.message || err?.error || 'Access failed. Please try again.';
+        msg.textContent = message;
+        if (widgetId !== null && window.hcaptcha) hcaptcha.reset(widgetId);
       }
     }
 
