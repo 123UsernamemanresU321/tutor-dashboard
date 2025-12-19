@@ -183,7 +183,7 @@
     });
 
     // Owner Auth
-    function hcaptchaOnLoad() {
+    function hcaptchaOnLoadLogin() {
       const container = document.getElementById('hcaptchaContainer');
       if (!container || !window.hcaptcha || hcaptchaWidgetId !== null) return;
       hcaptchaWidgetId = hcaptcha.render(container, {
@@ -195,7 +195,7 @@
         }
       });
     }
-    window.hcaptchaOnLoad = hcaptchaOnLoad;
+    window.hcaptchaOnLoadLogin = hcaptchaOnLoadLogin;
 
     const ownerForm = document.getElementById('ownerForm');
     const msg = document.getElementById('msg');
