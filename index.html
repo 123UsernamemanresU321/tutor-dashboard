@@ -729,6 +729,12 @@
                       <div id="studentContractMeta" class="text-[10px] text-slate-500"></div>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
+                      <span id="studentLoginCodeBadge"
+                        class="hidden px-2 py-1 text-[10px] rounded-lg bg-indigo-50 text-indigo-700 font-mono border border-indigo-100"></span>
+                      <button id="studentLoginCodeCopy" data-owner-only
+                        class="hidden px-2 py-1 text-[10px] rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+                        Copy code
+                      </button>
                       <span id="studentContractBadge"
                         class="px-2 py-1 text-[11px] rounded-lg bg-rose-100 text-rose-700 font-semibold">INVALID –
                         CONTRACT NOT SIGNED</span>
@@ -1390,11 +1396,11 @@
         <div class="text-xl font-bold text-indigo-700">Tutor Control Center</div>
         <div class="flex gap-3">
           <a href="./login.html"
-            class="px-4 py-2 rounded-full border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-sm font-semibold">Sign
-            in</a>
-          <a href="./signup.html"
-            class="px-4 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold">Get
-            started</a>
+            class="px-4 py-2 rounded-full border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-sm font-semibold">Tutor
+            sign in</a>
+          <a href="./login.html"
+            class="px-4 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold">Enter
+            login code</a>
         </div>
       </header>
       <div class="grid md:grid-cols-2 gap-10 items-center">
@@ -1405,12 +1411,12 @@
             share resources, and keep contracts signed and stored securely. Students and parents each see a tailored
             portal.</p>
           <div class="flex flex-wrap gap-3">
-            <a href="./signup.html"
-              class="px-4 py-2 rounded-full bg-slate-900 text-white hover:bg-slate-800 text-sm font-semibold">Create
-              account</a>
             <a href="./login.html"
-              class="px-4 py-2 rounded-full border border-slate-300 text-sm font-semibold hover:bg-slate-100">I already
-              have an account</a>
+              class="px-4 py-2 rounded-full bg-slate-900 text-white hover:bg-slate-800 text-sm font-semibold">Enter
+              your login code</a>
+            <a href="./login.html"
+              class="px-4 py-2 rounded-full border border-slate-300 text-sm font-semibold hover:bg-slate-100">Tutor
+              sign in</a>
           </div>
           <ul class="text-slate-700 text-sm space-y-2 mt-4">
             <li>• Parent & student portals with contract gating</li>
@@ -1472,12 +1478,10 @@
       <div class="flex items-center justify-between">
         <h2 class="text-base font-semibold">Sign in</h2>
       </div>
-      <p class="text-[11px] text-slate-500">Please sign in or sign up from the dedicated pages.</p>
+      <p class="text-[11px] text-slate-500">Please sign in from the login page or use your access code.</p>
       <div class="space-y-2">
         <a href="./login.html"
           class="block px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium text-center">Go to Sign in</a>
-        <a href="./signup.html"
-          class="block px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-medium text-center">Go to Sign up</a>
       </div>
     </div>
   </div>
@@ -1495,6 +1499,7 @@
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkc3FuYmVidXR1aHdja2pwd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxMDE1NzcsImV4cCI6MjA3OTY3NzU3N30.pJglpTaZouSQFUVCbQONHK1UsB9CgWewKQCIV13NOEM';
     const FUNCTIONS_URL = SUPABASE_URL + '/functions/v1';
     const OWNER_EMAIL = 'erichuang.shangjing@outlook.com';
+    const CODE_EMAIL_SUFFIX = '@codes.tutor';
     // If true, try Supabase Storage uploads; if false, always fall back to local data URL to avoid 400/RLS spam until backend is fixed.
     const ALLOW_STORAGE_UPLOADS = true;
     // hCaptcha config
@@ -1522,6 +1527,15 @@
     // SAFE deep clone helper
     function deepClone(obj) {
       return JSON.parse(JSON.stringify(obj));
+    }
+
+    function normalizeCode(code) {
+      return (code || '').trim().toUpperCase();
+    }
+
+    function codeToEmail(code) {
+      const normalized = normalizeCode(code);
+      return normalized ? `${normalized.toLowerCase()}${CODE_EMAIL_SUFFIX}` : '';
     }
 
     const defaultState = {
@@ -1597,8 +1611,13 @@
         s.contractSignerName = s.contractSignerName || s.contract_signer_name || '';
         s.contractSignerEmail = s.contractSignerEmail || s.contract_signer_email || '';
         s.lastContractId = s.lastContractId || s.last_contract_id || '';
+        s.loginCode = normalizeCode(s.loginCode || s.login_code || '');
       });
-      st.parents.forEach(p => { p.id = cleanId(p.id); p.email = (p.email || '').trim().toLowerCase(); });
+      st.parents.forEach(p => {
+        p.id = cleanId(p.id);
+        p.email = (p.email || '').trim().toLowerCase();
+        p.loginCode = normalizeCode(p.loginCode || p.login_code || '');
+      });
       st.parentLinks.forEach(pl => { pl.id = cleanId(pl.id); pl.parentId = cleanId(pl.parentId); pl.studentId = cleanId(pl.studentId); });
       st.sessions.forEach(s => {
         s.id = cleanId(s.id);
@@ -1776,7 +1795,8 @@
         name: p.name,
         phone: p.phone,
         notes: p.notes,
-        verified: p.verified || false
+        verified: p.verified || false,
+        login_code: normalizeCode(p.loginCode)
       }));
       await upsertAndPrune('parents', parents, 'id');
 
@@ -1805,7 +1825,8 @@
         contract_version: s.contractVersion || 'v1',
         contract_signer_name: s.contractSignerName || null,
         contract_signer_email: s.contractSignerEmail || null,
-        last_contract_id: s.lastContractId || null
+        last_contract_id: s.lastContractId || null,
+        login_code: normalizeCode(s.loginCode)
       }));
       await upsertAndPrune('students', students, 'id');
 
@@ -2096,6 +2117,26 @@
       if (!isSupabaseReady()) return;
       const { error } = await supabaseClient.from('invoices').delete().eq('id', cleanId(id));
       if (error) throw new Error('Supabase invoice delete failed: ' + error.message);
+    }
+
+    async function provisionLoginCode(role, code, opts = {}) {
+      if (!isSupabaseReady() || !isOwner()) return;
+      const normalized = normalizeCode(code);
+      if (!normalized) return;
+      try {
+        await supabaseClient.functions.invoke('issue-login-code', {
+          body: {
+            role,
+            code: normalized,
+            studentId: opts.studentId || null,
+            parentId: opts.parentId || null,
+            fullName: opts.fullName || ''
+          },
+          headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
+        });
+      } catch (err) {
+        console.warn('Login code provisioning failed', err);
+      }
     }
 
     function generateId(prefix) {
@@ -3146,13 +3187,43 @@
       return (supabaseSession?.user?.email || '').trim().toLowerCase();
     }
 
+    function getSessionMetadata() {
+      return supabaseSession?.user?.user_metadata || {};
+    }
+
+    function getSessionRole() {
+      const metaRole = (getSessionMetadata().sys_role || '').toLowerCase();
+      if (metaRole) return metaRole;
+      const email = getSessionEmail();
+      if (email && email === OWNER_EMAIL.toLowerCase()) return 'owner';
+      return '';
+    }
+
+    function getSessionStudentId() {
+      return cleanId(getSessionMetadata().student_id || '');
+    }
+
+    function getSessionParentId() {
+      return cleanId(getSessionMetadata().parent_id || '');
+    }
+
+    function getSessionLoginCode() {
+      return normalizeCode(getSessionMetadata().login_code || '');
+    }
+
     function getParentProfileBySession() {
+      const parentId = getSessionParentId();
+      if (parentId) {
+        const byId = state.parents.find(p => p.id === parentId);
+        if (byId) return byId;
+      }
       const email = getSessionEmail();
       return state.parents.find(p => p.email === email);
     }
 
     function isOwner() {
       if (!supabaseAvailable) return true;
+      if (getSessionRole() === 'owner') return true;
       return !!(supabaseSession && getSessionEmail() === OWNER_EMAIL.toLowerCase());
     }
 
@@ -3161,9 +3232,15 @@
         // Session not resolved yet; keep UI as-is
         return;
       }
+      const role = supabaseAvailable ? getSessionRole() : '';
       const parentProfile = supabaseAvailable ? getParentProfileBySession() : null;
-      studentMode = supabaseAvailable ? (!isOwner() && !!getSessionEmail() && !parentProfile) : false;
-      parentMode = supabaseAvailable ? (!isOwner() && !!parentProfile) : false;
+      studentMode = role === 'student';
+      parentMode = role === 'parent';
+      if (!studentMode && !parentMode && supabaseAvailable && supabaseSession) {
+        // Legacy fallback based on email linkage if metadata is missing
+        studentMode = !!getSessionEmail() && !isOwner() && !parentProfile;
+        parentMode = !!parentProfile && !isOwner();
+      }
       readOnlyMode = studentMode || parentMode || (supabaseAvailable ? !isOwner() : false);
       const banner = document.getElementById('readOnlyBanner');
       if (banner) {
@@ -3347,7 +3424,8 @@
           contractVersion: s.contract_version || 'v1',
           contractSignerName: s.contract_signer_name,
           contractSignerEmail: s.contract_signer_email,
-          lastContractId: s.last_contract_id
+          lastContractId: s.last_contract_id,
+          loginCode: normalizeCode(s.login_code)
         }));
         merged.parents = (parentsRes?.data || []).map(p => ({
           id: p.id,
@@ -3355,7 +3433,8 @@
           name: p.name,
           phone: p.phone,
           notes: p.notes,
-          verified: p.verified
+          verified: p.verified,
+          loginCode: normalizeCode(p.login_code)
         }));
         merged.parentLinks = (parentLinksRes?.data || []).map(pl => ({
           id: pl.id,
@@ -3511,6 +3590,155 @@
       const localSettings = loadState().settings;
       merged.settings = localSettings;
 
+      const sessionRole = getSessionRole();
+      const sessionStudentId = getSessionStudentId();
+      const sessionParentId = getSessionParentId();
+      const sessionLoginCode = getSessionLoginCode();
+
+      async function mapSnapshotToState(snapshot) {
+        const snap = snapshot || {};
+        const out = deepClone(defaultState);
+        out.settings = localSettings;
+        out.students = (snap.students || []).map(s => ({
+          id: s.id,
+          name: s.name,
+          gradeLevel: s.grade_level ?? s.gradeLevel,
+          rate: s.rate,
+          subjects: s.subjects,
+          notes: s.notes,
+          studentEmail: s.student_email || '',
+          createdAt: s.created_at,
+          contractSigned: s.contract_signed,
+          contractSignedAt: s.contract_signed_at,
+          contractVersion: s.contract_version || 'v1',
+          contractSignerName: s.contract_signer_name,
+          contractSignerEmail: s.contract_signer_email,
+          lastContractId: s.last_contract_id,
+          loginCode: normalizeCode(s.login_code)
+        }));
+        out.parents = (snap.parents || []).map(p => ({
+          id: p.id,
+          email: (p.email || '').toLowerCase(),
+          name: p.name,
+          phone: p.phone,
+          notes: p.notes,
+          verified: p.verified,
+          loginCode: normalizeCode(p.login_code)
+        }));
+        out.parentLinks = (snap.parentLinks || []).map(pl => ({
+          id: pl.id,
+          parentId: pl.parent_id,
+          studentId: pl.student_id,
+          relationship: pl.relationship
+        }));
+        out.sessions = (snap.sessions || []).map(sess => ({
+          id: sess.id,
+          date: sess.date,
+          startTime: sess.start_time,
+          durationHours: sess.duration_hours,
+          subject: sess.subject,
+          topic: sess.topic,
+          notes: sess.notes,
+          completed: sess.completed,
+          invoiceId: sess.invoice_id,
+          studentIds: (snap.sessionStudents || [])
+            .filter(ss => ss.session_id === sess.id)
+            .map(ss => cleanId(ss.student_id))
+            .filter(Boolean)
+        })).filter(s => (s.studentIds || []).length > 0);
+        out.homework = (snap.homework || []).map(h => ({
+          id: h.id,
+          studentId: h.student_id,
+          resourceId: h.resource_id,
+          status: h.status,
+          dueDate: h.due_date,
+          assignedDate: h.assigned_date
+        }));
+        out.resources = (snap.resources || []).map(r => ({
+          id: r.id,
+          title: r.title,
+          subject: r.subject,
+          level: r.level,
+          tags: r.tags,
+          description: r.description,
+          createdAt: r.created_at,
+          favorite: r.favorite,
+          storage_path: r.storage_path,
+          fileName: r.file_name,
+          signedUrl: r.signed_url || r.signedUrl || ''
+        }));
+        out.invoices = (snap.invoices || []).map(inv => ({
+          id: inv.id,
+          studentId: inv.student_id,
+          issueDate: inv.issue_date,
+          dueDate: inv.due_date,
+          baseAmount: inv.base_amount,
+          total: inv.total,
+          lateFeePercent: inv.late_fee_percent,
+          shortNoticePercent: inv.short_notice_percent,
+          lateApplied: inv.late_applied,
+          shortApplied: inv.short_applied,
+          paid: inv.paid,
+          notes: inv.notes
+        }));
+        out.contractSignatures = (snap.contractSignatures || []).map(cs => ({
+          id: cs.id,
+          studentId: cs.student_id,
+          parentName: cs.parent_name,
+          parentEmail: cs.parent_email,
+          signedAt: cs.signed_at,
+          contractVersion: cs.contract_version || 'v1',
+          contractTextSnapshot: cs.contract_text_snapshot,
+          renderedPdfUrl: cs.rendered_pdf_url,
+          signatureMethod: cs.signature_method,
+          parentIp: cs.parent_ip
+        }));
+        out.contracts = (snap.contracts || []).map(c => ({
+          id: c.id,
+          studentId: c.student_id,
+          fileName: c.file_name,
+          storage_path: c.storage_path,
+          status: c.status,
+          notes: c.notes,
+          uploadedAt: c.uploaded_at,
+          signedUrl: c.signed_url || ''
+        }));
+        out.messages = (snap.messages || []).map(m => ({
+          id: m.id,
+          studentId: m.student_id,
+          text: m.text,
+          sender: m.sender,
+          created_at: m.created_at
+        }));
+        out.documents = (snap.documents || []).map(d => ({
+          id: d.id,
+          studentId: d.student_id,
+          title: d.title,
+          status: d.status,
+          date: d.date,
+          notes: d.notes,
+          createdAt: d.created_at
+        }));
+        sanitizeState(out);
+        normalizeIdsToUuid();
+        return out;
+      }
+
+      if (sessionLoginCode && (sessionRole === 'student' || sessionRole === 'parent')) {
+        try {
+          const { data: snapshot, error: snapErr } = await supabaseClient.functions.invoke('portal-snapshot', {
+            body: { code: sessionLoginCode, role: sessionRole },
+            headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
+          });
+          if (snapErr) throw snapErr;
+          if (snapshot) {
+            return await mapSnapshotToState(snapshot);
+          }
+        } catch (err) {
+          console.warn('Portal snapshot fetch failed; falling back to direct queries', err);
+        }
+      }
+
       let studentsRes = { data: [] };
       let parentsRes = { data: [] };
       let parentLinksRes = { data: [] };
@@ -3524,13 +3752,28 @@
       let contractsRes = { data: [] };
 
       try {
-        studentsRes = await supabaseClient.from('students').select('*').eq('student_email', email);
+        if (sessionRole === 'student' && sessionStudentId) {
+          studentsRes = await supabaseClient.from('students').select('*').eq('id', sessionStudentId);
+        } else if (sessionLoginCode) {
+          studentsRes = await supabaseClient.from('students').select('*').eq('login_code', sessionLoginCode);
+        } else {
+          studentsRes = await supabaseClient.from('students').select('*').eq('student_email', email);
+        }
       } catch { }
       try {
-        parentsRes = await supabaseClient.from('parents').select('*').eq('email', email);
+        if (sessionRole === 'parent' && sessionParentId) {
+          parentsRes = await supabaseClient.from('parents').select('*').eq('id', sessionParentId);
+        } else if (sessionLoginCode) {
+          parentsRes = await supabaseClient.from('parents').select('*').eq('login_code', sessionLoginCode);
+        } else if (email) {
+          parentsRes = await supabaseClient.from('parents').select('*').eq('email', email);
+        }
       } catch { }
 
-      const parentIds = (parentsRes.data || []).map(p => p.id);
+      let parentIds = (parentsRes.data || []).map(p => p.id);
+      if (!parentIds.length && sessionRole === 'parent' && sessionParentId) {
+        parentIds = [sessionParentId];
+      }
       if (parentIds.length) {
         try {
           parentLinksRes = await supabaseClient.from('parent_students').select('*').in('parent_id', parentIds);
@@ -3541,6 +3784,7 @@
         ...(studentsRes.data || []).map(s => s.id),
         ...(parentLinksRes.data || []).map(pl => pl.student_id)
       ]);
+      if (sessionRole === 'student' && sessionStudentId) studentIds.add(sessionStudentId);
       const studentIdArray = Array.from(studentIds);
 
       // If this is a parent with linked students, fetch those student rows
@@ -3600,7 +3844,8 @@
         contractVersion: s.contract_version || 'v1',
         contractSignerName: s.contract_signer_name,
         contractSignerEmail: s.contract_signer_email,
-        lastContractId: s.last_contract_id
+        lastContractId: s.last_contract_id,
+        loginCode: normalizeCode(s.login_code)
       }));
       merged.parents = (parentsRes.data || []).map(p => ({
         id: p.id,
@@ -3608,7 +3853,8 @@
         name: p.name,
         phone: p.phone,
         notes: p.notes,
-        verified: p.verified
+        verified: p.verified,
+        loginCode: normalizeCode(p.login_code)
       }));
       merged.parentLinks = (parentLinksRes.data || []).map(pl => ({
         id: pl.id,
@@ -3885,10 +4131,11 @@
       stopPresence();
       const run = async () => {
         try {
+          const sessionRole = getSessionRole() || (isOwner() ? 'owner' : parentMode ? 'parent' : 'student');
           await supabaseClient.from('presence').upsert({
             user_id: supabaseSession.user.id,
             email: getSessionEmail(),
-            role: isOwner() ? 'owner' : parentMode ? 'parent' : 'student',
+            role: sessionRole,
             updated_at: new Date().toISOString()
           });
           await refreshPresence();
@@ -4352,11 +4599,13 @@
       list.innerHTML = state.parents.map(p => {
         const kids = getParentLinkedStudents(p.id);
         const kidNames = kids.map(k => k.name).join(', ') || 'No students linked';
+        const codeChip = p.loginCode ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-mono text-[10px] border border-indigo-100">${p.loginCode}</span>` : '';
         return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80 flex items-start justify-between gap-2">
           <div>
             <div class="font-semibold">${p.name || p.email}</div>
             <div class="text-[10px] text-slate-500">${p.email}</div>
             <div class="text-[10px] text-slate-500">${kidNames}</div>
+            ${codeChip ? `<div class="mt-1">${codeChip}</div>` : ''}
           </div>
           <button data-parent-id="${p.id}" class="px-2 py-1 text-[10px] rounded-lg border border-slate-300 hover:bg-slate-50">Edit</button>
         </li>`;
@@ -4372,7 +4621,7 @@
     function openParentModal(parent) {
       if (!guardEdit()) return;
       const isEdit = !!parent;
-      const parentEmailOptions = getAvailableParentEmails(parent?.email).map(e => `<option value="${e}">${e}</option>`).join('');
+      const parentEmailOptions = getAvailableParentEmails(parent?.email).map(e => `<option value="${e}">`).join('');
       const linked = new Set(
         state.parentLinks.filter(pl => pl.parentId === parent?.id).map(pl => pl.studentId)
       );
@@ -4382,6 +4631,7 @@
           <span>${s.name}</span>
         </label>
       `).join('');
+      const existingCode = normalizeCode(parent?.loginCode);
       const html = `
         <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit parent' : 'Add parent'}</h2>
         <form id="parentForm" class="space-y-2 text-xs">
@@ -4391,10 +4641,11 @@
           </div>
           <div>
             <label class="block text-[11px] mb-1">Email</label>
-            <select name="email" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
-              <option value="">Select an account email</option>
+            <input list="parentEmailOptions" name="email" value="${parent?.email || ''}" placeholder="Optional (for notifications)"
+              class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            <datalist id="parentEmailOptions">
               ${parentEmailOptions}
-            </select>
+            </datalist>
           </div>
           <div>
             <label class="block text-[11px] mb-1">Phone</label>
@@ -4409,6 +4660,29 @@
           <div>
             <label class="block text-[11px] mb-1">Notes</label>
             <textarea name="notes" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${parent?.notes || ''}</textarea>
+          </div>
+          <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
+            <div class="flex items-center justify-between mb-1">
+              <div>
+                <div class="text-xs font-semibold text-indigo-900">Parent login code</div>
+                <div class="text-[10px] text-indigo-700">They sign in with this code—no account setup needed.</div>
+              </div>
+              ${existingCode ? `<span class="text-[10px] text-indigo-700 font-semibold">${existingCode}</span>` : ''}
+            </div>
+            <div class="flex gap-2">
+              <button type="button" id="parentGenerateCodeBtn" class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 transition shadow-sm w-full">
+                ${existingCode ? 'Regenerate code' : 'Generate code'}
+              </button>
+              ${existingCode ? `<button type="button" id="parentCopyExistingBtn" class="px-3 py-1.5 bg-white border border-indigo-200 text-indigo-700 text-xs rounded-lg hover:bg-indigo-50 transition shadow-sm">Copy</button>` : ''}
+            </div>
+            <div id="parentCodeResult" class="${existingCode ? '' : 'hidden'} mt-2 p-2 bg-white border border-indigo-200 rounded-lg">
+              <div class="text-[10px] text-slate-500 mb-1">Share this code with the parent:</div>
+              <div class="flex items-center gap-2">
+                <code id="parentGeneratedCode" class="text-base font-mono font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded select-all tracking-wide">${existingCode || ''}</code>
+                <button type="button" id="parentCopyBtn" class="text-[10px] text-indigo-600 hover:underline">Copy</button>
+              </div>
+            </div>
+            <input type="hidden" name="loginCode" id="parentHiddenLoginCode" value="${existingCode || ''}">
           </div>
           <div class="space-y-1">
             <div class="text-[11px] font-semibold">Link students</div>
@@ -4430,23 +4704,57 @@
       `;
       openModal(html, () => {
         const form = document.getElementById('parentForm');
+        const parentGenerateBtn = document.getElementById('parentGenerateCodeBtn');
+        const parentCodeBox = document.getElementById('parentCodeResult');
+        const parentCodeDisplay = document.getElementById('parentGeneratedCode');
+        const parentCopyBtn = document.getElementById('parentCopyBtn');
+        const parentCopyExistingBtn = document.getElementById('parentCopyExistingBtn');
+        const parentHiddenLoginCode = document.getElementById('parentHiddenLoginCode');
+        if (parentGenerateBtn) {
+          parentGenerateBtn.onclick = () => {
+            const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for (let i = 0; i < 8; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+            parentCodeDisplay.textContent = code;
+            parentHiddenLoginCode.value = code;
+            parentCodeBox.classList.remove('hidden');
+            parentGenerateBtn.textContent = 'Regenerate code';
+          };
+        }
+        if (parentCopyBtn) {
+          parentCopyBtn.onclick = () => {
+            if (!parentCodeDisplay.textContent) return;
+            navigator.clipboard.writeText(parentCodeDisplay.textContent);
+            parentCopyBtn.textContent = 'Copied!';
+            setTimeout(() => parentCopyBtn.textContent = 'Copy', 2000);
+          };
+        }
+        if (parentCopyExistingBtn && existingCode) {
+          parentCopyExistingBtn.onclick = () => {
+            navigator.clipboard.writeText(existingCode);
+            parentCopyExistingBtn.textContent = 'Copied';
+            setTimeout(() => parentCopyExistingBtn.textContent = 'Copy', 1800);
+          };
+        }
         form.onsubmit = (e) => {
           e.preventDefault();
+          const emailVal = form.email.value.trim().toLowerCase();
+          const loginCode = normalizeCode(form.loginCode?.value || parent?.loginCode || '');
           const newParent = {
             id: parent?.id || generateId('par'),
             name: form.name.value.trim(),
-            email: form.email.value.trim().toLowerCase(),
+            email: emailVal,
             phone: (form.phoneCode.value || '') + (form.phoneLocal.value.trim() ? (' ' + form.phoneLocal.value.trim()) : ''),
-            notes: form.notes.value.trim()
+            notes: form.notes.value.trim(),
+            loginCode
           };
-          if (!newParent.email) {
-            alert('Email is required.');
-            return;
-          }
-          const taken = state.parents.some(p => p.email === newParent.email && p.id !== newParent.id);
+          const taken = newParent.email && state.parents.some(p => p.email === newParent.email && p.id !== newParent.id);
           if (taken) {
             alert('That email is already used by another parent.');
             return;
+          }
+          if (!newParent.loginCode && !isEdit) {
+            if (!confirm('You have not generated a login code. The parent will not be able to log in. Continue?')) return;
           }
           if (isEdit) {
             const idx = state.parents.findIndex(p => p.id === parent.id);
@@ -4469,6 +4777,9 @@
           saveState();
           closeModal();
           renderParentsList();
+          if (newParent.loginCode && isSupabaseReady() && isOwner()) {
+            provisionLoginCode('parent', newParent.loginCode, { parentId: newParent.id, fullName: newParent.name });
+          }
         };
         if (isEdit) {
           const delBtn = document.getElementById('deleteParentBtn');
@@ -4552,6 +4863,22 @@
       const latestSig = getLatestSignature(s.id);
       const contractEntry = state.contracts.find(c => c.studentId === s.id && c.status === 'Signed') || null;
       const hasContract = !!latestSig || !!contractEntry || !!s.contractSigned;
+      const loginCodeBadge = document.getElementById('studentLoginCodeBadge');
+      const loginCodeCopy = document.getElementById('studentLoginCodeCopy');
+      if (loginCodeBadge) {
+        loginCodeBadge.textContent = s.loginCode ? `CODE: ${s.loginCode}` : '';
+        loginCodeBadge.classList.toggle('hidden', !s.loginCode);
+      }
+      if (loginCodeCopy) {
+        const hasCode = !!s.loginCode;
+        loginCodeCopy.classList.toggle('hidden', !hasCode || parentMode);
+        loginCodeCopy.onclick = () => {
+          if (!hasCode) return;
+          navigator.clipboard.writeText(s.loginCode);
+          loginCodeCopy.textContent = 'Copied!';
+          setTimeout(() => loginCodeCopy.textContent = 'Copy code', 2000);
+        };
+      }
       if (contractBadge) {
         const signed = !!s.contractSigned;
         contractBadge.textContent = signed ? 'VALID – CONTRACT SIGNED' : 'INVALID – CONTRACT NOT SIGNED';
@@ -5877,32 +6204,30 @@ Best regards,
       const isEdit = !!student;
       const emailOptions = getAvailableStudentEmails(student?.studentEmail).map(e => `<option value="${e}">${e}</option>`).join('');
 
-      // New: Code-Only Login Generation
-      let codeSection = '';
-      if (!isEdit) {
-        codeSection = `
-          <div class="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
-            <h3 class="text-xs font-semibold text-indigo-900 mb-2">🔑 Student Login Code</h3>
-            <p class="text-[10px] text-indigo-700 mb-2">
-              Generate a unique code. The student will use this code to log in directly.
-            </p>
-            <div class="flex gap-2">
-              <button type="button" id="generateCodeBtn" 
-                class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 transition shadow-sm w-full">
-                Generate Code
-              </button>
-            </div>
-            <div id="codeResult" class="hidden mt-2 p-2 bg-white border border-indigo-200 rounded-lg">
-              <div class="text-[10px] text-slate-500 mb-1">Give this to the student:</div>
-              <div class="flex items-center gap-2">
-                <code id="generatedCodeDisplay" class="text-base font-mono font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded select-all tracking-wide"></code>
-                <button type="button" id="copyCodeBtn" class="text-[10px] text-indigo-600 hover:underline">Copy</button>
-              </div>
+      const existingCode = normalizeCode(student?.loginCode);
+      const codeSection = `
+        <div class="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
+          <h3 class="text-xs font-semibold text-indigo-900 mb-2">🔑 Student Login Code</h3>
+          <p class="text-[10px] text-indigo-700 mb-2">
+            Generate a unique code. The student will use this code to log in directly (no sign-up needed).
+          </p>
+          <div class="flex gap-2">
+            <button type="button" id="generateCodeBtn" 
+              class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 transition shadow-sm w-full">
+              ${existingCode ? 'Regenerate code' : 'Generate code'}
+            </button>
+            ${existingCode ? `<button type="button" id="copyExistingCodeBtn" class="px-3 py-1.5 bg-white border border-indigo-200 text-indigo-700 text-xs rounded-lg hover:bg-indigo-50 transition shadow-sm">Copy</button>` : ''}
+          </div>
+          <div id="codeResult" class="${existingCode ? '' : 'hidden'} mt-2 p-2 bg-white border border-indigo-200 rounded-lg">
+            <div class="text-[10px] text-slate-500 mb-1">Share this code with the student:</div>
+            <div class="flex items-center gap-2">
+              <code id="generatedCodeDisplay" class="text-base font-mono font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded select-all tracking-wide">${existingCode || ''}</code>
+              <button type="button" id="copyCodeBtn" class="text-[10px] text-indigo-600 hover:underline">Copy</button>
             </div>
           </div>
-          <hr class="border-slate-100 my-4">
-        `;
-      }
+        </div>
+        <hr class="border-slate-100 my-4">
+      `;
 
       const html = `
         <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit student' : 'Add student'}</h2>
@@ -5913,7 +6238,7 @@ Best regards,
             <input name="name" value="${student?.name || ''}" required
                    class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
           </div>
-          <input type="hidden" name="linkCode" id="hiddenLinkCode">
+          <input type="hidden" name="loginCode" id="hiddenLoginCode" value="${existingCode || ''}">
           
           <div class="grid grid-cols-2 gap-2">
             <div>
@@ -5950,23 +6275,34 @@ Best regards,
       `;
       openModal(html, () => {
         // Invite Code Logic
-        if (!isEdit) {
-          const generateBtn = document.getElementById('generateCodeBtn');
-          const resultBox = document.getElementById('codeResult');
-          const codeDisplay = document.getElementById('generatedCodeDisplay');
-          const copyBtn = document.getElementById('copyCodeBtn');
-          const hiddenInput = document.getElementById('hiddenLinkCode');
+        const generateBtn = document.getElementById('generateCodeBtn');
+        const resultBox = document.getElementById('codeResult');
+        const codeDisplay = document.getElementById('generatedCodeDisplay');
+        const copyBtn = document.getElementById('copyCodeBtn');
+        const hiddenInput = document.getElementById('hiddenLoginCode');
+        const copyExistingBtn = document.getElementById('copyExistingCodeBtn');
 
-          generateBtn.onclick = () => {
-            // Generate alphanumeric code: 6 chars
-            const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-            codeDisplay.textContent = code;
-            hiddenInput.value = code; // Auto-fill into form to save to 'students' table
-            resultBox.classList.remove('hidden');
-            generateBtn.textContent = 'Regenerate';
+        if (copyExistingBtn && existingCode) {
+          copyExistingBtn.onclick = () => {
+            navigator.clipboard.writeText(existingCode);
+            copyExistingBtn.textContent = 'Copied';
+            setTimeout(() => copyExistingBtn.textContent = 'Copy', 1800);
           };
+        }
 
+        generateBtn.onclick = () => {
+          const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+          let code = '';
+          for (let i = 0; i < 8; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+          codeDisplay.textContent = code;
+          hiddenInput.value = code;
+          resultBox.classList.remove('hidden');
+          generateBtn.textContent = 'Regenerate code';
+        };
+
+        if (copyBtn) {
           copyBtn.onclick = () => {
+            if (!codeDisplay.textContent) return;
             navigator.clipboard.writeText(codeDisplay.textContent);
             copyBtn.textContent = 'Copied!';
             setTimeout(() => copyBtn.textContent = 'Copy', 2000);
@@ -5984,7 +6320,7 @@ Best regards,
             subjects: form.subjects.value.split(',').map(s => s.trim()).filter(Boolean),
             notes: form.notes.value.trim(),
             studentEmail: '', // No longer using explicit email linking here
-            linkCode: form.linkCode?.value || student?.linkCode || '', // Save the Code
+            loginCode: normalizeCode(form.loginCode?.value || student?.loginCode || ''), // Save the Code
             contractSigned: student?.contractSigned || false,
             contractSignedAt: student?.contractSignedAt || null,
             contractVersion: student?.contractVersion || 'v1',
@@ -5998,7 +6334,7 @@ Best regards,
           }
 
           // Validation: If adding, emphasize code?
-          if (!isEdit && !newStudent.linkCode) {
+          if (!isEdit && !newStudent.loginCode) {
             if (!confirm('You have not generated a login code. The student will not be able to log in. Continue?')) return;
           }
 
@@ -6014,10 +6350,10 @@ Best regards,
           closeModal();
           renderStudentsView();
 
-          // Sync to Supabase (assuming sync() handles 'linkCode' if column exists)
-          // Note: `students` table has `link_code` column already (Step 28).
-          // We need to ensure `syncStudents` maps it.
-          // Note: The `login.html` lazy auth will rely on the user knowing this code.
+          // Provision Supabase auth account for code-based login
+          if (newStudent.loginCode && isSupabaseReady() && isOwner()) {
+            provisionLoginCode('student', newStudent.loginCode, { studentId: newStudent.id, fullName: newStudent.name });
+          }
         };
         if (isEdit) {
           document.getElementById('deleteStudentBtn').onclick = () => {
