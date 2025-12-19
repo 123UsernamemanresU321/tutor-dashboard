@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>Tutoring Dashboard – Physics • Chemistry • Maths</title>
@@ -19,7 +20,8 @@
   <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=7">
   <link rel="shortcut icon" type="image/svg+xml" href="./favicon.svg?v=7">
   <link rel="apple-touch-icon" href="./favicon.svg?v=7">
-  <link rel="alternate icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%234f46e5'/%3E%3Cstop offset='100%25' stop-color='%230ea5e9'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='2' y='2' width='60' height='60' rx='12' fill='%23f8fafc' stroke='%233b82f6' stroke-width='3'/%3E%3Cpath d='M18 18h28v6H34v22h-6V24H18z' fill='url(%23g)'/%3E%3Ccircle cx='46' cy='42' r='6' fill='%23f97316'/%3E%3C/svg%3E">
+  <link rel="alternate icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%234f46e5'/%3E%3Cstop offset='100%25' stop-color='%230ea5e9'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='2' y='2' width='60' height='60' rx='12' fill='%23f8fafc' stroke='%233b82f6' stroke-width='3'/%3E%3Cpath d='M18 18h28v6H34v22h-6V24H18z' fill='url(%23g)'/%3E%3Ccircle cx='46' cy='42' r='6' fill='%23f97316'/%3E%3C/svg%3E">
 
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -34,114 +36,157 @@
       --text-dark: #e5e7eb;
       --border-dark: #1e293b;
     }
-    .hidden { display: none !important; }
+
+    .hidden {
+      display: none !important;
+    }
+
     body {
       font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
       background:
-        radial-gradient(circle at 12% 20%, rgba(79,70,229,0.12), transparent 45%),
-        radial-gradient(circle at 88% 18%, rgba(14,165,233,0.14), transparent 46%),
+        radial-gradient(circle at 12% 20%, rgba(79, 70, 229, 0.12), transparent 45%),
+        radial-gradient(circle at 88% 18%, rgba(14, 165, 233, 0.14), transparent 46%),
         linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #f1f5f9 100%);
       background-attachment: fixed;
       color: var(--text-light);
     }
+
     body.dark {
       background:
-        radial-gradient(circle at 12% 20%, rgba(59,130,246,0.18), transparent 42%),
-        radial-gradient(circle at 85% 25%, rgba(34,211,238,0.12), transparent 50%),
+        radial-gradient(circle at 12% 20%, rgba(59, 130, 246, 0.18), transparent 42%),
+        radial-gradient(circle at 85% 25%, rgba(34, 211, 238, 0.12), transparent 50%),
         linear-gradient(135deg, #020617 0%, #0b1221 45%, #0b1324 100%);
       background-attachment: fixed;
       color: var(--text-dark);
     }
+
     body.dark .sidebar,
     body.dark .topbar {
-      background: rgba(15,23,42,0.98) !important;
+      background: rgba(15, 23, 42, 0.98) !important;
       border-color: var(--border-dark) !important;
       backdrop-filter: blur(18px);
     }
+
     body.dark #viewsContainer {
       background: transparent !important;
     }
+
     .card {
       background-color: var(--card-light);
-      border: 1px solid rgba(148,163,184,0.25);
+      border: 1px solid rgba(148, 163, 184, 0.25);
       border-radius: 1.1rem;
       box-shadow:
-        0 20px 60px -34px rgba(15,23,42,0.7),
-        0 0 0 1px rgba(148,163,184,0.12);
+        0 20px 60px -34px rgba(15, 23, 42, 0.7),
+        0 0 0 1px rgba(148, 163, 184, 0.12);
       transition: background 0.25s ease, border-color 0.2s ease, box-shadow 0.25s ease, transform 0.18s ease;
     }
+
     .card:hover {
       transform: translateY(-2px);
       box-shadow:
-        0 26px 70px -36px rgba(15,23,42,0.85),
-        0 0 0 1px rgba(148,163,184,0.2);
+        0 26px 70px -36px rgba(15, 23, 42, 0.85),
+        0 0 0 1px rgba(148, 163, 184, 0.2);
     }
+
     body.dark .card {
       background: radial-gradient(circle at 0% 0%, #111827 0, #0b1221 48%);
       border-color: var(--border-dark);
       color: var(--text-dark);
       box-shadow:
-        0 20px 60px -30px rgba(15,23,42,0.9),
-        0 0 0 1px rgba(15,23,42,0.85);
+        0 20px 60px -30px rgba(15, 23, 42, 0.9),
+        0 0 0 1px rgba(15, 23, 42, 0.85);
     }
+
     .sidebar {
       background: radial-gradient(circle at 0% 0%, #0f172a 0, #020617 70%);
       border-right: 1px solid #020617;
-      box-shadow: 6px 0 24px -20px rgba(15,23,42,0.9);
+      box-shadow: 6px 0 24px -20px rgba(15, 23, 42, 0.9);
     }
+
     .topbar {
-      background: rgba(255,255,255,0.9);
+      background: rgba(255, 255, 255, 0.9);
       backdrop-filter: blur(18px);
-      border-bottom: 1px solid rgba(148,163,184,0.25);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.25);
     }
+
     body.dark .topbar {
       color: var(--text-dark);
-      border-color: rgba(51,65,85,0.75);
-      background: rgba(8,15,27,0.92);
+      border-color: rgba(51, 65, 85, 0.75);
+      background: rgba(8, 15, 27, 0.92);
     }
+
     .scrollbar-thin::-webkit-scrollbar {
       width: 6px;
       height: 6px;
     }
+
     .scrollbar-thin::-webkit-scrollbar-thumb {
-      background-color: rgba(148,163,184,0.8);
+      background-color: rgba(148, 163, 184, 0.8);
       border-radius: 999px;
     }
+
     .scrollbar-thin::-webkit-scrollbar-track {
       background-color: transparent;
     }
+
     .badge {
       border-radius: 999px;
       padding: 0.15rem 0.6rem;
       font-size: 0.75rem;
       font-weight: 500;
     }
-    .subject-physics { background-color: #eff6ff; color: #1d4ed8; }
-    .subject-chemistry { background-color: #ecfdf3; color: #15803d; }
-    .subject-maths { background-color: #fef2f2; color: #b91c1c; }
-    body.dark .subject-physics { background-color: rgba(37,99,235,0.16); color: #93c5fd; }
-    body.dark .subject-chemistry { background-color: rgba(22,163,74,0.14); color: #6ee7b7; }
-    body.dark .subject-maths { background-color: rgba(248,113,113,0.16); color: #fecaca; }
+
+    .subject-physics {
+      background-color: #eff6ff;
+      color: #1d4ed8;
+    }
+
+    .subject-chemistry {
+      background-color: #ecfdf3;
+      color: #15803d;
+    }
+
+    .subject-maths {
+      background-color: #fef2f2;
+      color: #b91c1c;
+    }
+
+    body.dark .subject-physics {
+      background-color: rgba(37, 99, 235, 0.16);
+      color: #93c5fd;
+    }
+
+    body.dark .subject-chemistry {
+      background-color: rgba(22, 163, 74, 0.14);
+      color: #6ee7b7;
+    }
+
+    body.dark .subject-maths {
+      background-color: rgba(248, 113, 113, 0.16);
+      color: #fecaca;
+    }
 
     .calendar-grid {
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 0.35rem;
     }
+
     .calendar-day {
       min-height: 6rem;
       border-radius: 0.8rem;
-      border: 1px solid rgba(148,163,184,0.35);
+      border: 1px solid rgba(148, 163, 184, 0.35);
       padding: 0.4rem 0.45rem;
       display: flex;
       flex-direction: column;
       font-size: 0.75rem;
-      background: rgba(255,255,255,0.88);
+      background: rgba(255, 255, 255, 0.88);
       backdrop-filter: blur(12px);
     }
+
     body.dark .calendar-day {
       background: radial-gradient(circle at 0% 0%, #020617 0, #020617 55%);
-      border-color: rgba(51,65,85,0.9);
+      border-color: rgba(51, 65, 85, 0.9);
     }
 
     .tag-pill {
@@ -155,51 +200,57 @@
       align-items: center;
       gap: 0.15rem;
     }
+
     body.dark .tag-pill {
-      background-color: rgba(51,65,85,0.9);
+      background-color: rgba(51, 65, 85, 0.9);
       color: #e5e7eb;
     }
+
     .overlay {
       position: fixed;
       inset: 0;
-      background: rgba(15,23,42,0.65);
+      background: rgba(15, 23, 42, 0.65);
       display: none;
       align-items: center;
       justify-content: center;
       z-index: 80;
       backdrop-filter: blur(18px);
     }
+
     .overlay.show {
       display: flex;
     }
 
     /* Session chips */
     .session-card {
-      border: 1px solid rgba(148,163,184,0.35);
+      border: 1px solid rgba(148, 163, 184, 0.35);
       border-radius: 0.75rem;
       padding: 0.45rem 0.55rem;
-      background: rgba(255,255,255,0.9);
+      background: rgba(255, 255, 255, 0.9);
       display: flex;
       flex-direction: column;
       gap: 0.15rem;
       transition: transform 0.1s ease, box-shadow 0.2s ease;
     }
+
     .session-card:hover {
       transform: translateY(-1px);
-      box-shadow: 0 10px 30px -20px rgba(15,23,42,0.4);
+      box-shadow: 0 10px 30px -20px rgba(15, 23, 42, 0.4);
     }
+
     .session-chip {
       font-size: 0.65rem;
       text-transform: uppercase;
       letter-spacing: 0.03em;
       padding: 0.1rem 0.4rem;
       border-radius: 999px;
-      border: 1px solid rgba(0,0,0,0.06);
+      border: 1px solid rgba(0, 0, 0, 0.06);
       display: inline-flex;
       align-items: center;
       gap: 0.25rem;
-      background: rgba(248,250,252,0.7);
+      background: rgba(248, 250, 252, 0.7);
     }
+
     .session-time {
       font-weight: 700;
       font-size: 0.8rem;
@@ -209,7 +260,7 @@
     .auth-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(15,23,42,0.75);
+      background: rgba(15, 23, 42, 0.75);
       backdrop-filter: blur(20px);
       display: none;
       align-items: center;
@@ -217,6 +268,7 @@
       z-index: 60;
       padding: 1.5rem;
     }
+
     .auth-overlay.show {
       display: flex;
     }
@@ -241,18 +293,21 @@
       padding-inline: 0.75rem;
       transition: background 0.18s ease, color 0.18s ease, transform 0.12s ease;
     }
+
     .nav-btn span:first-child {
       width: 1.3rem;
       text-align: center;
     }
+
     .nav-btn.active,
     .nav-btn.bg-slate-800 {
       background: linear-gradient(135deg, #4f46e5, #6366f1);
       color: #e5e7eb;
       transform: translateY(-1px);
     }
+
     .nav-btn:hover {
-      background-color: rgba(15,23,42,0.6);
+      background-color: rgba(15, 23, 42, 0.6);
     }
 
     /* INPUTS / TEXTAREAS / SELECTS */
@@ -265,6 +320,7 @@
     select {
       transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
     }
+
     body.dark input[type="text"],
     body.dark input[type="search"],
     body.dark input[type="number"],
@@ -276,6 +332,7 @@
       border-color: var(--border-dark);
       color: var(--text-dark);
     }
+
     body.dark input::placeholder,
     body.dark textarea::placeholder {
       color: #64748b;
@@ -283,15 +340,17 @@
 
     /* THEME TOGGLE BUTTON */
     #themeToggleBtn {
-      box-shadow: 0 6px 18px -8px rgba(15,23,42,0.9);
+      box-shadow: 0 6px 18px -8px rgba(15, 23, 42, 0.9);
       background: radial-gradient(circle at 30% 20%, #fef3c7 0, #fbbf24 40%, #f97316 100%);
       color: #111827;
     }
+
     body.dark #themeToggleBtn {
       background: radial-gradient(circle at 30% 20%, #22d3ee 0, #0ea5e9 40%, #1d4ed8 100%);
       color: #e5e7eb;
-      box-shadow: 0 6px 20px -8px rgba(59,130,246,0.9);
+      box-shadow: 0 6px 20px -8px rgba(59, 130, 246, 0.9);
     }
+
     .sr-only {
       position: absolute;
       width: 1px;
@@ -303,6 +362,7 @@
       white-space: nowrap;
       border: 0;
     }
+
     .sr-only:focus {
       position: static;
       width: auto;
@@ -322,33 +382,36 @@
 
     /* Light utility chips */
     .chip-btn {
-      border: 1px solid rgba(148,163,184,0.6);
+      border: 1px solid rgba(148, 163, 184, 0.6);
       border-radius: 999px;
       padding: 0.25rem 0.65rem;
       font-size: 0.75rem;
       transition: all 0.15s ease;
     }
+
     .chip-btn.active {
       background: linear-gradient(135deg, #4f46e5, #22d3ee);
       color: #f8fafc;
       border-color: transparent;
-      box-shadow: 0 10px 30px -20px rgba(79,70,229,0.8);
+      box-shadow: 0 10px 30px -20px rgba(79, 70, 229, 0.8);
     }
 
     .progress-track {
       height: 0.55rem;
       border-radius: 999px;
-      background: rgba(148,163,184,0.25);
+      background: rgba(148, 163, 184, 0.25);
       overflow: hidden;
     }
+
     .progress-thumb {
       height: 100%;
       border-radius: 999px;
       background: linear-gradient(90deg, #6366f1, #22c55e);
       transition: width 0.2s ease;
     }
+
     body.dark .progress-track {
-      background: rgba(51,65,85,0.9);
+      background: rgba(51, 65, 85, 0.9);
     }
 
     .hint {
@@ -358,23 +421,28 @@
 
     /* Section breathing */
     .section-shell {
-      background: linear-gradient(135deg, rgba(255,255,255,0.72), rgba(255,255,255,0.6));
-      border: 1px solid rgba(148,163,184,0.22);
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.6));
+      border: 1px solid rgba(148, 163, 184, 0.22);
       border-radius: 1.3rem;
       padding: 1.25rem;
-      box-shadow: 0 24px 70px -48px rgba(15,23,42,0.55);
+      box-shadow: 0 24px 70px -48px rgba(15, 23, 42, 0.55);
     }
+
     body.dark .section-shell {
-      background: linear-gradient(135deg, rgba(15,23,42,0.75), rgba(15,23,42,0.65));
-      border-color: rgba(51,65,85,0.8);
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.75), rgba(15, 23, 42, 0.65));
+      border-color: rgba(51, 65, 85, 0.8);
     }
   </style>
 </head>
+
 <body>
-  <a href="#mainContent" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 bg-indigo-600 text-white px-3 py-2 rounded-lg">Skip to main content</a>
+  <a href="#mainContent"
+    class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 bg-indigo-600 text-white px-3 py-2 rounded-lg">Skip
+    to main content</a>
   <div id="appShell" class="min-h-screen flex">
     <!-- Sidebar -->
-    <aside class="sidebar w-64 text-slate-200 flex flex-col border-r border-slate-900" role="navigation" aria-label="Primary">
+    <aside class="sidebar w-64 text-slate-200 flex flex-col border-r border-slate-900" role="navigation"
+      aria-label="Primary">
       <div class="px-4 py-4 flex items-center gap-2 border-b border-slate-800">
         <div class="h-9 w-9 rounded-2xl bg-indigo-500 flex items-center justify-center text-white font-bold text-lg">
           T
@@ -386,34 +454,44 @@
       </div>
 
       <nav class="mt-4 flex-1 overflow-y-auto scrollbar-thin pb-2">
-        <button data-view="dashboard" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
+        <button data-view="dashboard"
+          class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
           <span>🏠</span><span>Dashboard</span>
         </button>
-        <button data-view="students" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
+        <button data-view="students"
+          class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
           <span>👥</span><span>Students</span>
         </button>
-        <button data-view="schedule" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
+        <button data-view="schedule"
+          class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
           <span>📅</span><span>Schedule</span>
         </button>
-        <button data-view="resources" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
+        <button data-view="resources"
+          class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
           <span>📚</span><span>Resources</span>
         </button>
-        <button id="navFinanceBtn" data-view="finance" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
+        <button id="navFinanceBtn" data-view="finance"
+          class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
           <span>💰</span><span>Finance</span>
         </button>
-        <button data-view="settings" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
+        <button data-view="settings"
+          class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
           <span>⚙️</span><span>Settings</span>
         </button>
-        <button id="navReportsBtn" data-view="reports" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
+        <button id="navReportsBtn" data-view="reports"
+          class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
           <span>📊</span><span>Reports</span>
         </button>
-        <button data-view="profile" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
+        <button data-view="profile"
+          class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition">
           <span>👤</span><span>Profile</span>
         </button>
-        <button data-view="portal" id="navPortalBtn" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition hidden">
+        <button data-view="portal" id="navPortalBtn"
+          class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition hidden">
           <span>📂</span><span>My portal</span>
         </button>
-        <button data-view="parent-portal" id="navParentPortalBtn" class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition hidden">
+        <button data-view="parent-portal" id="navParentPortalBtn"
+          class="nav-btn w-full text-left px-4 py-2 flex items-center gap-2 text-sm hover:bg-slate-800/60 transition hidden">
           <span>👪</span><span>Parent portal</span>
         </button>
       </nav>
@@ -428,29 +506,36 @@
         <div class="flex-1 max-w-xl">
           <div class="relative">
             <input id="globalSearchInput" type="search" placeholder="Search students, sessions, resources, invoices…"
-                   class="w-full rounded-2xl border border-slate-200 px-10 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white/80">
+              class="w-full rounded-2xl border border-slate-200 px-10 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white/80">
             <span class="absolute left-3 top-1.5">🔍</span>
-            <div id="globalSearchResults" class="absolute mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl text-xs hidden max-h-64 overflow-y-auto z-20"></div>
+            <div id="globalSearchResults"
+              class="absolute mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl text-xs hidden max-h-64 overflow-y-auto z-20">
+            </div>
           </div>
         </div>
 
         <!-- Quick actions -->
         <div class="flex items-center gap-2">
-          <button id="quickAddStudentBtn" data-owner-only class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 shadow-sm">
+          <button id="quickAddStudentBtn" data-owner-only
+            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 shadow-sm">
             ＋ Student
           </button>
-          <button id="quickAddSessionBtn" data-owner-only class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 shadow-sm">
+          <button id="quickAddSessionBtn" data-owner-only
+            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 shadow-sm">
             ＋ Session
           </button>
-          <button id="refreshBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl border border-slate-300 text-xs font-medium hover:bg-slate-50">
+          <button id="refreshBtn"
+            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl border border-slate-300 text-xs font-medium hover:bg-slate-50">
             ⟳ Refresh
           </button>
-          <button id="signOutBtn" class="hidden inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl border border-slate-300 text-xs font-medium hover:bg-slate-50">
+          <button id="signOutBtn"
+            class="hidden inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl border border-slate-300 text-xs font-medium hover:bg-slate-50">
             ⏏ Sign out
           </button>
 
           <!-- Theme toggle -->
-          <button id="themeToggleBtn" class="ml-2 inline-flex items-center justify-center h-8 w-8 rounded-full border border-slate-300 text-sm">
+          <button id="themeToggleBtn"
+            class="ml-2 inline-flex items-center justify-center h-8 w-8 rounded-full border border-slate-300 text-sm">
             🌙
           </button>
         </div>
@@ -460,7 +545,8 @@
       </div>
 
       <!-- Views container -->
-      <main id="viewsContainer" class="flex-1 overflow-y-auto bg-transparent px-8 py-8 space-y-8 max-w-7xl mx-auto w-full">
+      <main id="viewsContainer"
+        class="flex-1 overflow-y-auto bg-transparent px-8 py-8 space-y-8 max-w-7xl mx-auto w-full">
         <!-- Dashboard -->
         <section id="view-dashboard" class="view">
           <div class="section-shell space-y-6">
@@ -487,7 +573,7 @@
                     <div id="focusHomework" class="font-semibold">0</div>
                     <div class="text-[10px] text-slate-500">Due within 5 days</div>
                   </div>
-                    <div class="border border-slate-200 rounded-lg p-3 bg-white/70">
+                  <div class="border border-slate-200 rounded-lg p-3 bg-white/70">
                     <div class="text-[10px] text-slate-500">Overdue invoices</div>
                     <div id="focusInvoices" class="font-semibold text-rose-600">0</div>
                     <div class="text-[10px] text-slate-500">Follow up today</div>
@@ -594,7 +680,8 @@
                 <h2 class="text-lg font-semibold">Students</h2>
                 <p class="text-xs text-slate-500">Manage profiles, 360° timelines and subject mix.</p>
               </div>
-              <button id="addStudentBtn" data-owner-only class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 shadow-sm">
+              <button id="addStudentBtn" data-owner-only
+                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 shadow-sm">
                 ＋ Add student
               </button>
             </div>
@@ -622,7 +709,8 @@
                 <div class="border-t border-slate-200 mt-4 pt-3 space-y-2" data-owner-only>
                   <div class="flex items-center justify-between">
                     <h3 class="text-sm font-semibold">Parents</h3>
-                    <button id="addParentBtn" class="px-2 py-1 rounded-lg border border-slate-300 text-[11px]">＋ Add</button>
+                    <button id="addParentBtn" class="px-2 py-1 rounded-lg border border-slate-300 text-[11px]">＋
+                      Add</button>
                   </div>
                   <ul id="parentsList" class="space-y-2 text-xs"></ul>
                 </div>
@@ -630,160 +718,182 @@
 
               <!-- Student detail -->
               <div class="card p-4 col-span-2 max-h-[75vh] overflow-y-auto scrollbar-thin">
-              <div id="studentDetailEmpty" class="text-xs text-slate-500">
-                Select a student on the left to view their 360° panel.
-              </div>
-              <div id="studentDetail" class="hidden text-xs space-y-3">
-                <div class="flex items-center justify-between">
-                <div>
-                  <div id="studentDetailName" class="text-base font-semibold"></div>
-                  <div id="studentDetailMeta" class="text-[11px] text-slate-500"></div>
-                  <div id="studentContractMeta" class="text-[10px] text-slate-500"></div>
+                <div id="studentDetailEmpty" class="text-xs text-slate-500">
+                  Select a student on the left to view their 360° panel.
                 </div>
-                <div class="flex flex-wrap items-center gap-2">
-                  <span id="studentContractBadge" class="px-2 py-1 text-[11px] rounded-lg bg-rose-100 text-rose-700 font-semibold">INVALID – CONTRACT NOT SIGNED</span>
-                  <button id="studentContractLinkBtn" data-owner-only class="px-2 py-1 text-[10px] rounded-lg border border-slate-300 hover:bg-slate-50">Copy parent link</button>
-                  <button id="studentContractDeleteBtn" data-owner-only class="px-2 py-1 text-[10px] rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50 hidden">Remove contract</button>
-                </div>
-                <button id="editStudentBtn" data-owner-only class="px-2 py-1 text-[11px] rounded-lg border border-slate-300 hover:bg-slate-50">
-                  Edit
-                </button>
-                </div>
+                <div id="studentDetail" class="hidden text-xs space-y-3">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div id="studentDetailName" class="text-base font-semibold"></div>
+                      <div id="studentDetailMeta" class="text-[11px] text-slate-500"></div>
+                      <div id="studentContractMeta" class="text-[10px] text-slate-500"></div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span id="studentContractBadge"
+                        class="px-2 py-1 text-[11px] rounded-lg bg-rose-100 text-rose-700 font-semibold">INVALID –
+                        CONTRACT NOT SIGNED</span>
+                      <button id="studentContractLinkBtn" data-owner-only
+                        class="px-2 py-1 text-[10px] rounded-lg border border-slate-300 hover:bg-slate-50">Copy parent
+                        link</button>
+                      <button id="studentContractDeleteBtn" data-owner-only
+                        class="px-2 py-1 text-[10px] rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50 hidden">Remove
+                        contract</button>
+                    </div>
+                    <button id="editStudentBtn" data-owner-only
+                      class="px-2 py-1 text-[11px] rounded-lg border border-slate-300 hover:bg-slate-50">
+                      Edit
+                    </button>
+                  </div>
 
-                <!-- Subject mix bar -->
-                <div>
-                  <h4 class="text-[11px] font-semibold mb-1">Subject mix (last 30 days)</h4>
-                  <div class="w-full h-3 rounded-full bg-slate-100 overflow-hidden flex text-[10px]">
-                    <div id="mixPhysics" class="bg-indigo-500 h-full text-center text-white"></div>
-                    <div id="mixChemistry" class="bg-emerald-500 h-full text-center text-white"></div>
-                    <div id="mixMaths" class="bg-rose-500 h-full text-center text-white"></div>
+                  <!-- Subject mix bar -->
+                  <div>
+                    <h4 class="text-[11px] font-semibold mb-1">Subject mix (last 30 days)</h4>
+                    <div class="w-full h-3 rounded-full bg-slate-100 overflow-hidden flex text-[10px]">
+                      <div id="mixPhysics" class="bg-indigo-500 h-full text-center text-white"></div>
+                      <div id="mixChemistry" class="bg-emerald-500 h-full text-center text-white"></div>
+                      <div id="mixMaths" class="bg-rose-500 h-full text-center text-white"></div>
+                    </div>
+                    <div class="flex justify-between mt-1 text-[10px] text-slate-500">
+                      <span>Physics</span><span>Chemistry</span><span>Maths</span>
+                    </div>
                   </div>
-                  <div class="flex justify-between mt-1 text-[10px] text-slate-500">
-                    <span>Physics</span><span>Chemistry</span><span>Maths</span>
-                  </div>
-                </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <div class="border border-slate-200 rounded-lg p-2 bg-white/70">
-                    <div class="text-[10px] text-slate-500">Hours (last 30 days)</div>
-                    <div id="engagementHours" class="text-lg font-semibold">0</div>
-                  </div>
-                  <div class="border border-slate-200 rounded-lg p-2 bg-white/70">
-                    <div class="text-[10px] text-slate-500">Streak (weeks)</div>
-                    <div id="engagementStreak" class="text-lg font-semibold">0</div>
-                    <div class="text-[10px] text-slate-500" id="engagementNextGap"></div>
-                  </div>
-                  <div class="border border-slate-200 rounded-lg p-2 bg-white/70">
-                    <div class="text-[10px] text-slate-500">Homework completion</div>
-                    <div class="flex items-center justify-between">
-                      <div id="engagementHomework" class="text-lg font-semibold">0%</div>
-                      <div class="progress-track w-24">
-                        <div id="engagementHomeworkProgress" class="progress-thumb" style="width:0%"></div>
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <div class="border border-slate-200 rounded-lg p-2 bg-white/70">
+                      <div class="text-[10px] text-slate-500">Hours (last 30 days)</div>
+                      <div id="engagementHours" class="text-lg font-semibold">0</div>
+                    </div>
+                    <div class="border border-slate-200 rounded-lg p-2 bg-white/70">
+                      <div class="text-[10px] text-slate-500">Streak (weeks)</div>
+                      <div id="engagementStreak" class="text-lg font-semibold">0</div>
+                      <div class="text-[10px] text-slate-500" id="engagementNextGap"></div>
+                    </div>
+                    <div class="border border-slate-200 rounded-lg p-2 bg-white/70">
+                      <div class="text-[10px] text-slate-500">Homework completion</div>
+                      <div class="flex items-center justify-between">
+                        <div id="engagementHomework" class="text-lg font-semibold">0%</div>
+                        <div class="progress-track w-24">
+                          <div id="engagementHomeworkProgress" class="progress-thumb" style="width:0%"></div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  <div class="border border-slate-200 rounded-lg p-2 bg-white/70">
-                    <div class="flex items-center justify-between mb-1">
-                      <h4 class="text-[11px] font-semibold">Follow-ups</h4>
-                      <span class="hint">Personal tasks</span>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div class="border border-slate-200 rounded-lg p-2 bg-white/70">
+                      <div class="flex items-center justify-between mb-1">
+                        <h4 class="text-[11px] font-semibold">Follow-ups</h4>
+                        <span class="hint">Personal tasks</span>
+                      </div>
+                      <ul id="studentTodosList" class="space-y-1 text-[11px]"></ul>
+                      <form id="studentTodoForm" class="mt-2 grid grid-cols-3 gap-1 text-[11px]">
+                        <input name="todoText" placeholder="Email parent…"
+                          class="col-span-2 border border-slate-300 rounded-lg px-2 py-1">
+                        <input name="todoDue" type="date" class="border border-slate-300 rounded-lg px-2 py-1">
+                        <button class="col-span-3 bg-slate-900 text-white rounded-lg py-1">Add follow-up</button>
+                      </form>
                     </div>
-                    <ul id="studentTodosList" class="space-y-1 text-[11px]"></ul>
-                    <form id="studentTodoForm" class="mt-2 grid grid-cols-3 gap-1 text-[11px]">
-                      <input name="todoText" placeholder="Email parent…" class="col-span-2 border border-slate-300 rounded-lg px-2 py-1">
-                      <input name="todoDue" type="date" class="border border-slate-300 rounded-lg px-2 py-1">
-                      <button class="col-span-3 bg-slate-900 text-white rounded-lg py-1">Add follow-up</button>
-                    </form>
-                  </div>
-                  <div class="border border-slate-200 rounded-lg p-2 bg-white/70">
-                    <div class="flex items-center justify-between mb-1">
-                      <h4 class="text-[11px] font-semibold">Check-ins</h4>
-                      <span class="hint">Timestamped notes</span>
+                    <div class="border border-slate-200 rounded-lg p-2 bg-white/70">
+                      <div class="flex items-center justify-between mb-1">
+                        <h4 class="text-[11px] font-semibold">Check-ins</h4>
+                        <span class="hint">Timestamped notes</span>
+                      </div>
+                      <ul id="studentCheckinsList"
+                        class="space-y-1 text-[11px] max-h-32 overflow-y-auto scrollbar-thin"></ul>
+                      <form id="studentCheckinForm" class="mt-2 space-y-1 text-[11px]">
+                        <textarea name="checkinText" rows="2"
+                          class="w-full border border-slate-300 rounded-lg px-2 py-1"
+                          placeholder="Short note..."></textarea>
+                        <button class="w-full bg-indigo-600 text-white rounded-lg py-1">Add check-in</button>
+                      </form>
                     </div>
-                    <ul id="studentCheckinsList" class="space-y-1 text-[11px] max-h-32 overflow-y-auto scrollbar-thin"></ul>
-                    <form id="studentCheckinForm" class="mt-2 space-y-1 text-[11px]">
-                      <textarea name="checkinText" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-1" placeholder="Short note..."></textarea>
-                      <button class="w-full bg-indigo-600 text-white rounded-lg py-1">Add check-in</button>
-                    </form>
-                  </div>
-                  <div class="border border-slate-200 rounded-lg p-2 bg-white/70">
-                    <div class="flex items-center justify-between mb-1">
-                      <h4 class="text-[11px] font-semibold">Lesson contracts</h4>
-                      <button id="uploadContractBtn" class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50">Upload scan</button>
+                    <div class="border border-slate-200 rounded-lg p-2 bg-white/70">
+                      <div class="flex items-center justify-between mb-1">
+                        <h4 class="text-[11px] font-semibold">Lesson contracts</h4>
+                        <button id="uploadContractBtn"
+                          class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50">Upload
+                          scan</button>
+                      </div>
+                      <ul id="studentContractsList"
+                        class="space-y-1 text-[11px] max-h-32 overflow-y-auto scrollbar-thin"></ul>
+                      <p class="hint mt-1">PDF or image stored locally; attach one per agreement.</p>
                     </div>
-                    <ul id="studentContractsList" class="space-y-1 text-[11px] max-h-32 overflow-y-auto scrollbar-thin"></ul>
-                    <p class="hint mt-1">PDF or image stored locally; attach one per agreement.</p>
                   </div>
-                </div>
 
-                <!-- Tabs for detail -->
-        <div class="border-b border-slate-200 flex gap-4 text-[11px]" id="studentDetailTabs">
-          <button data-student-tab="timeline" class="student-tab border-b-2 border-indigo-500 pb-1 font-medium">
-            Timeline
-          </button>
-          <button data-student-tab="sessions" class="student-tab pb-1 text-slate-500">
-            Sessions
-          </button>
-          <button data-student-tab="documents" class="student-tab pb-1 text-slate-500">
-            Documents
-          </button>
-          <button data-student-tab="finance" class="student-tab pb-1 text-slate-500">
-            Finance
-          </button>
-          <button data-student-tab="messages" class="student-tab pb-1 text-slate-500">
-            Messages
-          </button>
-        </div>
-        <div id="studentUnsignedNotice" class="border border-rose-300 bg-rose-50 text-rose-800 text-[11px] rounded-lg px-3 py-2 hidden">
-          Contract not signed. Share the parent link so the guardian can sign. Some features may be limited until signing is complete.
-        </div>
-
-                <div id="studentTab-timeline" class="student-tab-pane space-y-2 mt-2">
-                  <ul id="studentTimeline" class="space-y-2 text-[11px]"></ul>
-                </div>
-                <div id="studentTab-sessions" class="student-tab-pane hidden mt-2">
-                  <ul id="studentSessionsList" class="space-y-2 text-[11px]"></ul>
-                </div>
-                <div id="studentTab-documents" class="student-tab-pane hidden mt-2">
-                  <div class="flex items-center justify-between mb-1">
-                    <h4 class="text-[11px] font-semibold">Documents</h4>
-                    <button id="addDocumentForStudentBtn" data-owner-only class="px-2 py-1 rounded-lg border border-slate-300 text-[10px] hover:bg-slate-50">
-                      ＋ Add document
+                  <!-- Tabs for detail -->
+                  <div class="border-b border-slate-200 flex gap-4 text-[11px]" id="studentDetailTabs">
+                    <button data-student-tab="timeline"
+                      class="student-tab border-b-2 border-indigo-500 pb-1 font-medium">
+                      Timeline
+                    </button>
+                    <button data-student-tab="sessions" class="student-tab pb-1 text-slate-500">
+                      Sessions
+                    </button>
+                    <button data-student-tab="documents" class="student-tab pb-1 text-slate-500">
+                      Documents
+                    </button>
+                    <button data-student-tab="finance" class="student-tab pb-1 text-slate-500">
+                      Finance
+                    </button>
+                    <button data-student-tab="messages" class="student-tab pb-1 text-slate-500">
+                      Messages
                     </button>
                   </div>
-                  <ul id="studentDocumentsList" class="space-y-2 text-[11px]"></ul>
+                  <div id="studentUnsignedNotice"
+                    class="border border-rose-300 bg-rose-50 text-rose-800 text-[11px] rounded-lg px-3 py-2 hidden">
+                    Contract not signed. Share the parent link so the guardian can sign. Some features may be limited
+                    until signing is complete.
+                  </div>
+
+                  <div id="studentTab-timeline" class="student-tab-pane space-y-2 mt-2">
+                    <ul id="studentTimeline" class="space-y-2 text-[11px]"></ul>
+                  </div>
+                  <div id="studentTab-sessions" class="student-tab-pane hidden mt-2">
+                    <ul id="studentSessionsList" class="space-y-2 text-[11px]"></ul>
+                  </div>
+                  <div id="studentTab-documents" class="student-tab-pane hidden mt-2">
+                    <div class="flex items-center justify-between mb-1">
+                      <h4 class="text-[11px] font-semibold">Documents</h4>
+                      <button id="addDocumentForStudentBtn" data-owner-only
+                        class="px-2 py-1 rounded-lg border border-slate-300 text-[10px] hover:bg-slate-50">
+                        ＋ Add document
+                      </button>
+                    </div>
+                    <ul id="studentDocumentsList" class="space-y-2 text-[11px]"></ul>
+                  </div>
+                  <div id="studentTab-finance" class="student-tab-pane hidden mt-2">
+                    <div class="flex items-center justify-between mb-1">
+                      <h4 class="text-[11px] font-semibold">Invoices & balance</h4>
+                      <button id="studentCreateInvoiceBtn" data-owner-only
+                        class="px-2 py-1 rounded-lg border border-emerald-500 text-emerald-600 text-[10px] hover:bg-emerald-50">
+                        ＋ Invoice for this student
+                      </button>
+                    </div>
+                    <div id="studentBalance" class="text-xs mb-1"></div>
+                    <ul id="studentInvoicesList" class="space-y-1 text-[11px]"></ul>
+                  </div>
+                  <div id="studentTab-messages" class="student-tab-pane hidden mt-2">
+                    <div class="flex items-center justify-between mb-1">
+                      <h4 class="text-[11px] font-semibold">Messages</h4>
+                      <div class="flex items-center gap-2">
+                        <span class="hint">Owner & student thread</span>
+                        <button id="studentMessageAiBtn" data-owner-only
+                          class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50">
+                          Draft with AI
+                        </button>
+                      </div>
+                    </div>
+                    <ul id="studentMessagesList" class="space-y-1 text-[11px] max-h-64 overflow-y-auto scrollbar-thin">
+                    </ul>
+                    <form id="studentMessageForm" class="mt-2 space-y-1 text-[11px]">
+                      <textarea name="messageText" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-1"
+                        placeholder="Write a note to this student"></textarea>
+                      <button class="w-full bg-slate-900 text-white rounded-lg py-1">Send</button>
+                    </form>
+                  </div>
                 </div>
-        <div id="studentTab-finance" class="student-tab-pane hidden mt-2">
-          <div class="flex items-center justify-between mb-1">
-            <h4 class="text-[11px] font-semibold">Invoices & balance</h4>
-            <button id="studentCreateInvoiceBtn" data-owner-only class="px-2 py-1 rounded-lg border border-emerald-500 text-emerald-600 text-[10px] hover:bg-emerald-50">
-              ＋ Invoice for this student
-            </button>
-          </div>
-          <div id="studentBalance" class="text-xs mb-1"></div>
-          <ul id="studentInvoicesList" class="space-y-1 text-[11px]"></ul>
-        </div>
-        <div id="studentTab-messages" class="student-tab-pane hidden mt-2">
-          <div class="flex items-center justify-between mb-1">
-            <h4 class="text-[11px] font-semibold">Messages</h4>
-            <div class="flex items-center gap-2">
-              <span class="hint">Owner & student thread</span>
-              <button id="studentMessageAiBtn" data-owner-only class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50">
-                Draft with AI
-              </button>
+              </div>
             </div>
-          </div>
-          <ul id="studentMessagesList" class="space-y-1 text-[11px] max-h-64 overflow-y-auto scrollbar-thin"></ul>
-          <form id="studentMessageForm" class="mt-2 space-y-1 text-[11px]">
-            <textarea name="messageText" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-1" placeholder="Write a note to this student"></textarea>
-            <button class="w-full bg-slate-900 text-white rounded-lg py-1">Send</button>
-          </form>
-        </div>
-      </div>
-            </div>
-          </div>
         </section>
 
         <!-- Schedule -->
@@ -796,10 +906,14 @@
                 <p class="text-xs text-slate-500">Week grid, quick stats, and conflict signals.</p>
               </div>
               <div class="flex items-center gap-2">
-                <button id="schedulePrevWeek" class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs hover:bg-slate-50">← Prev</button>
-                <button id="scheduleToday" class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs hover:bg-slate-50">Today</button>
-                <button id="scheduleNextWeek" class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs hover:bg-slate-50">Next →</button>
-                <button id="addSessionBtn" data-owner-only class="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 shadow-sm">
+                <button id="schedulePrevWeek"
+                  class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs hover:bg-slate-50">← Prev</button>
+                <button id="scheduleToday"
+                  class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs hover:bg-slate-50">Today</button>
+                <button id="scheduleNextWeek"
+                  class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs hover:bg-slate-50">Next →</button>
+                <button id="addSessionBtn" data-owner-only
+                  class="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 shadow-sm">
                   ＋ Session
                 </button>
               </div>
@@ -810,12 +924,17 @@
               <div class="card p-5 col-span-2 space-y-3 h-full">
                 <div class="flex items-center justify-between text-xs">
                   <div class="flex items-center gap-2">
-                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-700"><span class="h-2 w-2 rounded-full bg-indigo-500"></span> Physics</span>
-                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-700"><span class="h-2 w-2 rounded-full bg-emerald-500"></span> Chemistry</span>
-                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-700"><span class="h-2 w-2 rounded-full bg-rose-500"></span> Maths</span>
+                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-700"><span
+                        class="h-2 w-2 rounded-full bg-indigo-500"></span> Physics</span>
+                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-700"><span
+                        class="h-2 w-2 rounded-full bg-emerald-500"></span> Chemistry</span>
+                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-700"><span
+                        class="h-2 w-2 rounded-full bg-rose-500"></span> Maths</span>
                   </div>
                   <div class="flex items-center gap-2">
-                    <button id="exportIcsBtn" class="px-2 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50">Export ICS</button>
+                    <button id="exportIcsBtn"
+                      class="px-2 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50">Export
+                      ICS</button>
                     <div id="scheduleWeekLabel" class="font-medium text-slate-700"></div>
                   </div>
                 </div>
@@ -826,8 +945,12 @@
                 <div class="flex items-center justify-between text-[10px] text-slate-500">
                   <span>Click a session chip to open quick actions.</span>
                   <span class="flex items-center gap-2">
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">⚠ Clash</span>
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">⏱ Tight gap</span>
+                    <span
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">⚠
+                      Clash</span>
+                    <span
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">⏱
+                      Tight gap</span>
                   </span>
                 </div>
               </div>
@@ -853,7 +976,8 @@
                     <h3 class="text-sm font-semibold">Tight transitions</h3>
                     <span class="text-[10px] text-slate-500">&lt; 20 min gap</span>
                   </div>
-                  <ul id="tightTransitionsList" class="space-y-1 max-h-32 overflow-y-auto scrollbar-thin text-[11px]"></ul>
+                  <ul id="tightTransitionsList" class="space-y-1 max-h-32 overflow-y-auto scrollbar-thin text-[11px]">
+                  </ul>
                 </div>
               </div>
             </div>
@@ -865,51 +989,53 @@
           <div class="section-shell space-y-4">
             <div class="flex items-center justify-between mb-1">
               <div>
-            <h2 class="text-lg font-semibold">Resources</h2>
-            <p class="text-xs text-slate-500">Worksheets, lectures, and homework tracking. Upload files for quick download.</p>
+                <h2 class="text-lg font-semibold">Resources</h2>
+                <p class="text-xs text-slate-500">Worksheets, lectures, and homework tracking. Upload files for quick
+                  download.</p>
               </div>
-              <button id="addResourceBtn" data-owner-only class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 shadow-sm">
+              <button id="addResourceBtn" data-owner-only
+                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 shadow-sm">
                 ＋ Add resource
               </button>
             </div>
 
-          <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div class="card p-4 col-span-2 max-h-[75vh] overflow-y-auto scrollbar-thin">
-              <div class="flex items-center justify-between mb-2 text-xs">
-                <div class="flex gap-2">
-                  <select id="resourceSubjectFilter" class="border border-slate-300 rounded-xl px-2 py-1 text-xs">
-                    <option value="">All subjects</option>
-                    <option value="Physics">Physics</option>
-                    <option value="Chemistry">Chemistry</option>
-                    <option value="Maths">Maths</option>
-                  </select>
-                  <input id="resourceSearchInput" type="text" placeholder="Search resources"
-                         class="border border-slate-300 rounded-xl px-2 py-1 text-xs w-40">
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <div class="card p-4 col-span-2 max-h-[75vh] overflow-y-auto scrollbar-thin">
+                <div class="flex items-center justify-between mb-2 text-xs">
+                  <div class="flex gap-2">
+                    <select id="resourceSubjectFilter" class="border border-slate-300 rounded-xl px-2 py-1 text-xs">
+                      <option value="">All subjects</option>
+                      <option value="Physics">Physics</option>
+                      <option value="Chemistry">Chemistry</option>
+                      <option value="Maths">Maths</option>
+                    </select>
+                    <input id="resourceSearchInput" type="text" placeholder="Search resources"
+                      class="border border-slate-300 rounded-xl px-2 py-1 text-xs w-40">
+                  </div>
                 </div>
+                <div id="resourceTagFilters" class="flex flex-wrap gap-2 mb-3 text-[10px]"></div>
+                <ul id="resourcesList" class="space-y-2 text-xs"></ul>
               </div>
-              <div id="resourceTagFilters" class="flex flex-wrap gap-2 mb-3 text-[10px]"></div>
-              <ul id="resourcesList" class="space-y-2 text-xs"></ul>
-            </div>
 
-            <!-- Homework board -->
-            <div class="card p-4 col-span-1 max-h-[75vh] overflow-y-auto scrollbar-thin text-xs">
-              <h3 class="text-sm font-semibold mb-2">Homework board</h3>
-              <div class="grid grid-cols-3 gap-2 text-[11px]">
-                <div>
-                  <div class="font-semibold mb-1">To Do</div>
-                  <ul id="hwTodo" class="space-y-1"></ul>
+              <!-- Homework board -->
+              <div class="card p-4 col-span-1 max-h-[75vh] overflow-y-auto scrollbar-thin text-xs">
+                <h3 class="text-sm font-semibold mb-2">Homework board</h3>
+                <div class="grid grid-cols-3 gap-2 text-[11px]">
+                  <div>
+                    <div class="font-semibold mb-1">To Do</div>
+                    <ul id="hwTodo" class="space-y-1"></ul>
+                  </div>
+                  <div>
+                    <div class="font-semibold mb-1">In progress</div>
+                    <ul id="hwInProgress" class="space-y-1"></ul>
+                  </div>
+                  <div>
+                    <div class="font-semibold mb-1">Completed</div>
+                    <ul id="hwDone" class="space-y-1"></ul>
+                  </div>
                 </div>
-                <div>
-                  <div class="font-semibold mb-1">In progress</div>
-                  <ul id="hwInProgress" class="space-y-1"></ul>
-                </div>
-                <div>
-                  <div class="font-semibold mb-1">Completed</div>
-                  <ul id="hwDone" class="space-y-1"></ul>
-                </div>
+                <p class="mt-2 text-[10px] text-slate-500">Change status using the dropdown on each card.</p>
               </div>
-              <p class="mt-2 text-[10px] text-slate-500">Change status using the dropdown on each card.</p>
-            </div>
             </div>
           </div>
         </section>
@@ -922,44 +1048,47 @@
                 <h2 class="text-lg font-semibold">Finance</h2>
                 <p class="text-xs text-slate-500">Invoices, balances & overdue reminders.</p>
               </div>
-              <button id="addInvoiceBtn" data-owner-only class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 shadow-sm">
+              <button id="addInvoiceBtn" data-owner-only
+                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 shadow-sm">
                 ＋ Create invoice
               </button>
             </div>
 
             <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 text-xs">
               <div class="card p-4 col-span-2 max-h-[75vh] overflow-y-auto scrollbar-thin">
-              <h3 class="text-sm font-semibold mb-2">Student balances</h3>
-              <table class="w-full text-[11px]">
-                <thead>
-                <tr class="text-left text-[10px] text-slate-500 border-b border-slate-200">
-                  <th class="py-1 pr-1">Student</th>
-                  <th class="py-1 pr-1 text-right">Balance</th>
-                  <th class="py-1 pr-1 text-right">Unpaid invoices</th>
-                </tr>
-                </thead>
-                <tbody id="financeStudentTable"></tbody>
-              </table>
+                <h3 class="text-sm font-semibold mb-2">Student balances</h3>
+                <table class="w-full text-[11px]">
+                  <thead>
+                    <tr class="text-left text-[10px] text-slate-500 border-b border-slate-200">
+                      <th class="py-1 pr-1">Student</th>
+                      <th class="py-1 pr-1 text-right">Balance</th>
+                      <th class="py-1 pr-1 text-right">Unpaid invoices</th>
+                    </tr>
+                  </thead>
+                  <tbody id="financeStudentTable"></tbody>
+                </table>
+              </div>
+              <div class="card p-4 col-span-1 max-h-[75vh] overflow-y-auto scrollbar-thin">
+                <h3 class="text-sm font-semibold mb-2">Overdue invoices</h3>
+                <ul id="overdueInvoicesList" class="space-y-2 text-[11px]"></ul>
+                <p class="mt-2 text-[10px] text-slate-500">Click “Reminder text” to generate a polite message you can
+                  paste into email or chat.</p>
+              </div>
             </div>
-            <div class="card p-4 col-span-1 max-h-[75vh] overflow-y-auto scrollbar-thin">
-              <h3 class="text-sm font-semibold mb-2">Overdue invoices</h3>
-              <ul id="overdueInvoicesList" class="space-y-2 text-[11px]"></ul>
-              <p class="mt-2 text-[10px] text-slate-500">Click “Reminder text” to generate a polite message you can paste into email or chat.</p>
-            </div>
-          </div>
 
-          <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 text-xs mt-4">
-            <div class="card p-4 col-span-2">
-              <h3 class="text-sm font-semibold mb-2">Unbilled hours</h3>
-              <ul id="unbilledList" class="space-y-2 text-[11px]"></ul>
-              <p class="mt-2 text-[10px] text-slate-500">Calculated from sessions since the last invoice per student (using their rate).</p>
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 text-xs mt-4">
+              <div class="card p-4 col-span-2">
+                <h3 class="text-sm font-semibold mb-2">Unbilled hours</h3>
+                <ul id="unbilledList" class="space-y-2 text-[11px]"></ul>
+                <p class="mt-2 text-[10px] text-slate-500">Calculated from sessions since the last invoice per student
+                  (using their rate).</p>
+              </div>
+              <div class="card p-4 col-span-1">
+                <h3 class="text-sm font-semibold mb-2">Cashflow forecast (14 days)</h3>
+                <div id="forecastSummary" class="text-sm font-semibold"></div>
+                <ul id="forecastList" class="space-y-1 text-[11px] mt-2"></ul>
+              </div>
             </div>
-            <div class="card p-4 col-span-1">
-              <h3 class="text-sm font-semibold mb-2">Cashflow forecast (14 days)</h3>
-              <div id="forecastSummary" class="text-sm font-semibold"></div>
-              <ul id="forecastList" class="space-y-1 text-[11px] mt-2"></ul>
-            </div>
-          </div>
         </section>
 
         <!-- Settings -->
@@ -974,59 +1103,68 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div class="card p-5 text-xs space-y-3">
-              <h3 class="text-sm font-semibold mb-1">Appearance</h3>
-              <div class="flex items-center justify-between">
-                <span>Theme</span>
-                <select id="settingsThemeSelect" class="border border-slate-300 rounded-xl px-2 py-1 text-xs">
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                </select>
+                <h3 class="text-sm font-semibold mb-1">Appearance</h3>
+                <div class="flex items-center justify-between">
+                  <span>Theme</span>
+                  <select id="settingsThemeSelect" class="border border-slate-300 rounded-xl px-2 py-1 text-xs">
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                  </select>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span>Layout density</span>
+                  <select id="settingsDensitySelect" class="border border-slate-300 rounded-xl px-2 py-1 text-xs">
+                    <option value="comfortable">Comfortable</option>
+                    <option value="compact">Compact</option>
+                  </select>
+                </div>
               </div>
-              <div class="flex items-center justify-between">
-                <span>Layout density</span>
-                <select id="settingsDensitySelect" class="border border-slate-300 rounded-xl px-2 py-1 text-xs">
-                  <option value="comfortable">Comfortable</option>
-                  <option value="compact">Compact</option>
-                </select>
-              </div>
-            </div>
 
-            <div class="card p-5 text-xs space-y-3">
-              <h3 class="text-sm font-semibold mb-1">Goals & defaults</h3>
-              <div class="flex items-center justify-between gap-2">
-                <span>Weekly hours goal</span>
-                <input id="settingsWeeklyGoal" type="number" step="0.5" class="border border-slate-300 rounded-xl px-2 py-1 text-xs w-24">
+              <div class="card p-5 text-xs space-y-3">
+                <h3 class="text-sm font-semibold mb-1">Goals & defaults</h3>
+                <div class="flex items-center justify-between gap-2">
+                  <span>Weekly hours goal</span>
+                  <input id="settingsWeeklyGoal" type="number" step="0.5"
+                    class="border border-slate-300 rounded-xl px-2 py-1 text-xs w-24">
+                </div>
+                <div class="flex items-center justify-between gap-2">
+                  <span>Monthly income goal (R)</span>
+                  <input id="settingsMonthlyGoal" type="number" step="100"
+                    class="border border-slate-300 rounded-xl px-2 py-1 text-xs w-24">
+                </div>
+                <div class="flex items-center justify-between gap-2">
+                  <span>Default session duration (h)</span>
+                  <input id="settingsDefaultDuration" type="number" step="0.25"
+                    class="border border-slate-300 rounded-xl px-2 py-1 text-xs w-24">
+                </div>
+                <div>
+                  <label class="block text-[11px] mb-1">Weekly reflection note</label>
+                  <textarea id="settingsReflection" rows="3"
+                    class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]"
+                    placeholder="What matters this week?"></textarea>
+                </div>
               </div>
-              <div class="flex items-center justify-between gap-2">
-                <span>Monthly income goal (R)</span>
-                <input id="settingsMonthlyGoal" type="number" step="100" class="border border-slate-300 rounded-xl px-2 py-1 text-xs w-24">
-              </div>
-              <div class="flex items-center justify-between gap-2">
-                <span>Default session duration (h)</span>
-                <input id="settingsDefaultDuration" type="number" step="0.25" class="border border-slate-300 rounded-xl px-2 py-1 text-xs w-24">
-              </div>
-              <div>
-                <label class="block text-[11px] mb-1">Weekly reflection note</label>
-                <textarea id="settingsReflection" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]" placeholder="What matters this week?"></textarea>
-              </div>
-            </div>
 
-            <div class="card p-5 text-xs space-y-3">
-              <h3 class="text-sm font-semibold mb-1">Data backup</h3>
-              <p>Export your dashboard data as JSON and paste it somewhere safe. You can import it later.</p>
-              <div class="flex gap-2">
-                <button id="exportDataBtn" class="px-3 py-1.5 rounded-2xl bg-slate-900 text-white text-xs shadow-sm">Export</button>
-                <button id="importDataBtn" class="px-3 py-1.5 rounded-2xl border border-slate-300 text-xs">Import</button>
+              <div class="card p-5 text-xs space-y-3">
+                <h3 class="text-sm font-semibold mb-1">Data backup</h3>
+                <p>Export your dashboard data as JSON and paste it somewhere safe. You can import it later.</p>
+                <div class="flex gap-2">
+                  <button id="exportDataBtn"
+                    class="px-3 py-1.5 rounded-2xl bg-slate-900 text-white text-xs shadow-sm">Export</button>
+                  <button id="importDataBtn"
+                    class="px-3 py-1.5 rounded-2xl border border-slate-300 text-xs">Import</button>
+                </div>
+                <textarea id="backupTextarea" rows="5"
+                  class="mt-2 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]"
+                  placeholder="Exported JSON will appear here. Paste JSON here to import."></textarea>
               </div>
-              <textarea id="backupTextarea" rows="5" class="mt-2 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]" placeholder="Exported JSON will appear here. Paste JSON here to import."></textarea>
-            </div>
 
-            <div class="card p-5 text-xs space-y-3">
-              <h3 class="text-sm font-semibold mb-1">Activity log</h3>
-              <p class="text-[11px] text-slate-500">Recent actions for this account (last 25).</p>
-              <ul id="activityLogList" class="space-y-1 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+              <div class="card p-5 text-xs space-y-3">
+                <h3 class="text-sm font-semibold mb-1">Activity log</h3>
+                <p class="text-[11px] text-slate-500">Recent actions for this account (last 25).</p>
+                <ul id="activityLogList" class="space-y-1 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+              </div>
             </div>
-          </div>
         </section>
 
         <!-- Profile -->
@@ -1043,7 +1181,8 @@
               <div class="card p-5 space-y-2">
                 <div class="flex items-center justify-between">
                   <h3 class="text-sm font-semibold">Account</h3>
-                  <span id="profileEmailVerified" class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Unverified</span>
+                  <span id="profileEmailVerified"
+                    class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Unverified</span>
                 </div>
                 <div class="text-[11px] text-slate-500">Email</div>
                 <div id="profileEmail" class="text-sm font-semibold">—</div>
@@ -1076,9 +1215,11 @@
                   <span class="text-[10px] text-rose-600">Irreversible</span>
                 </div>
                 <p class="text-[11px] text-rose-700">
-                  This deletes your account and all associated data (students, sessions, invoices, resources, notes). You’ll need to sign up again to use the dashboard.
+                  This deletes your account and all associated data (students, sessions, invoices, resources, notes).
+                  You’ll need to sign up again to use the dashboard.
                 </p>
-                <button id="deleteAccountBtn" class="px-3 py-1.5 rounded-xl border border-rose-400 bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700">
+                <button id="deleteAccountBtn"
+                  class="px-3 py-1.5 rounded-xl border border-rose-400 bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700">
                   Delete my account
                 </button>
                 <div id="deleteAccountStatus" class="text-[11px] text-rose-700"></div>
@@ -1096,29 +1237,9 @@
                 <p class="text-xs text-slate-500">Your schedule, homework, invoices, and resources.</p>
               </div>
             </div>
-            <div id="portalBlocker" class="hidden border border-rose-300 bg-rose-50 text-rose-800 rounded-lg px-3 py-2 text-xs">
+            <div id="portalBlocker"
+              class="hidden border border-rose-300 bg-rose-50 text-rose-800 rounded-lg px-3 py-2 text-xs">
               INVALID – CONTRACT NOT SIGNED. Ask your parent/guardian to sign the contract to unlock this portal.
-            </div>
-
-            <!-- Student ↔ Parent linking -->
-            <div class="card p-4 space-y-3">
-              <div class="flex items-center justify-between">
-                <div>
-                  <h3 class="text-sm font-semibold">Parent linking</h3>
-                  <p class="text-[11px] text-slate-500">Share this link code with your parent. Approve their request when it appears below.</p>
-                </div>
-                <button id="regenLinkCodeBtn" class="text-[11px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50">Regenerate code</button>
-              </div>
-              <div class="flex items-center gap-3">
-                <div class="font-mono text-base bg-slate-100 px-3 py-2 rounded-lg" id="studentLinkCodeValue">—</div>
-                <span id="studentLinkStatus" class="text-[11px] text-slate-600"></span>
-              </div>
-              <div>
-                <h4 class="text-[11px] font-semibold mb-1">Pending parent requests</h4>
-                <ul id="studentLinkRequests" class="space-y-1 text-[11px]"></ul>
-                <div id="studentLinkEmpty" class="text-[11px] text-slate-500">No pending requests.</div>
-              </div>
-              <div id="studentGateSummary" class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 hidden"></div>
             </div>
 
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
@@ -1162,7 +1283,9 @@
                   <h3 class="text-sm font-semibold">AI Study Helper</h3>
                   <span class="hint">Uses recent lessons/resources</span>
                 </div>
-                <textarea id="portalAiQuestion" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]" placeholder="Ask a question about your lessons or resources"></textarea>
+                <textarea id="portalAiQuestion" rows="2"
+                  class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]"
+                  placeholder="Ask a question about your lessons or resources"></textarea>
                 <div class="flex items-center gap-2">
                   <button id="portalAiAskBtn" class="px-3 py-1 rounded-lg bg-indigo-600 text-white text-xs">Ask</button>
                   <span id="portalAiStatus" class="text-[10px] text-slate-500"></span>
@@ -1223,15 +1346,6 @@
                 <p class="text-xs text-slate-500">Linked students, schedules, homework, invoices, and messages.</p>
               </div>
             </div>
-            <div class="card p-4 space-y-2">
-              <h3 class="text-sm font-semibold">Link to your child</h3>
-              <form id="parentLinkForm" class="flex flex-col sm:flex-row gap-2 text-xs">
-                <input id="parentLinkCodeInput" type="text" class="border border-slate-300 rounded-lg px-3 py-2 flex-1" placeholder="Enter student link code" required>
-                <button type="submit" class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700">Request link</button>
-              </form>
-              <div id="parentLinkMsg" class="text-[11px] text-slate-600"></div>
-              <div id="parentLinkStatuses" class="text-[11px] text-slate-700 space-y-2"></div>
-            </div>
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
               <div class="card p-4 space-y-2">
                 <h3 class="text-sm font-semibold">Linked students</h3>
@@ -1269,25 +1383,34 @@
   </div>
 
   <!-- Landing Page -->
-  <div id="landingPage" class="fixed inset-0 z-50 bg-gradient-to-br from-indigo-50 via-white to-cyan-50 text-slate-900 hidden overflow-y-auto">
-    <div class="max-w-6xl mx-auto px-6 py-12 space-y-12">
-      <header class="flex items-center justify-between">
+  <div id="landingPage"
+    class="fixed inset-0 z-50 bg-gradient-to-br from-indigo-50 via-white to-cyan-50 text-slate-900 hidden overflow-y-auto">
+    <div class="max-w-5xl mx-auto px-6 py-12">
+      <header class="flex items-center justify-between mb-10">
         <div class="text-xl font-bold text-indigo-700">Tutor Control Center</div>
         <div class="flex gap-3">
-          <a href="./login.html" class="px-4 py-2 rounded-full border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-sm font-semibold">Sign in</a>
-          <a href="./signup.html" class="px-4 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold">Create account</a>
+          <a href="./login.html"
+            class="px-4 py-2 rounded-full border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-sm font-semibold">Sign
+            in</a>
+          <a href="./signup.html"
+            class="px-4 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold">Get
+            started</a>
         </div>
       </header>
-
-      <!-- Hero -->
       <div class="grid md:grid-cols-2 gap-10 items-center">
         <div class="space-y-4">
           <p class="text-indigo-600 text-xs font-semibold tracking-wide uppercase">Physics • Chemistry • Maths</p>
-          <h1 class="text-3xl md:text-4xl font-bold leading-tight">Secure tutoring dashboard for students, parents, and the tutor.</h1>
-          <p class="text-slate-600 text-sm md:text-base">One platform for contracts, prepaid invoices (one month in advance), scheduling, resources, and transparent communication. Students and parents each get a tailored portal.</p>
+          <h1 class="text-3xl md:text-4xl font-bold leading-tight">A private tutoring hub for students and parents.</h1>
+          <p class="text-slate-600 text-sm md:text-base">Schedule lessons, track invoices (paid one month in advance),
+            share resources, and keep contracts signed and stored securely. Students and parents each see a tailored
+            portal.</p>
           <div class="flex flex-wrap gap-3">
-            <a href="./signup.html" class="px-4 py-2 rounded-full bg-slate-900 text-white hover:bg-slate-800 text-sm font-semibold">Create account</a>
-            <a href="./login.html" class="px-4 py-2 rounded-full border border-slate-300 text-sm font-semibold hover:bg-slate-100">I already have an account</a>
+            <a href="./signup.html"
+              class="px-4 py-2 rounded-full bg-slate-900 text-white hover:bg-slate-800 text-sm font-semibold">Create
+              account</a>
+            <a href="./login.html"
+              class="px-4 py-2 rounded-full border border-slate-300 text-sm font-semibold hover:bg-slate-100">I already
+              have an account</a>
           </div>
           <ul class="text-slate-700 text-sm space-y-2 mt-4">
             <li>• Parent & student portals with contract gating</li>
@@ -1332,177 +1455,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Metrics + badges -->
-      <div class="grid md:grid-cols-4 gap-4 text-center text-sm">
-        <div class="p-4 rounded-2xl bg-white shadow border border-slate-100">
-          <p class="text-2xl font-bold text-indigo-700">2.5k+</p>
-          <p class="text-slate-600 text-xs">Hours taught</p>
-        </div>
-        <div class="p-4 rounded-2xl bg-white shadow border border-slate-100">
-          <p class="text-2xl font-bold text-indigo-700">120</p>
-          <p class="text-slate-600 text-xs">Students supported</p>
-        </div>
-        <div class="p-4 rounded-2xl bg-white shadow border border-slate-100">
-          <p class="text-2xl font-bold text-indigo-700">92%</p>
-          <p class="text-slate-600 text-xs">Improved grades</p>
-        </div>
-        <div class="p-4 rounded-2xl bg-white shadow border border-slate-100">
-          <p class="text-2xl font-bold text-indigo-700">100%</p>
-          <p class="text-slate-600 text-xs">GDPR-aligned storage</p>
-        </div>
-      </div>
-
-      <!-- Features -->
-      <section class="space-y-4">
-        <h2 class="text-2xl font-bold">Platform features</h2>
-        <div class="grid md:grid-cols-3 gap-4 text-sm">
-          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-            <p class="font-semibold mb-1">Scheduling & attendance</p>
-            <p class="text-slate-600">Book, track, and lock sessions until contract + invoice are cleared.</p>
-          </div>
-          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-            <p class="font-semibold mb-1">Contracts</p>
-            <p class="text-slate-600">Parent-only signing, secure storage, downloadable PDFs.</p>
-          </div>
-          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-            <p class="font-semibold mb-1">Invoicing & payments</p>
-            <p class="text-slate-600">Prepaid monthly invoices with status tracking and reminders.</p>
-          </div>
-          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-            <p class="font-semibold mb-1">Portals</p>
-            <p class="text-slate-600">Student + parent views with approvals and link codes.</p>
-          </div>
-          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-            <p class="font-semibold mb-1">Resources</p>
-            <p class="text-slate-600">Secure sharing of notes, worksheets, and homework tasks.</p>
-          </div>
-          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-            <p class="font-semibold mb-1">AI helpers</p>
-            <p class="text-slate-600">Study assistant, parent summaries, lesson plan drafts.</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- How it works -->
-      <section class="space-y-4">
-        <h2 class="text-2xl font-bold">How it works</h2>
-        <div class="grid md:grid-cols-4 gap-4 text-sm">
-          <div class="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
-            <p class="font-semibold">1. Sign up</p>
-            <p class="text-slate-600">Student or parent creates an account.</p>
-          </div>
-          <div class="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
-            <p class="font-semibold">2. Link</p>
-            <p class="text-slate-600">Parent enters student link code → student approves.</p>
-          </div>
-          <div class="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
-            <p class="font-semibold">3. Contract & invoice</p>
-            <p class="text-slate-600">Parent signs contract and pays the month in advance.</p>
-          </div>
-          <div class="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
-            <p class="font-semibold">4. Lessons unlock</p>
-            <p class="text-slate-600">Sessions, resources, and homework become available.</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- Benefits -->
-      <section class="space-y-6">
-        <h2 class="text-2xl font-bold">Benefits for everyone</h2>
-        <div class="grid md:grid-cols-3 gap-4 text-sm">
-          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-            <p class="font-semibold mb-1">For students</p>
-            <p class="text-slate-600">Clarity on sessions, homework, and resources in one place.</p>
-          </div>
-          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-            <p class="font-semibold mb-1">For parents</p>
-            <p class="text-slate-600">Transparent invoices, contracts, and progress summaries.</p>
-          </div>
-          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-            <p class="font-semibold mb-1">For the tutor</p>
-            <p class="text-slate-600">Automated admin: contracts, payments, and reminders are centralised.</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- Testimonials & security -->
-      <section class="grid md:grid-cols-2 gap-6">
-        <div class="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm space-y-4">
-          <h3 class="text-xl font-semibold">What families say</h3>
-          <p class="text-slate-700 text-sm italic">“The dashboard keeps me in the loop: invoices, lessons, and notes in one place.”</p>
-          <p class="text-slate-700 text-sm italic">“We love the prepaid clarity. No surprises, just consistent lessons.”</p>
-          <p class="text-slate-700 text-sm italic">“Contracts and resources are easy to access. Super professional.”</p>
-        </div>
-        <div class="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm space-y-3">
-          <h3 class="text-xl font-semibold">Security & reliability</h3>
-          <ul class="text-sm text-slate-700 space-y-2">
-            <li>• GDPR-aligned data handling</li>
-            <li>• Supabase authentication & storage</li>
-            <li>• Private, role-based portals</li>
-            <li>• Encrypted contract PDFs and signatures</li>
-            <li>• No third-party data resale</li>
-          </ul>
-        </div>
-      </section>
-
-      <!-- Pricing + contract preview -->
-      <section class="grid md:grid-cols-2 gap-6 items-start">
-        <div class="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm space-y-3">
-          <h3 class="text-xl font-semibold">Pricing transparency</h3>
-          <p class="text-sm text-slate-700">Standard rate: ZAR 200/hour. Monthly invoices are issued in advance; lessons unlock once that invoice is paid.</p>
-          <ul class="text-sm text-slate-700 space-y-1">
-            <li>• Sessions usually 60 minutes</li>
-            <li>• Make-ups allowed within 8 weeks (max 2 reschedules)</li>
-            <li>• 30 days notice before rate changes</li>
-            <li>• Invoices unpaid by lesson date pause future lessons</li>
-          </ul>
-          <a href="./tos.html" class="text-indigo-600 text-sm underline">View Terms of Service</a> · <a href="./privacy.html" class="text-indigo-600 text-sm underline">View Privacy Policy</a>
-        </div>
-        <div class="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm space-y-3">
-          <h3 class="text-xl font-semibold">Contract snapshot</h3>
-          <p class="text-sm text-slate-700">Parents sign online; a PDF copy is stored securely and downloadable. Contracts gate session scheduling until signed.</p>
-          <div class="grid grid-cols-2 gap-3 text-xs">
-            <div class="p-3 rounded-xl border border-slate-200 bg-slate-50">Key clauses: lesson scope, cancellations, payment timelines.</div>
-            <div class="p-3 rounded-xl border border-slate-200 bg-slate-50">Signing: parent-only, per student, with downloadable proof.</div>
-          </div>
-          <a href="./contract-sign.html" class="text-sm text-indigo-600 underline">Open contract signing page</a>
-        </div>
-      </section>
-
-      <!-- FAQ -->
-      <section class="space-y-4">
-        <h2 class="text-2xl font-bold">FAQ</h2>
-        <div class="grid md:grid-cols-2 gap-4 text-sm">
-          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-            <p class="font-semibold">When do lessons unlock?</p>
-            <p class="text-slate-600">After the parent signs the contract and pays the current month’s invoice.</p>
-          </div>
-          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-            <p class="font-semibold">Can I reschedule?</p>
-            <p class="text-slate-600">Yes, up to 2 reschedules within 8 weeks per the contract terms.</p>
-          </div>
-          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-            <p class="font-semibold">How are invoices calculated?</p>
-            <p class="text-slate-600">Based on prepaid monthly hours at ZAR 200/hour; late or unpaid invoices pause lessons.</p>
-          </div>
-          <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-            <p class="font-semibold">Is data safe?</p>
-            <p class="text-slate-600">Yes, all access is role-based with Supabase Auth and secure storage.</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- Contact -->
-      <section class="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm space-y-3">
-        <h3 class="text-xl font-semibold">Contact & Support</h3>
-        <p class="text-sm text-slate-700">Email: erichuang.shangjing@outlook.com</p>
-        <p class="text-sm text-slate-700">Business hours: Mon–Fri, 8:00–18:00</p>
-        <div class="flex gap-3">
-          <a href="./signup.html" class="px-4 py-2 rounded-full bg-indigo-600 text-white text-sm font-semibold">Get started</a>
-          <a href="./login.html" class="px-4 py-2 rounded-full border border-slate-300 text-sm font-semibold">Sign in</a>
-        </div>
-      </section>
     </div>
   </div>
 
@@ -1522,22 +1474,15 @@
       </div>
       <p class="text-[11px] text-slate-500">Please sign in or sign up from the dedicated pages.</p>
       <div class="space-y-2">
-        <a href="./login.html" class="block px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium text-center">Go to Sign in</a>
-        <a href="./signup.html" class="block px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-medium text-center">Go to Sign up</a>
+        <a href="./login.html"
+          class="block px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium text-center">Go to Sign in</a>
+        <a href="./signup.html"
+          class="block px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-medium text-center">Go to Sign up</a>
       </div>
     </div>
   </div>
 
   <script>
-    /************************************************************
-     * ONBOARDING & ACCESS FLOW (ASCII DOC)
-     *
-     * Student sign up -> profiles(role=student) -> students row with link_code
-     * Parent sign up  -> profiles(role=parent)  -> parents row
-     * Parent enters link_code -> parent_students row (pending)
-     * Student approves -> parent_students.status=active
-     * Contract signed by parent + invoice paid => sessions unlocked
-     ************************************************************/
     /***********************
      * STATE & PERSISTENCE *
      ***********************/
@@ -1639,7 +1584,7 @@
     }
 
     function sanitizeState(st) {
-      ['students','parents','parentLinks','sessions','resources','homework','documents','contracts','invoices','studentTodos','studentCheckins','messages'].forEach(key => {
+      ['students', 'parents', 'parentLinks', 'sessions', 'resources', 'homework', 'documents', 'contracts', 'invoices', 'studentTodos', 'studentCheckins', 'messages'].forEach(key => {
         if (!Array.isArray(st[key])) st[key] = [];
       });
       if (!Array.isArray(st.activityLog)) st.activityLog = [];
@@ -1884,7 +1829,7 @@
         invoice_id: cleanId(sess.invoiceId)
       }));
       try {
-      await upsertAndPrune('lesson_sessions', sessions, 'id');
+        await upsertAndPrune('lesson_sessions', sessions, 'id');
       } catch (err) {
         console.warn('Sessions sync failed (check schema for invoice_id column):', err?.message || err);
       }
@@ -2041,10 +1986,10 @@
       // Upsert rows
       if (rows.length) {
         const { error } = await supabaseClient.from(table).upsert(rows);
-      if (error) {
-        console.error(`Upsert failed for ${table}`, error);
-        throw error;
-      }
+        if (error) {
+          console.error(`Upsert failed for ${table}`, error);
+          throw error;
+        }
       }
       // Prune skipped to avoid accidental deletions; Supabase is source of truth.
     }
@@ -2323,7 +2268,7 @@
      ***********************/
     function setupRealtime() {
       if (!supabaseClient || !supabaseSession) return;
-      const tables = ['students','lesson_sessions','homework','invoices','messages','resources','documents','contracts','student_todos','student_checkins','parent_contract_signatures','presence'];
+      const tables = ['students', 'lesson_sessions', 'homework', 'invoices', 'messages', 'resources', 'documents', 'contracts', 'student_todos', 'student_checkins', 'parent_contract_signatures', 'presence'];
       tables.forEach(table => {
         supabaseClient
           .channel(`${table}-changes`)
@@ -2352,17 +2297,17 @@
         return;
       }
       let targetView = viewName;
-      if (studentMode && ['finance','reports','dashboard','parent-portal'].includes(targetView)) {
+      if (studentMode && ['finance', 'reports', 'dashboard', 'parent-portal'].includes(targetView)) {
         targetView = 'portal';
       }
       if (parentMode) {
-        const allowed = new Set(['parent-portal','students','schedule','resources','profile','settings']);
+        const allowed = new Set(['parent-portal', 'students', 'schedule', 'resources', 'profile', 'settings']);
         if (!allowed.has(targetView)) targetView = 'parent-portal';
       }
       document.getElementById('view-' + targetView)?.classList.remove('hidden');
       document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('bg-slate-800', 'active'));
       const activeBtn = document.querySelector(`.nav-btn[data-view="${targetView}"]`);
-      if (activeBtn) activeBtn.classList.add('bg-slate-800','active');
+      if (activeBtn) activeBtn.classList.add('bg-slate-800', 'active');
       if (targetView === 'dashboard') updateKPIsAndCharts();
       if (targetView === 'students') renderStudentsView();
       if (targetView === 'schedule') renderScheduleView();
@@ -2388,8 +2333,6 @@
           }
           supabaseSession = null;
           toggleAuthOverlay(true);
-          // Always drop back to landing on sign-out
-          window.location.href = './index.html';
         };
       }
 
@@ -2505,8 +2448,8 @@
       setVal('notifyInvoicesDays', state.settings.notifyInvoicesDays ?? 3);
       // lock settings for students
       const lockIds = [
-        'settingsWeeklyGoal','settingsMonthlyGoal','settingsDefaultDuration',
-        'settingsReflection','notifySessionsDays','notifyHomeworkDays','notifyInvoicesDays'
+        'settingsWeeklyGoal', 'settingsMonthlyGoal', 'settingsDefaultDuration',
+        'settingsReflection', 'notifySessionsDays', 'notifyHomeworkDays', 'notifyInvoicesDays'
       ];
       lockIds.forEach(id => {
         const el = document.getElementById(id);
@@ -2636,13 +2579,13 @@
         return;
       }
       const now = new Date();
-      const soon = new Date(now.getTime() + 14*24*60*60*1000);
+      const soon = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
       const mySessions = state.sessions.filter(s => s.studentIds.includes(student.id))
         .filter(s => {
           const d = new Date(s.date + 'T' + (s.startTime || '00:00'));
           return d >= now && d <= soon;
         })
-        .sort((a,b) => new Date(a.date) - new Date(b.date));
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
       if (sessionsUl) {
         sessionsUl.innerHTML = mySessions.length ? mySessions.map(s => `
           <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
@@ -2664,12 +2607,12 @@
       }
 
       const myInv = state.invoices.filter(inv => inv.studentId === student.id)
-        .sort((a,b) => new Date(a.dueDate||0) - new Date(b.dueDate||0));
+        .sort((a, b) => new Date(a.dueDate || 0) - new Date(b.dueDate || 0));
       if (invUl) {
         invUl.innerHTML = myInv.length ? myInv.map(inv => `
           <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
             <div class="font-medium">Invoice ${inv.id}</div>
-            <div class="text-[10px] text-slate-500">Issued ${inv.issueDate || 'n/a'} • Due ${inv.dueDate || 'n/a'} • R ${Number(inv.total||0).toFixed(2)} • ${inv.paid ? 'Paid' : 'Unpaid'}</div>
+            <div class="text-[10px] text-slate-500">Issued ${inv.issueDate || 'n/a'} • Due ${inv.dueDate || 'n/a'} • R ${Number(inv.total || 0).toFixed(2)} • ${inv.paid ? 'Paid' : 'Unpaid'}</div>
           </li>
         `).join('') : '<li class="text-slate-500 text-xs">No invoices yet.</li>';
       }
@@ -2692,7 +2635,7 @@
       if (msgsList) {
         const msgs = state.messages
           .filter(m => m.studentId === student.id)
-          .sort((a,b) => new Date(a.created_at||0) - new Date(b.created_at||0));
+          .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
         msgsList.innerHTML = msgs.length ? msgs.map(m => `
           <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
             <div class="flex justify-between text-[10px] text-slate-500">
@@ -2736,93 +2679,6 @@
           }
         };
       }
-
-      // Parent linking card rendering for student
-      const linkCodeEl = document.getElementById('studentLinkCodeValue');
-      const linkStatusEl = document.getElementById('studentLinkStatus');
-      const linkRequestsEl = document.getElementById('studentLinkRequests');
-      const linkEmptyEl = document.getElementById('studentLinkEmpty');
-      const gateSummaryEl = document.getElementById('studentGateSummary');
-      const regenBtn = document.getElementById('regenLinkCodeBtn');
-      if (linkCodeEl) linkCodeEl.textContent = student.link_code || student.linkCode || '—';
-      if (regenBtn) {
-        regenBtn.onclick = async () => {
-          const newCode = generateLinkCode(12);
-          student.link_code = newCode;
-          student.linkCode = newCode;
-          const st = state.students.find(s => s.id === student.id);
-          if (st) { st.linkCode = newCode; st.link_code = newCode; }
-          saveState();
-          if (isSupabaseReady()) {
-            await supabaseClient.from('students').update({ link_code: newCode }).eq('id', student.id);
-          }
-          if (linkCodeEl) linkCodeEl.textContent = newCode;
-          alert('New link code generated.');
-        };
-      }
-      const myLinks = state.parentLinks.filter(pl => pl.studentId === student.id || pl.student_id === student.id);
-      const pending = myLinks.filter(l => (l.status || '').toLowerCase().includes('pending'));
-      const active = myLinks.filter(l => ['active','approved'].includes((l.status || '').toLowerCase()));
-      if (linkStatusEl) {
-        linkStatusEl.textContent = active.length ? `Linked to ${active.length} parent(s)` : pending.length ? 'Link pending approval' : 'No parent linked';
-      }
-      if (linkRequestsEl && linkEmptyEl) {
-        if (!pending.length) {
-          linkEmptyEl.classList.remove('hidden');
-          linkRequestsEl.innerHTML = '';
-        } else {
-          linkEmptyEl.classList.add('hidden');
-          linkRequestsEl.innerHTML = pending.map(l => {
-            const p = state.parents.find(px => px.id === (l.parentId || l.parent_id));
-            return `<div class=\"flex items-center justify-between border border-slate-200 rounded-lg px-2 py-1\">
-              <div class=\"text-[11px]\">
-                <div class=\"font-semibold\">${p?.name || 'Parent'}</div>
-                <div class=\"text-slate-500\">${p?.email || ''}</div>
-              </div>
-              <div class=\"flex gap-2\">
-                <button class=\"text-[11px] px-2 py-1 rounded-lg border border-emerald-300 text-emerald-700\" data-approve=\"${l.id}\">Approve</button>
-                <button class=\"text-[11px] px-2 py-1 rounded-lg border border-rose-300 text-rose-700\" data-reject=\"${l.id}\">Reject</button>
-              </div>
-            </div>`;
-          }).join('');
-          linkRequestsEl.querySelectorAll('[data-approve]').forEach(btn => {
-            btn.addEventListener('click', async () => {
-              const id = btn.getAttribute('data-approve');
-              if (isSupabaseReady()) {
-                await supabaseClient.from('parent_students').update({ status: 'active', responded_at: new Date().toISOString() }).eq('id', id);
-              }
-              const link = state.parentLinks.find(pl => pl.id === id);
-              if (link) link.status = 'active';
-              saveState();
-              renderStudentPortal();
-              renderParentPortal();
-            });
-          });
-          linkRequestsEl.querySelectorAll('[data-reject]').forEach(btn => {
-            btn.addEventListener('click', async () => {
-              const id = btn.getAttribute('data-reject');
-              if (isSupabaseReady()) {
-                await supabaseClient.from('parent_students').update({ status: 'rejected', responded_at: new Date().toISOString() }).eq('id', id);
-              }
-              const link = state.parentLinks.find(pl => pl.id === id);
-              if (link) link.status = 'rejected';
-              saveState();
-              renderStudentPortal();
-              renderParentPortal();
-            });
-          });
-        }
-      }
-      if (gateSummaryEl) {
-        const contractSigned = !!student.contractSigned || !!student.contract_signed_at;
-        const hasActiveLink = !!active.length;
-        const paidInvoice = state.invoices.some(inv => inv.studentId === student.id && (inv.paid || inv.status === 'paid' || inv.is_paid === true));
-        const msgs = [];
-        if (!hasActiveLink) msgs.push('No linked parent yet.');
-        if (!contractSigned) msgs.push('Contract not signed.');
-        if (!paidInvoice) msgs.push('Invoice unpaid.');
-        gateSummaryEl.textContent = msgs.length ? msgs.join(' ') : 'All clear: sessions unlocked.';
-      }
     }
 
     function getChildrenForParent() {
@@ -2835,58 +2691,6 @@
     function renderParentPortal() {
       const parent = getParentProfileBySession();
       const students = getChildrenForParent();
-      const parentLinks = state.parentLinks.filter(pl => pl.parentId === parent?.id);
-      const linkForm = document.getElementById('parentLinkForm');
-      const linkInput = document.getElementById('parentLinkCodeInput');
-      const linkMsg = document.getElementById('parentLinkMsg');
-      const linkStatuses = document.getElementById('parentLinkStatuses');
-      if (linkForm && linkInput) {
-        linkForm.onsubmit = async (e) => {
-          e.preventDefault();
-          const code = linkInput.value.trim();
-          if (!code) return;
-          linkMsg.textContent = 'Sending request...';
-          try {
-            if (!isSupabaseReady() || !parent) throw new Error('Sign in first.');
-            const { data: studentRows, error: sErr } = await supabaseClient.from('students').select('id').eq('link_code', code);
-            if (sErr) throw sErr;
-            if (!studentRows || !studentRows.length) {
-              linkMsg.textContent = 'No student found for that code.';
-              return;
-            }
-            const studentId = studentRows[0].id;
-            await supabaseClient.from('parent_students').upsert({
-              parent_id: parent.id,
-              student_id: studentId,
-              status: 'pending',
-              requested_at: new Date().toISOString(),
-              created_by: supabaseSession?.user?.id || null
-            }, { onConflict: 'parent_id,student_id' });
-            linkMsg.textContent = 'Link request sent. Waiting for student approval.';
-            linkInput.value = '';
-            await tryLoadRemoteThenLocal();
-            renderParentPortal();
-          } catch (err) {
-            console.error(err);
-            linkMsg.textContent = err?.message || 'Request failed.';
-          }
-        };
-      }
-      if (linkStatuses) {
-        linkStatuses.innerHTML = parentLinks.length ? parentLinks.map(l => {
-          const stu = getStudentById(l.studentId);
-          const status = (l.status || 'pending').toLowerCase();
-          const badge = status === 'active' || status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
-                        status === 'rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700';
-          return `<div class="flex items-center justify-between border border-slate-200 rounded-lg px-2 py-1">
-            <div class="text-[11px]">
-              <div class="font-semibold">${stu?.name || 'Student'}</div>
-              <div class="text-slate-500">${status}</div>
-            </div>
-            <span class="px-2 py-0.5 rounded-full text-[10px] ${badge}">${status}</span>
-          </div>`;
-        }).join('') : '<div class="text-[11px] text-slate-500">No link requests yet.</div>';
-      }
       const sList = document.getElementById('parentStudentsList');
       if (sList) {
         sList.innerHTML = students.length ? students.map(s => {
@@ -2930,13 +2734,13 @@
       const childIds = new Set(students.map(s => s.id));
 
       const now = new Date();
-      const soon = new Date(now.getTime() + 14*24*60*60*1000);
+      const soon = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
       const mySessions = state.sessions.filter(s => s.studentIds.some(id => childIds.has(id)))
         .filter(s => {
           const d = new Date(s.date + 'T' + (s.startTime || '00:00'));
           return d >= now && d <= soon;
         })
-        .sort((a,b) => new Date(a.date) - new Date(b.date));
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
       if (sessionsUl) {
         sessionsUl.innerHTML = mySessions.length ? mySessions.map(s => {
           const names = s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
@@ -2972,13 +2776,13 @@
       }
 
       const myInv = state.invoices.filter(inv => childIds.has(inv.studentId))
-        .sort((a,b) => new Date(a.dueDate||0) - new Date(b.dueDate||0));
+        .sort((a, b) => new Date(a.dueDate || 0) - new Date(b.dueDate || 0));
       if (invUl) {
         invUl.innerHTML = myInv.length ? myInv.map(inv => {
           const s = getStudentById(inv.studentId);
           return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
             <div class="font-medium">Invoice ${inv.id}</div>
-            <div class="text-[10px] text-slate-500">${s?.name || ''} • Issued ${inv.issueDate || 'n/a'} • Due ${inv.dueDate || 'n/a'} • R ${Number(inv.total||0).toFixed(2)} • ${inv.paid ? 'Paid' : 'Unpaid'}</div>
+            <div class="text-[10px] text-slate-500">${s?.name || ''} • Issued ${inv.issueDate || 'n/a'} • Due ${inv.dueDate || 'n/a'} • R ${Number(inv.total || 0).toFixed(2)} • ${inv.paid ? 'Paid' : 'Unpaid'}</div>
             <div class="flex flex-wrap gap-2 mt-1 text-[10px]">
               <button id="btn-inv-${inv.id}" class="px-2 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50" onclick="explainInvoiceAI('${inv.id}')">Explain with AI</button>
             </div>
@@ -2990,7 +2794,7 @@
       if (msgsUl) {
         const msgs = state.messages
           .filter(m => childIds.has(m.studentId))
-          .sort((a,b) => new Date(a.created_at||0) - new Date(b.created_at||0));
+          .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
         msgsUl.innerHTML = msgs.length ? msgs.map(m => {
           const s = getStudentById(m.studentId);
           return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
@@ -3008,57 +2812,57 @@
       const btn = document.getElementById(`btn-inv-${invoiceId}`);
       const out = document.getElementById(`ai-invoice-${invoiceId}`);
       if (btn) { btn.disabled = true; btn.textContent = 'Explaining…'; }
-        if (out) out.textContent = '';
-        try {
-          const inv = state.invoices.find(i => i.id === invoiceId);
-          if (!inv) throw new Error('Invoice not found');
-          const sessions = state.sessions
-            .filter(s => s.studentIds.includes(inv.studentId))
-            .map(s => ({
-              date: s.date,
-              subject: s.subject,
-              topic: s.topic,
-              duration: s.durationHours
-            }));
+      if (out) out.textContent = '';
+      try {
+        const inv = state.invoices.find(i => i.id === invoiceId);
+        if (!inv) throw new Error('Invoice not found');
+        const sessions = state.sessions
+          .filter(s => s.studentIds.includes(inv.studentId))
+          .map(s => ({
+            date: s.date,
+            subject: s.subject,
+            topic: s.topic,
+            duration: s.durationHours
+          }));
         const text = await callLLM('invoice_explainer', { invoice: inv, sessions });
         if (out) renderAiMarkup(out, text);
-        } catch (err) {
+      } catch (err) {
         if (out) out.textContent = err?.message || 'AI failed.';
-        } finally {
-          if (btn) { btn.disabled = false; btn.textContent = 'Explain with AI'; }
-        }
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Explain with AI'; }
       }
+    }
 
     async function parentSummaryAI(studentId) {
       const btn = document.getElementById(`btn-summary-${studentId}`);
       const out = document.getElementById(`ai-summary-${studentId}`);
       if (btn) { btn.disabled = true; btn.textContent = 'Summarizing…'; }
-        if (out) out.textContent = '';
-        try {
-          const stu = getStudentById(studentId);
-          if (!stu) throw new Error('Student not found');
-          const cutoff = new Date();
-          cutoff.setDate(cutoff.getDate() - 30);
+      if (out) out.textContent = '';
+      try {
+        const stu = getStudentById(studentId);
+        if (!stu) throw new Error('Student not found');
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 30);
         const sessions = state.sessions
           .filter(s => s.studentIds.includes(studentId))
           .filter(s => new Date(s.date) >= cutoff)
           .map(s => ({ date: s.date, subject: s.subject, topic: s.topic, notes: s.notes }));
-          const homework = state.homework
-            .filter(h => h.studentId === studentId)
-            .map(h => ({ resource: getResourceById(h.resourceId)?.title || 'Homework', status: h.status, due: h.dueDate }));
-          const text = await callLLM('progress_summary', {
-            student: { name: stu.name, grade: stu.gradeLevel, subjects: stu.subjects },
-            range: 'last 30 days',
-            sessions,
-            homework
-          });
+        const homework = state.homework
+          .filter(h => h.studentId === studentId)
+          .map(h => ({ resource: getResourceById(h.resourceId)?.title || 'Homework', status: h.status, due: h.dueDate }));
+        const text = await callLLM('progress_summary', {
+          student: { name: stu.name, grade: stu.gradeLevel, subjects: stu.subjects },
+          range: 'last 30 days',
+          sessions,
+          homework
+        });
         if (out) renderAiMarkup(out, text);
-        } catch (err) {
+      } catch (err) {
         if (out) out.textContent = err?.message || 'AI failed.';
-        } finally {
-          if (btn) { btn.disabled = false; btn.textContent = 'AI summary (30d)'; }
-        }
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'AI summary (30d)'; }
       }
+    }
 
     function getAvailableStudentEmails(currentEmail = '') {
       const assigned = new Set(
@@ -3109,8 +2913,8 @@
         await supabaseClient.from('session_students').delete().eq('student_id', studentId);
         // Delete dependents
         const tables = [
-          'documents','contracts','invoices','homework',
-          'student_todos','student_checkins','session_students'
+          'documents', 'contracts', 'invoices', 'homework',
+          'student_todos', 'student_checkins', 'session_students'
         ];
         for (const t of tables) {
           await supabaseClient.from(t).delete().eq('student_id', studentId);
@@ -3121,7 +2925,7 @@
           console.warn('Remote parent_students delete failed', err);
         }
         if (sessionsToRemove.length) {
-        await supabaseClient.from('lesson_sessions').delete().in('id', sessionsToRemove);
+          await supabaseClient.from('lesson_sessions').delete().in('id', sessionsToRemove);
         }
         // Finally delete student
         await supabaseClient.from('students').delete().eq('id', studentId);
@@ -3152,7 +2956,7 @@
         state = deepClone(defaultState);
         await supabaseClient.auth.signOut();
         alert('Your account has been deleted.');
-        window.location.href = './index.html';
+        window.location.reload();
       } catch (err) {
         console.error(err);
         const msg = err?.message || 'Delete failed. Please try again.';
@@ -3342,25 +3146,6 @@
       return (supabaseSession?.user?.email || '').trim().toLowerCase();
     }
 
-    function getLoggedInStudent() {
-      const email = getSessionEmail();
-      return state.students.find(s => (s.studentEmail || '').toLowerCase() === email);
-    }
-
-    function getLoggedInParent() {
-      const email = getSessionEmail();
-      return state.parents.find(p => (p.email || '').toLowerCase() === email);
-    }
-
-    function generateLinkCode(len = 10) {
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      let out = '';
-      for (let i = 0; i < len; i++) {
-        out += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      return out;
-    }
-
     function getParentProfileBySession() {
       const email = getSessionEmail();
       return state.parents.find(p => p.email === email);
@@ -3377,8 +3162,7 @@
         return;
       }
       const parentProfile = supabaseAvailable ? getParentProfileBySession() : null;
-      const studentProfile = supabaseAvailable ? getLoggedInStudent() : null;
-      studentMode = supabaseAvailable ? (!isOwner() && !!studentProfile) : false;
+      studentMode = supabaseAvailable ? (!isOwner() && !!getSessionEmail() && !parentProfile) : false;
       parentMode = supabaseAvailable ? (!isOwner() && !!parentProfile) : false;
       readOnlyMode = studentMode || parentMode || (supabaseAvailable ? !isOwner() : false);
       const banner = document.getElementById('readOnlyBanner');
@@ -3431,7 +3215,7 @@
           state = await loadStateFromSupabase();
           if (!readOnlyMode) saveState(); // persist locally as cache
           if (isSupabaseReady()) {
-            await refreshPresence().catch(() => {});
+            await refreshPresence().catch(() => { });
           }
           updateReadOnlyUI();
           return;
@@ -3661,51 +3445,51 @@
           sender: m.sender,
           created_at: m.created_at
         }));
-      merged.activityLog = (activityRes?.data || []).map(a => ({
-        id: a.id,
-        action: a.action,
-        detail: a.detail,
-        created_at: a.created_at
-      }));
+        merged.activityLog = (activityRes?.data || []).map(a => ({
+          id: a.id,
+          action: a.action,
+          detail: a.detail,
+          created_at: a.created_at
+        }));
         merged.settings = loadState().settings; // keep local settings
 
-      // Merge in any local resources not yet in Supabase so they don't disappear on reload/switch
-      const localState = loadState();
-      if (localState?.resources?.length) {
-        const remoteIds = new Set(merged.resources.map(r => cleanId(r.id)));
-        localState.resources.forEach(r => {
-          const id = cleanId(r.id);
-          if (!remoteIds.has(id)) {
-            merged.resources.push({
-              id,
-              title: r.title,
-              subject: r.subject,
-              level: r.level,
-              tags: r.tags,
-              description: r.description,
-              createdAt: r.createdAt,
-              favorite: r.favorite,
-              storage_path: r.storage_path,
-              fileName: r.fileName,
-              signedUrl: r.signedUrl,
-              dataUrl: r.dataUrl
-            });
-          }
-        });
-      }
-      // Merge local homework if missing remotely (e.g., if an upsert failed due to RLS)
-      if (localState?.homework?.length) {
-        const remoteIds = new Set(merged.homework.map(h => cleanId(h.id)));
-        localState.homework.forEach(hw => {
-          const id = cleanId(hw.id);
-          if (!remoteIds.has(id)) merged.homework.push(hw);
-        });
-      }
-      // Merge local invoices/messages if rows are missing (e.g., legacy rows without user_id)
-      if (localState?.invoices?.length) {
-        const remoteIds = new Set(merged.invoices.map(i => cleanId(i.id)));
-        localState.invoices.forEach(inv => {
-          const id = cleanId(inv.id);
+        // Merge in any local resources not yet in Supabase so they don't disappear on reload/switch
+        const localState = loadState();
+        if (localState?.resources?.length) {
+          const remoteIds = new Set(merged.resources.map(r => cleanId(r.id)));
+          localState.resources.forEach(r => {
+            const id = cleanId(r.id);
+            if (!remoteIds.has(id)) {
+              merged.resources.push({
+                id,
+                title: r.title,
+                subject: r.subject,
+                level: r.level,
+                tags: r.tags,
+                description: r.description,
+                createdAt: r.createdAt,
+                favorite: r.favorite,
+                storage_path: r.storage_path,
+                fileName: r.fileName,
+                signedUrl: r.signedUrl,
+                dataUrl: r.dataUrl
+              });
+            }
+          });
+        }
+        // Merge local homework if missing remotely (e.g., if an upsert failed due to RLS)
+        if (localState?.homework?.length) {
+          const remoteIds = new Set(merged.homework.map(h => cleanId(h.id)));
+          localState.homework.forEach(hw => {
+            const id = cleanId(hw.id);
+            if (!remoteIds.has(id)) merged.homework.push(hw);
+          });
+        }
+        // Merge local invoices/messages if rows are missing (e.g., legacy rows without user_id)
+        if (localState?.invoices?.length) {
+          const remoteIds = new Set(merged.invoices.map(i => cleanId(i.id)));
+          localState.invoices.forEach(inv => {
+            const id = cleanId(inv.id);
             if (!remoteIds.has(id)) merged.invoices.push(inv);
           });
         }
@@ -3741,16 +3525,16 @@
 
       try {
         studentsRes = await supabaseClient.from('students').select('*').eq('student_email', email);
-      } catch {}
+      } catch { }
       try {
         parentsRes = await supabaseClient.from('parents').select('*').eq('email', email);
-      } catch {}
+      } catch { }
 
       const parentIds = (parentsRes.data || []).map(p => p.id);
       if (parentIds.length) {
         try {
           parentLinksRes = await supabaseClient.from('parent_students').select('*').in('parent_id', parentIds);
-        } catch {}
+        } catch { }
       }
 
       const studentIds = new Set([
@@ -3763,34 +3547,34 @@
       if (studentIdArray.length && !(studentsRes.data || []).length) {
         try {
           studentsRes = await supabaseClient.from('students').select('*').in('id', studentIdArray);
-        } catch {}
+        } catch { }
       }
 
       if (studentIdArray.length) {
         try {
           sessionStudentsRes = await supabaseClient.from('session_students').select('*').in('student_id', studentIdArray);
-        } catch {}
+        } catch { }
         const sessionIds = Array.from(new Set((sessionStudentsRes.data || []).map(ss => ss.session_id)));
         if (sessionIds.length) {
           try {
-          sessionsRes = await supabaseClient.from('lesson_sessions').select('*').in('id', sessionIds);
-          } catch {}
+            sessionsRes = await supabaseClient.from('lesson_sessions').select('*').in('id', sessionIds);
+          } catch { }
         }
         try {
           homeworkRes = await supabaseClient.from('homework').select('*').in('student_id', studentIdArray);
-        } catch {}
+        } catch { }
         try {
           invoicesRes = await supabaseClient.from('invoices').select('*').in('student_id', studentIdArray);
-        } catch {}
+        } catch { }
         try {
           messagesRes = await supabaseClient.from('messages').select('*').in('student_id', studentIdArray);
-        } catch {}
+        } catch { }
         try {
           contractSignaturesRes = await supabaseClient.from('parent_contract_signatures').select('*').in('student_id', studentIdArray);
-        } catch {}
+        } catch { }
         try {
           contractsRes = await supabaseClient.from('contracts').select('*').in('student_id', studentIdArray);
-        } catch {}
+        } catch { }
       }
 
       // Resources tied to homework
@@ -3798,7 +3582,7 @@
       if (resourceIds.length) {
         try {
           resourcesRes = await supabaseClient.from('resources').select('*').in('id', resourceIds);
-        } catch {}
+        } catch { }
       }
 
       // Map into state
@@ -4616,7 +4400,7 @@
             <label class="block text-[11px] mb-1">Phone</label>
             <div class="flex gap-2">
               <select name="phoneCode" class="border border-slate-300 rounded-lg px-2 py-1 text-xs w-28">
-                ${['+1','+27','+44','+61','+65','+91'].map(c => `<option value="${c}" ${parent?.phone?.startsWith(c) ? 'selected' : ''}>${c}</option>`).join('')}
+                ${['+1', '+27', '+44', '+61', '+65', '+91'].map(c => `<option value="${c}" ${parent?.phone?.startsWith(c) ? 'selected' : ''}>${c}</option>`).join('')}
                 <option value="" ${!(parent?.phone) ? 'selected' : ''}>Code</option>
               </select>
               <input name="phoneLocal" value="${parent?.phone ? parent.phone.replace(/^\\+\\d+\\s?/, '') : ''}" class="flex-1 border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="Number">
@@ -4686,8 +4470,8 @@
           closeModal();
           renderParentsList();
         };
-          if (isEdit) {
-            const delBtn = document.getElementById('deleteParentBtn');
+        if (isEdit) {
+          const delBtn = document.getElementById('deleteParentBtn');
           delBtn.onclick = () => {
             if (!confirm('Delete this parent and unlink from all students?')) return;
             deleteParentAndLinks(parent.id).then(() => {
@@ -4924,7 +4708,7 @@
           });
           saveState();
           renderStudentMessages(id);
-          logActivity('Message posted', text.slice(0,50));
+          logActivity('Message posted', text.slice(0, 50));
           msgForm.reset();
         };
       }
@@ -4980,7 +4764,7 @@
         const res = state.resources.find(r => r.id === hw.resourceId);
         if (!res) return;
         events.push({
-          date: hw.assignedDate || res.createdAt || new Date().toISOString().slice(0,10),
+          date: hw.assignedDate || res.createdAt || new Date().toISOString().slice(0, 10),
           type: 'Homework',
           description: `${res.title} [${hw.status}]`
         });
@@ -4996,7 +4780,7 @@
 
       state.documents.filter(doc => doc.studentId === studentId).forEach(doc => {
         events.push({
-          date: doc.date || doc.createdAt || new Date().toISOString().slice(0,10),
+          date: doc.date || doc.createdAt || new Date().toISOString().slice(0, 10),
           type: 'Document',
           description: `${doc.title} [${doc.status}]`
         });
@@ -5004,7 +4788,7 @@
 
       state.studentCheckins.filter(note => note.studentId === studentId).forEach(note => {
         events.push({
-          date: note.date || new Date().toISOString().slice(0,10),
+          date: note.date || new Date().toISOString().slice(0, 10),
           type: 'Check-in',
           description: note.text
         });
@@ -5012,7 +4796,7 @@
 
       state.contracts.filter(c => c.studentId === studentId).forEach(c => {
         events.push({
-          date: c.uploadedAt || new Date().toISOString().slice(0,10),
+          date: c.uploadedAt || new Date().toISOString().slice(0, 10),
           type: 'Contract',
           description: `${c.fileName || 'Contract'} [${c.status || 'Pending'}]`
         });
@@ -5028,9 +4812,9 @@
       ul.innerHTML = events.map(ev => `
         <li class="flex items-start gap-2">
           <div class="mt-1 h-2 w-2 rounded-full ${ev.type === 'Session' ? 'bg-indigo-500' :
-                                                ev.type === 'Invoice' ? 'bg-emerald-500' :
-                                                ev.type === 'Document' ? 'bg-amber-500' :
-                                                'bg-slate-400'}"></div>
+          ev.type === 'Invoice' ? 'bg-emerald-500' :
+            ev.type === 'Document' ? 'bg-amber-500' :
+              'bg-slate-400'}"></div>
           <div>
             <div class="text-[10px] text-slate-500">${ev.date} • ${ev.type}</div>
             <div>${ev.description}</div>
@@ -5224,7 +5008,7 @@
       if (!list) return;
       const msgs = state.messages
         .filter(m => m.studentId === studentId)
-        .sort((a,b) => new Date(a.created_at||0) - new Date(b.created_at||0));
+        .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
       if (!msgs.length) {
         list.innerHTML = '<li class="text-slate-500">No messages yet.</li>';
         return;
@@ -5298,7 +5082,7 @@
                 dataUrl: reader.result,
                 status,
                 notes,
-                uploadedAt: new Date().toISOString().slice(0,10)
+                uploadedAt: new Date().toISOString().slice(0, 10)
               });
               saveState();
               closeModal();
@@ -5327,7 +5111,7 @@
         storage_path: path,
         status,
         notes,
-        uploadedAt: new Date().toISOString().slice(0,10),
+        uploadedAt: new Date().toISOString().slice(0, 10),
         signedUrl: signed?.signedUrl
       };
       state.contracts.push(contract);
@@ -5384,7 +5168,7 @@
       const day = date.getDay();
       const diff = (day === 0 ? -6 : 1 - day);
       date.setDate(date.getDate() + diff);
-      date.setHours(0,0,0,0);
+      date.setHours(0, 0, 0, 0);
       return date;
     }
 
@@ -5392,7 +5176,7 @@
       const label = document.getElementById('scheduleWeekLabel');
       const end = new Date(currentWeekStart);
       end.setDate(end.getDate() + 6);
-      label.textContent = `${currentWeekStart.toISOString().slice(0,10)} – ${end.toISOString().slice(0,10)}`;
+      label.textContent = `${currentWeekStart.toISOString().slice(0, 10)} – ${end.toISOString().slice(0, 10)}`;
 
       const grid = document.getElementById('scheduleCalendarGrid');
       const dayLoadRow = document.getElementById('dayLoadRow');
@@ -5401,11 +5185,11 @@
       for (let i = 0; i < 7; i++) {
         const day = new Date(currentWeekStart);
         day.setDate(day.getDate() + i);
-        const isoDate = day.toISOString().slice(0,10);
+        const isoDate = day.toISOString().slice(0, 10);
         const sessions = state.sessions.filter(s => s.date === isoDate);
         const totalHours = sessions.reduce((acc, s) => acc + Number(s.durationHours || 0), 0);
-        dayLoads.push({ totalHours, dayName: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i] });
-        const dayName = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i];
+        dayLoads.push({ totalHours, dayName: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i] });
+        const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i];
         grid.innerHTML += `
           <div class="calendar-day" data-date="${isoDate}">
             <div class="flex flex-col mb-1">
@@ -5413,15 +5197,14 @@
               <span class="text-[10px] text-slate-500 whitespace-nowrap">${isoDate}</span>
             </div>
             <div class="space-y-1 text-[11px]">
-              ${
-        sessions.map(s => {
-                  const subjectClass = s.subject === 'Physics'
-                    ? 'text-indigo-700'
-                    : s.subject === 'Chemistry'
-                      ? 'text-emerald-700'
-                      : 'text-rose-700';
-                  const names = s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
-                  return `<div class="session-card cursor-pointer" onclick="openSessionQuickActions('${s.id}')">
+              ${sessions.map(s => {
+          const subjectClass = s.subject === 'Physics'
+            ? 'text-indigo-700'
+            : s.subject === 'Chemistry'
+              ? 'text-emerald-700'
+              : 'text-rose-700';
+          const names = s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+          return `<div class="session-card cursor-pointer" onclick="openSessionQuickActions('${s.id}')">
                             <div class="flex items-center justify-between">
                               <span class="session-time ${subjectClass}">${s.startTime || ''}</span>
                               <span class="session-chip ${subjectClass}">${s.subject}</span>
@@ -5429,8 +5212,8 @@
                             <div class="text-[11px] font-semibold text-slate-800">${names}</div>
                             <div class="text-[10px] text-slate-600 leading-snug">${s.topic || ''}</div>
                           </div>`;
-                }).join('')
-              }
+        }).join('')
+          }
             </div>
           </div>
         `;
@@ -5464,7 +5247,7 @@
       const exportBtn = document.getElementById('exportIcsBtn');
       if (exportBtn) exportBtn.onclick = downloadIcsFile;
 
-      const todayIso = new Date().toISOString().slice(0,10);
+      const todayIso = new Date().toISOString().slice(0, 10);
       const todayList = document.getElementById('todaySessionsList');
       const todaySessions = state.sessions.filter(s => s.date === todayIso)
         .sort((a, b) => (a.startTime || '00:00').localeCompare(b.startTime || '00:00'));
@@ -5497,7 +5280,7 @@
       const clashes = [];
       const sessions = [...state.sessions].sort((a, b) => (a.date + 'T' + (a.startTime || '00:00')).localeCompare(b.date + 'T' + (b.startTime || '00:00')));
       for (let i = 0; i < sessions.length; i++) {
-        for (let j = i+1; j < sessions.length; j++) {
+        for (let j = i + 1; j < sessions.length; j++) {
           const a = sessions[i], b = sessions[j];
           if (a.date !== b.date) continue;
           const aStart = timeToMinutes(a.startTime || '00:00');
@@ -5540,10 +5323,10 @@
         const sessions = byDate[date].sort((a, b) => (a.startTime || '00:00').localeCompare(b.startTime || '00:00'));
         for (let i = 0; i < sessions.length - 1; i++) {
           const currentEnd = timeToMinutes(sessions[i].startTime || '00:00') + Number(sessions[i].durationHours || 1) * 60;
-          const nextStart = timeToMinutes(sessions[i+1].startTime || '00:00');
+          const nextStart = timeToMinutes(sessions[i + 1].startTime || '00:00');
           const gap = nextStart - currentEnd;
           if (gap >= 0 && gap < 20) {
-            tight.push({ a: sessions[i], b: sessions[i+1], gap, date });
+            tight.push({ a: sessions[i], b: sessions[i + 1], gap, date });
           }
         }
       });
@@ -5563,7 +5346,7 @@
 
     function timeToMinutes(t) {
       const [h, m] = t.split(':').map(Number);
-      return h*60 + m;
+      return h * 60 + m;
     }
 
     function hasPaidInvoiceForDate(studentId, dateStr) {
@@ -5901,7 +5684,7 @@
 
       const unbilledList = document.getElementById('unbilledList');
       if (unbilledList) {
-      const unbilledSessions = state.sessions.filter(sess => !sess.invoiceId);
+        const unbilledSessions = state.sessions.filter(sess => !sess.invoiceId);
         const grouped = {};
         unbilledSessions.forEach(sess => {
           (sess.studentIds || []).forEach(sid => {
@@ -5913,7 +5696,7 @@
           const student = getStudentById(sid);
           const hours = sessList.reduce((acc, s) => acc + Number(s.durationHours || 0), 0);
           const amount = hours * (Number(student?.rate) || 0);
-          const lastDate = sessList.length ? sessList.sort((a,b) => new Date(b.date) - new Date(a.date))[0].date : 'n/a';
+          const lastDate = sessList.length ? sessList.sort((a, b) => new Date(b.date) - new Date(a.date))[0].date : 'n/a';
           return { student, hours, amount, lastDate };
         }).filter(item => item.student)
           .sort((a, b) => b.amount - a.amount)
@@ -5990,7 +5773,7 @@
       });
 
       // Unpaid invoices
-      const unpaid = state.invoices.filter(inv => !inv.paid).sort((a,b) => new Date(a.dueDate||0) - new Date(b.dueDate||0));
+      const unpaid = state.invoices.filter(inv => !inv.paid).sort((a, b) => new Date(a.dueDate || 0) - new Date(b.dueDate || 0));
 
       const reportEarnings = document.getElementById('repEarningsMonth');
       const reportEarningsCount = document.getElementById('repEarningsCount');
@@ -6007,7 +5790,7 @@
 
       const mixUl = document.getElementById('repSubjectMix');
       if (mixUl) {
-        mixUl.innerHTML = Object.entries(subjectHours).map(([k,v]) => `
+        mixUl.innerHTML = Object.entries(subjectHours).map(([k, v]) => `
           <li class="flex justify-between"><span>${k}</span><span>${v.toFixed(1)}h</span></li>
         `).join('');
       }
@@ -6017,7 +5800,7 @@
           const stu = getStudentById(inv.studentId)?.name || 'Student';
           return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
             <div class="font-medium">${stu}</div>
-            <div class="text-[10px] text-slate-500">Invoice ${inv.id} • Due ${inv.dueDate || 'n/a'} • R ${Number(inv.total||0).toFixed(2)}</div>
+            <div class="text-[10px] text-slate-500">Invoice ${inv.id} • Due ${inv.dueDate || 'n/a'} • R ${Number(inv.total || 0).toFixed(2)}</div>
           </li>`;
         }).join('') : '<li class="text-slate-500 text-xs">No unpaid invoices.</li>';
       }
@@ -6038,9 +5821,9 @@
       if (!inv) return;
       const s = getStudentById(inv.studentId);
       const name = s?.name || 'your child';
-      const today = new Date().toISOString().slice(0,10);
+      const today = new Date().toISOString().slice(0, 10);
       const text =
-`Hi,
+        `Hi,
 
 Just a friendly reminder about invoice ${inv.id} for ${name}, issued on ${inv.issueDate}, for R ${Number(inv.total || 0).toFixed(2)}. The due date was ${inv.dueDate || 'n/a'}.
 
@@ -6093,8 +5876,37 @@ Best regards,
       }
       const isEdit = !!student;
       const emailOptions = getAvailableStudentEmails(student?.studentEmail).map(e => `<option value="${e}">${e}</option>`).join('');
+
+      // New: Invite Code Generation UI (Only for Adding)
+      let inviteSection = '';
+      if (!isEdit) {
+        inviteSection = `
+          <div class="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
+            <h3 class="text-xs font-semibold text-indigo-900 mb-2">🚀 Invite Code</h3>
+            <p class="text-[10px] text-indigo-700 mb-2">
+              Generate a code for the student/parent to sign up themselves.
+            </p>
+            <div class="flex gap-2">
+              <button type="button" id="generateInviteBtn" 
+                class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 transition shadow-sm w-full">
+                Generate Code
+              </button>
+            </div>
+            <div id="inviteResult" class="hidden mt-2 p-2 bg-white border border-indigo-200 rounded-lg">
+              <div class="text-[10px] text-slate-500 mb-1">Send this code:</div>
+              <div class="flex items-center gap-2">
+                <code id="generatedCodeDisplay" class="text-sm font-mono font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded select-all"></code>
+                <button type="button" id="copyCodeBtn" class="text-[10px] text-indigo-600 hover:underline">Copy</button>
+              </div>
+            </div>
+          </div>
+          <hr class="border-slate-100 my-4">
+        `;
+      }
+
       const html = `
         <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit student' : 'Add student'}</h2>
+        ${inviteSection}
         <form id="studentForm" class="space-y-2">
           <div>
             <label class="block text-[11px] mb-1">Name</label>
@@ -6102,11 +5914,10 @@ Best regards,
                    class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
           </div>
           <div>
-            <label class="block text-[11px] mb-1">Student email (for login)</label>
+            <label class="block text-[11px] mb-1">Student email (optional if using code)</label>
             <input list="studentEmailOptions" name="studentEmail" type="email" value="${student?.studentEmail || ''}"
                    class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" ${readOnlyMode ? 'disabled' : ''} placeholder="email@example.com">
             <datalist id="studentEmailOptions">${emailOptions}</datalist>
-            <p class="text-[10px] text-slate-500 mt-1">Type or select an existing user email; each email can be used for only one student.</p>
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
@@ -6130,8 +5941,8 @@ Best regards,
             <textarea name="notes" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${student?.notes || ''}</textarea>
           </div>
           <div class="flex justify-between items-center mt-3">
-            <button type="submit" class="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium">
-              ${isEdit ? 'Save changes' : 'Add student'}
+            <button type="submit" class="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium">
+              ${isEdit ? 'Save changes' : 'Add Manually'}
             </button>
             ${isEdit ? `
               <button type="button" id="deleteStudentBtn"
@@ -6142,6 +5953,74 @@ Best regards,
         </form>
       `;
       openModal(html, () => {
+        // Invite Code Logic
+        if (!isEdit) {
+          const generateBtn = document.getElementById('generateInviteBtn');
+          const resultBox = document.getElementById('inviteResult');
+          const codeDisplay = document.getElementById('generatedCodeDisplay');
+          const copyBtn = document.getElementById('copyCodeBtn');
+
+          generateBtn.onclick = async () => {
+            const form = document.getElementById('studentForm');
+            const name = form.name.value.trim();
+            const grade = form.gradeLevel.value.trim();
+
+            if (!name) {
+              alert('Please enter a Name first to generate an invite.');
+              return;
+            }
+
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Generating...';
+
+            try {
+              // Generate local code
+              const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+
+              // Insert into Supabase invites table
+              if (!supabaseAvailable || !supabaseClient) throw new Error('Supabase not connected');
+
+              const { error } = await supabaseClient.from('invites').insert([{
+                code: code,
+                role: 'student',
+                full_name: name,
+                grade_level: grade,
+                metadata: {
+                  rate: form.rate.value,
+                  subjects: form.subjects.value,
+                  notes: form.notes.value
+                }
+              }]);
+
+              if (error) {
+                console.error('Invite Error', error);
+                if (error.code === '42P01') alert('Error: "invites" table missing. Please run the SQL migration.');
+                else alert('Failed to create invite: ' + error.message);
+                return;
+              }
+
+              // Success
+              codeDisplay.textContent = code;
+              resultBox.classList.remove('hidden');
+              generateBtn.textContent = 'Regenerate';
+
+              // Optional: Also add to local state as "Pending"? 
+              // For now, we trust the flow: Owner gives code -> Student signs up -> Student appears in list.
+
+            } catch (err) {
+              alert(err.message);
+            } finally {
+              generateBtn.disabled = false;
+            }
+          };
+
+          copyBtn.onclick = () => {
+            navigator.clipboard.writeText(codeDisplay.textContent);
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => copyBtn.textContent = 'Copy', 2000);
+          };
+        }
+
         document.getElementById('studentForm').onsubmit = (e) => {
           e.preventDefault();
           const form = e.target;
@@ -6217,23 +6096,22 @@ Best regards,
           <div>
             <label class="block text-[11px] mb-1">Students</label>
             <div class="grid grid-cols-2 gap-1 max-h-32 overflow-y-auto border border-slate-300 rounded-lg px-2 py-1">
-              ${
-                state.students.length
-                  ? state.students.map(s => `
+              ${state.students.length
+          ? state.students.map(s => `
                       <label class="flex items-center gap-1 text-[11px]">
                         <input type="checkbox" name="studentIds" value="${s.id}"
                           ${session?.studentIds?.includes(s.id) ? 'checked' : ''}>
                         <span>${s.name}</span>
                       </label>
                     `).join('')
-                  : '<div class="text-slate-500 text-[11px]">No students yet.</div>'
-              }
+          : '<div class="text-slate-500 text-[11px]">No students yet.</div>'
+        }
             </div>
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-[11px] mb-1">Date</label>
-              <input type="date" name="date" value="${session?.date || new Date().toISOString().slice(0,10)}"
+              <input type="date" name="date" value="${session?.date || new Date().toISOString().slice(0, 10)}"
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" required>
             </div>
             <div>
@@ -6306,7 +6184,7 @@ Best regards,
           }
         }
 
-        ['change','input'].forEach(ev => {
+        ['change', 'input'].forEach(ev => {
           form.date.addEventListener(ev, updateClashWarning);
           form.startTime.addEventListener(ev, updateClashWarning);
           form.durationHours.addEventListener(ev, updateClashWarning);
@@ -6333,14 +6211,14 @@ Best regards,
             notes: form.notes.value.trim(),
             completed: session?.completed || false
           };
-        if (isEdit) {
-          const idx = state.sessions.findIndex(s => s.id === session.id);
-          state.sessions[idx] = newSession;
-          logActivity('Updated session', newSession.topic || newSession.subject || 'Session');
-        } else {
-          state.sessions.push(newSession);
-          logActivity('Added session', newSession.topic || newSession.subject || 'Session');
-        }
+          if (isEdit) {
+            const idx = state.sessions.findIndex(s => s.id === session.id);
+            state.sessions[idx] = newSession;
+            logActivity('Updated session', newSession.topic || newSession.subject || 'Session');
+          } else {
+            state.sessions.push(newSession);
+            logActivity('Added session', newSession.topic || newSession.subject || 'Session');
+          }
           saveState();
           closeModal();
           renderScheduleView();
@@ -6473,7 +6351,7 @@ Best regards,
             level: form.level.value.trim(),
             tags: form.tags.value.split(',').map(t => t.trim()).filter(Boolean),
             description: form.description.value.trim(),
-            createdAt: resource?.createdAt || new Date().toISOString().slice(0,10),
+            createdAt: resource?.createdAt || new Date().toISOString().slice(0, 10),
             storage_path: resource?.storage_path || '',
             fileName: resource?.fileName || '',
             signedUrl: resource?.signedUrl || '',
@@ -6483,14 +6361,14 @@ Best regards,
             alert('Title is required.');
             return;
           }
-        if (isEdit) {
-          const idx = state.resources.findIndex(r => r.id === resource.id);
-          state.resources[idx] = newRes;
-          logActivity('Updated resource', newRes.title);
-        } else {
-          state.resources.push(newRes);
-          logActivity('Added resource', newRes.title);
-        }
+          if (isEdit) {
+            const idx = state.resources.findIndex(r => r.id === resource.id);
+            state.resources[idx] = newRes;
+            logActivity('Updated resource', newRes.title);
+          } else {
+            state.resources.push(newRes);
+            logActivity('Added resource', newRes.title);
+          }
           saveState();
           closeModal();
           renderResourcesView();
@@ -6521,7 +6399,7 @@ Best regards,
               return;
             }
             const maxSize = 15 * 1024 * 1024;
-            const allowed = ['application/pdf','image/png','image/jpeg','image/jpg','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+            const allowed = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
             if (file.size > maxSize) {
               alert('File too large (max 15MB).');
               return;
@@ -6607,22 +6485,21 @@ Best regards,
           <div>
             <label class="block text-[11px] mb-1">Students</label>
             <div class="grid grid-cols-2 gap-1 max-h-32 overflow-y-auto border border-slate-300 rounded-lg px-2 py-1">
-              ${
-                state.students.length
-                  ? state.students.map(s => `
+              ${state.students.length
+          ? state.students.map(s => `
                       <label class="flex items-center gap-1 text-[11px]">
                         <input type="checkbox" name="studentIds" value="${s.id}">
                         <span>${s.name}</span>
                       </label>
                     `).join('')
-                  : '<div class="text-slate-500 text-[11px]">No students yet.</div>'
-              }
+          : '<div class="text-slate-500 text-[11px]">No students yet.</div>'
+        }
             </div>
           </div>
           <div>
             <label class="block text-[11px] mb-1">Due date</label>
             <input type="date" name="dueDate" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs"
-                   value="${new Date().toISOString().slice(0,10)}">
+                   value="${new Date().toISOString().slice(0, 10)}">
           </div>
           <button type="submit" class="mt-2 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium">
             Assign
@@ -6639,7 +6516,7 @@ Best regards,
             return;
           }
           const dueDate = form.dueDate.value;
-          const today = new Date().toISOString().slice(0,10);
+          const today = new Date().toISOString().slice(0, 10);
           ids.forEach(stuId => {
             state.homework.push({
               id: generateId('hw'),
@@ -6676,14 +6553,13 @@ Best regards,
           <div>
             <label class="block text-[11px] mb-1">Student</label>
             <select name="studentId" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
-              ${
-                state.students.map(s => `
+              ${state.students.map(s => `
                   <option value="${s.id}"
                     ${(doc?.studentId === s.id || fixedStudentId === s.id) ? 'selected' : ''}>
                     ${s.name}
                   </option>
                 `).join('')
-              }
+        }
             </select>
           </div>
           <div>
@@ -6702,7 +6578,7 @@ Best regards,
           </div>
           <div>
             <label class="block text-[11px] mb-1">Date</label>
-            <input type="date" name="date" value="${doc?.date || new Date().toISOString().slice(0,10)}"
+            <input type="date" name="date" value="${doc?.date || new Date().toISOString().slice(0, 10)}"
                    class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
           </div>
           <div>
@@ -6732,7 +6608,7 @@ Best regards,
             status: form.status.value,
             date: form.date.value,
             notes: form.notes.value.trim(),
-            createdAt: doc?.createdAt || new Date().toISOString().slice(0,10)
+            createdAt: doc?.createdAt || new Date().toISOString().slice(0, 10)
           };
           if (!newDoc.studentId) {
             alert('Select a student.');
@@ -6742,14 +6618,14 @@ Best regards,
             alert('Title required.');
             return;
           }
-        if (isEdit) {
-          const idx = state.documents.findIndex(d => d.id === doc.id);
-          state.documents[idx] = newDoc;
-          logActivity('Updated document', newDoc.title);
-        } else {
-          state.documents.push(newDoc);
-          logActivity('Added document', newDoc.title);
-        }
+          if (isEdit) {
+            const idx = state.documents.findIndex(d => d.id === doc.id);
+            state.documents[idx] = newDoc;
+            logActivity('Updated document', newDoc.title);
+          } else {
+            state.documents.push(newDoc);
+            logActivity('Added document', newDoc.title);
+          }
           saveState();
           closeModal();
           if (selectedStudentId) {
@@ -6785,14 +6661,13 @@ Best regards,
           <div>
             <label class="block text-[11px] mb-1">Student</label>
             <select name="studentId" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
-              ${
-                state.students.map(s => `
+              ${state.students.map(s => `
                   <option value="${s.id}"
                     ${(inv?.studentId === s.id || (!inv && selectedStudentId === s.id)) ? 'selected' : ''}>
                     ${s.name}
                   </option>
                 `).join('')
-              }
+        }
             </select>
           </div>
           <div>
@@ -6808,7 +6683,7 @@ Best regards,
             </div>
             <div>
               <label class="block text-[11px] mb-1">Issue date</label>
-              <input type="date" name="issueDate" value="${inv?.issueDate || new Date().toISOString().slice(0,10)}"
+              <input type="date" name="issueDate" value="${inv?.issueDate || new Date().toISOString().slice(0, 10)}"
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
             </div>
           </div>
@@ -6829,7 +6704,7 @@ Best regards,
               <label class="block text-[11px] mb-1">Late fee %</label>
               <div class="flex items-center gap-2">
                 <select name="lateFeePercent" class="flex-1 border border-slate-300 rounded-lg px-2 py-1 text-xs">
-                  ${[0,5,10,15,20].map(p => `<option value="${p}" ${inv?.lateFeePercent === p ? 'selected' : ''}>${p}%</option>`).join('')}
+                  ${[0, 5, 10, 15, 20].map(p => `<option value="${p}" ${inv?.lateFeePercent === p ? 'selected' : ''}>${p}%</option>`).join('')}
                 </select>
                 <label class="flex items-center gap-1 text-[10px]">
                   <input type="checkbox" name="applyLate" ${inv?.lateApplied ? 'checked' : ''}>
@@ -6841,7 +6716,7 @@ Best regards,
               <label class="block text-[11px] mb-1">Short notice %</label>
               <div class="flex items-center gap-2">
                 <select name="shortNoticePercent" class="flex-1 border border-slate-300 rounded-lg px-2 py-1 text-xs">
-                  ${[0,5,10,15].map(p => `<option value="${p}" ${inv?.shortNoticePercent === p ? 'selected' : ''}>${p}%</option>`).join('')}
+                  ${[0, 5, 10, 15].map(p => `<option value="${p}" ${inv?.shortNoticePercent === p ? 'selected' : ''}>${p}%</option>`).join('')}
                 </select>
                 <label class="flex items-center gap-1 text-[10px]">
                   <input type="checkbox" name="applyShort" ${inv?.shortApplied ? 'checked' : ''}>
@@ -6914,7 +6789,7 @@ Best regards,
           const base = Number(form.baseAmount.value || form.total.value || 0);
           const latePct = form.applyLate.checked ? Number(form.lateFeePercent.value || 0) : 0;
           const shortPct = form.applyShort.checked ? Number(form.shortNoticePercent.value || 0) : 0;
-          const total = base * (1 + latePct/100 + shortPct/100);
+          const total = base * (1 + latePct / 100 + shortPct / 100);
           if (base > 0) {
             form.total.value = total.toFixed(2);
             const display = document.getElementById('computedTotal');
@@ -6922,11 +6797,11 @@ Best regards,
           }
         }
 
-        ['baseAmount','lateFeePercent','shortNoticePercent'].forEach(name => {
+        ['baseAmount', 'lateFeePercent', 'shortNoticePercent'].forEach(name => {
           const el = form[name];
           if (el) el.addEventListener('input', computeTotalFromFees);
         });
-        ['applyLate','applyShort'].forEach(name => {
+        ['applyLate', 'applyShort'].forEach(name => {
           const el = form[name];
           if (el) el.addEventListener('change', computeTotalFromFees);
         });
@@ -7027,5 +6902,5 @@ Best regards,
     }
   </script>
 </body>
->>>>>>> theirs
+
 </html>
