@@ -115,7 +115,7 @@
     <!-- Owner Login -->
     <div id="owner-tab" class="tab-content">
       <h1>Sign in</h1>
-      <p class="text-sm">Tutor/Owner access.</p>
+      <p class="text-sm">Tutor/Owner access. Students and parents use their login code.</p>
       <form id="ownerForm" class="mt-3">
         <div class="mt-3">
           <label>Email</label>
@@ -169,6 +169,7 @@
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkc3FuYmVidXR1aHdja2pwd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxMDE1NzcsImV4cCI6MjA3OTY3NzU3N30.pJglpTaZouSQFUVCbQONHK1UsB9CgWewKQCIV13NOEM';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const HCAPTCHA_SITEKEY = '3ff631fc-4c9c-43ee-a486-3232939eedb2';
+    const CODE_EMAIL_SUFFIX = '@codes.tutor';
 
     // Widget IDs
     let widgets = {
@@ -218,12 +219,6 @@
     initCaptchas();
     window.addEventListener('load', initCaptchas);
 
-    // State to track if we need to sign up (first time) vs sign in
-    let requestMode = {
-      parent: 'login', // 'login' or 'signup'
-      student: 'login'
-    };
-
     const ownerForm = document.getElementById('ownerForm');
     const msg = document.getElementById('msg');
 
@@ -258,66 +253,30 @@
      * @param {string} widgetId - The widget ID to reset if needed
      */
     async function handleCodeLogin(code, role, token, widgetId) {
-      msg.textContent = 'Verifying...';
+      msg.textContent = 'Verifying code...';
       const cleanCode = code.trim().toUpperCase();
-      const dummyEmail = `${cleanCode}@tutor.app`;
-      const dummyPassword = cleanCode;
+      const loginEmail = `${cleanCode.toLowerCase()}${CODE_EMAIL_SUFFIX}`;
 
       try {
         if (!token) throw new Error('Please complete hCaptcha.');
 
-        const mode = requestMode[role]; // 'login' or 'signup'
+        const { error } = await supabaseClient.auth.signInWithPassword({
+          email: loginEmail,
+          password: cleanCode,
+          options: { captchaToken: token }
+        });
 
-        if (mode === 'login') {
-          // Attempt Login
-          const { data, error } = await supabaseClient.auth.signInWithPassword({
-            email: dummyEmail,
-            password: dummyPassword,
-            options: { captchaToken: token }
-          });
-
-          if (error) {
-            // Check for "Invalid login credentials" implying user doesn't exist yet
-            const isCredError = error.message.includes('Invalid login') || error.message.includes('credentials');
-
-            if (isCredError) {
-              // Switch to Signup Mode
-              console.log('User not found, switching to signup flow');
-              requestMode[role] = 'signup';
-              msg.innerHTML = '<span class="text-indigo-600">First time access detected.<br>Please solve the captcha again to activate your secure account.</span>';
-              if (widgetId !== null) hcaptcha.reset(widgetId);
-              return; // Stop here, wait for user to re-submit
-            }
-            throw error; // Other errors (network, etc)
-          }
-
-          // Login Success
-          window.location.href = './index.html';
-
-        } else {
-          // Attempt Signup (Active Mode)
-          msg.textContent = 'Activating account...';
-          const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
-            email: dummyEmail,
-            password: dummyPassword,
-            options: {
-              data: { sys_role: role, code_user: true },
-              captchaToken: token
-            }
-          });
-
-          if (signUpError) throw signUpError;
-
-          // Signup Success
-          window.location.href = './index.html';
+        if (error) {
+          throw new Error('Invalid or expired code. Ask your tutor for a new one.');
         }
+
+        // Login Success
+        window.location.href = './index.html';
 
       } catch (err) {
         console.error(err);
         msg.textContent = err.message || 'Access failed. Please try again.';
         if (widgetId !== null) hcaptcha.reset(widgetId);
-        // Reset mode on error so they can try fresh
-        requestMode[role] = 'login';
       }
     }
 
