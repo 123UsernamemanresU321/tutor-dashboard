@@ -36,7 +36,7 @@
 <body>
   <div class="card">
     <h1>Terms of Service</h1>
-    <div class="muted">Last Updated: 28 November 2025</div>
+    <div class="muted">Last Updated: <span data-terms-effective-date>TERMS_EFFECTIVE_DATE</span></div>
     <p>These Terms of Service govern use of the tutoring dashboard (“Dashboard”) and related tutoring services. By accessing the Dashboard, you agree to these terms.</p>
 
     <h2>1. Eligibility</h2>
@@ -70,6 +70,16 @@
     <h3>5.3 Late Payments</h3>
     <p>Repeated late payment may result in late fees and/or suspension of lessons.</p>
 
+    <h2>Payments and Merchant Details</h2>
+    <ul>
+      <li><strong>Merchant of record:</strong> <span data-merchant-name>MERCHANT_NAME</span></li>
+      <li><strong>Payment processor:</strong> Yoco</li>
+      <li><strong>Operator/service delivery:</strong> <span data-operator-name>OPERATOR_NAME</span></li>
+      <li><strong>Contact email:</strong> <span data-support-email>SUPPORT_EMAIL</span></li>
+      <li><strong>Business address:</strong> <span data-business-address>BUSINESS_ADDRESS</span></li>
+      <li><strong>Refund policy:</strong> Refunds are considered case-by-case for unused sessions; contact support to request a review.</li>
+    </ul>
+
     <h2>6. Resources & Intellectual Property</h2>
     <p>All materials (notes, worksheets, videos, explanations) are for personal academic use only. Redistribution, resale, or misrepresentation is prohibited.</p>
 
@@ -86,7 +96,10 @@
     <p>These terms align with common standards for private tutoring and student data handling and are not tied to a specific legal jurisdiction.</p>
 
     <h2>11. Contact</h2>
-    <p>Questions about these Terms: <strong>erichuang.shangjing@outlook.com</strong></p>
+    <p>Questions about these Terms: <strong data-support-email>SUPPORT_EMAIL</strong></p>
   </div>
+  <footer class="muted" data-merchant-disclosure style="margin-top: 16px; text-align: center;"></footer>
+  <script src="./business-config.js"></script>
+  <script src="./business-ui.js"></script>
 </body>
 </html>
