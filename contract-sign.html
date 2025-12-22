@@ -586,33 +586,44 @@ Date: [date]
       if (!contractEl || !window.html2canvas || !jsPDF) {
         return { pdfBase64, pdfName };
       }
-      const canvas = await withTimeout(
-        window.html2canvas(contractEl, {
-          scale: 2,
-          backgroundColor: '#ffffff',
-          useCORS: true
-        }),
-        12000,
-        'Screenshot render'
-      );
-      const imgData = canvas.toDataURL('image/png');
-      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-      doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        doc.addPage();
-        doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      const MAX_PDF_BASE64 = 3_500_000;
+      const renderPass = async (scale, quality) => {
+        const canvas = await withTimeout(
+          window.html2canvas(contractEl, {
+            scale,
+            backgroundColor: '#ffffff',
+            useCORS: true
+          }),
+          12000,
+          'Screenshot render'
+        );
+        const imgData = canvas.toDataURL('image/jpeg', quality);
+        const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const imgWidth = pageWidth;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        let heightLeft = imgHeight;
+        let position = 0;
+        doc.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
+        while (heightLeft > 0) {
+          position = heightLeft - imgHeight;
+          doc.addPage();
+          doc.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+          heightLeft -= pageHeight;
+        }
+        const dataUri = doc.output('datauristring');
+        const base64 = dataUri.split(',')[1] || '';
+        return base64;
+      };
+      pdfBase64 = await renderPass(1.2, 0.75);
+      if (pdfBase64.length > MAX_PDF_BASE64) {
+        pdfBase64 = await renderPass(1.0, 0.6);
       }
-      const dataUri = doc.output('datauristring');
-      pdfBase64 = dataUri.split(',')[1] || '';
+      if (pdfBase64.length > MAX_PDF_BASE64) {
+        pdfBase64 = '';
+      }
       const safeName = (fields.student_name || 'student').replace(/[^a-z0-9_-]+/gi, '_');
       pdfName = `signed_contract_${safeName}.pdf`;
       return { pdfBase64, pdfName };
@@ -644,7 +655,11 @@ Date: [date]
         } catch (err) {
           console.warn('Failed to generate contract PDF', err);
         }
-        msgEl.textContent = 'Submitting signature...';
+        if (!pdfBase64) {
+          msgEl.textContent = 'Submitting signature (PDF too large, stored without screenshot)...';
+        } else {
+          msgEl.textContent = 'Submitting signature...';
+        }
         const resp = await fetch(`${SUPABASE_URL}/functions/v1/sign-contract`, {
           method: 'POST',
           headers: {
