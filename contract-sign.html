@@ -155,6 +155,7 @@
   </div>
   </form>
 
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script>
     const SUPABASE_URL = 'https://wdsqnbebutuhwckjpwqf.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkc3FuYmVidXR1aHdja2pwd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxMDE1NzcsImV4cCI6MjA3OTY3NzU3N30.pJglpTaZouSQFUVCbQONHK1UsB9CgWewKQCIV13NOEM';
@@ -584,6 +585,33 @@ Date: [date]
       msgEl.textContent = 'Signing...';
       try {
         const contractTextSnapshot = buildContractSnapshot(fields);
+        let pdfBase64 = '';
+        let pdfName = 'signed_contract.pdf';
+        try {
+          const jsPDF = window.jspdf?.jsPDF;
+          if (jsPDF) {
+            const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+            const margin = 40;
+            const pageWidth = doc.internal.pageSize.getWidth() - margin * 2;
+            const lineHeight = 14;
+            const lines = doc.splitTextToSize(contractTextSnapshot, pageWidth);
+            let y = margin;
+            lines.forEach(line => {
+              if (y > doc.internal.pageSize.getHeight() - margin) {
+                doc.addPage();
+                y = margin;
+              }
+              doc.text(line, margin, y);
+              y += lineHeight;
+            });
+            const dataUri = doc.output('datauristring');
+            pdfBase64 = dataUri.split(',')[1] || '';
+            const safeName = (fields.student_name || 'student').replace(/[^a-z0-9_-]+/gi, '_');
+            pdfName = `signed_contract_${safeName}.pdf`;
+          }
+        } catch (err) {
+          console.warn('Failed to generate contract PDF', err);
+        }
         const resp = await fetch(`${SUPABASE_URL}/functions/v1/sign-contract`, {
           method: 'POST',
           headers: {
@@ -598,8 +626,8 @@ Date: [date]
             version,
             signature_method: 'online click-to-sign',
             contract_text_snapshot: contractTextSnapshot,
-            pdf_base64: '', // server generates PDF
-            pdf_name: 'signed_contract.pdf',
+            pdf_base64: pdfBase64,
+            pdf_name: pdfName,
             signature_text: fields.parent_signature,
             parent_phone: fields.parent_phone,
             parent_id: fields.parent_id,
