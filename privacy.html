@@ -37,7 +37,7 @@
 <body>
   <div class="card">
     <h1>Privacy Policy</h1>
-    <div class="muted">Last Updated: 28 November 2025</div>
+    <div class="muted">Last Updated: <span data-terms-effective-date>TERMS_EFFECTIVE_DATE</span></div>
     <p>This Privacy Policy describes how personal information is collected, used, and protected in connection with the tutoring dashboard (“Dashboard”). By creating an account or using the Dashboard, you consent to these practices.</p>
 
     <h2>1. Information Collected</h2>
@@ -93,7 +93,10 @@
     <p>This policy may be updated as the Dashboard evolves. Material changes will be communicated.</p>
 
     <h2>9. Contact</h2>
-    <p>Questions or requests: <strong>erichuang.shangjing@outlook.com</strong></p>
+    <p>Questions or requests: <strong data-support-email>SUPPORT_EMAIL</strong></p>
   </div>
+  <footer class="muted" data-merchant-disclosure style="margin-top: 16px; text-align: center;"></footer>
+  <script src="./business-config.js"></script>
+  <script src="./business-ui.js"></script>
 </body>
 </html>
