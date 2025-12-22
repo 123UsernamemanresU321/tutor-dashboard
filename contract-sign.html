@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <title>Sign Tutoring Contract</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #0f172a; padding: 1.5rem; }
     .page { max-width: 900px; margin: 0 auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.5rem; box-shadow: 0 20px 60px -40px rgba(15,23,42,0.4); }
@@ -159,9 +158,10 @@
   <script>
     const SUPABASE_URL = 'https://wdsqnbebutuhwckjpwqf.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkc3FuYmVidXR1aHdja2pwd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxMDE1NzcsImV4cCI6MjA3OTY3NzU3N30.pJglpTaZouSQFUVCbQONHK1UsB9CgWewKQCIV13NOEM';
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const studentId = new URLSearchParams(location.search).get('student_id');
-    const version = new URLSearchParams(location.search).get('v') || 'v1';
+    const params = new URLSearchParams(location.search);
+    const studentId = params.get('student_id');
+    const studentNameParam = (params.get('student_name') || '').trim();
+    const version = params.get('v') || 'v1';
     const statusEl = document.getElementById('status');
     const msgEl = document.getElementById('message');
     const form = document.getElementById('signForm');
@@ -484,7 +484,6 @@ Date: [date]
 
     if (!studentId) {
       statusEl.textContent = 'Missing student_id in the link.';
-      form.style.display = 'none';
     } else {
       statusEl.textContent = 'Ready to sign';
     }
@@ -518,16 +517,14 @@ Date: [date]
     }
 
     async function loadStudent() {
-    const { data, error } = await supabaseClient.from('students').select('name,contract_signed').eq('id', studentId).single();
-    if (error || !data) {
-      statusEl.textContent = 'Student not found.';
-      form.style.display = 'none';
-      return;
-    }
-    studentNameForText = data.name;
-    const studentNameEl = document.getElementById('studentName');
-    if (studentNameEl) studentNameEl.textContent = `Student: ${studentNameForText}`;
-    form.student_name.value = studentNameForText;
+      if (studentNameParam) {
+        studentNameForText = studentNameParam;
+        const studentNameEl = document.getElementById('studentName');
+        if (studentNameEl) studentNameEl.textContent = `Student: ${studentNameForText}`;
+        if (form.student_name && !form.student_name.value) {
+          form.student_name.value = studentNameForText;
+        }
+      }
       const today = new Date().toISOString().slice(0,10);
       ['date','date_guardian','date_parent'].forEach(n => {
         const el = document.querySelector(`[name="${n}"]`);
@@ -546,9 +543,6 @@ Date: [date]
       setIfEmpty('tutor_name', 'Shangjing Huang');
       setIfEmpty('tutor_email', 'erichuang.shangjing@outlook.com');
       setIfEmpty('package_months', '6');
-      if (data.contract_signed) {
-        statusEl.textContent = 'Already signed';
-      }
     }
 
     function buildContractSnapshot(fields) {
@@ -576,7 +570,10 @@ Date: [date]
 
     form.onsubmit = async (e) => {
       e.preventDefault();
-      if (!studentId) return;
+      if (!studentId) {
+        msgEl.textContent = 'Missing student_id in the link.';
+        return;
+      }
       const fields = getFieldsFromInputs();
       if (!fields.parent_name || !fields.parent_email || !fields.student_name || !fields.student_dob || !fields.student_school || !form.confirm.checked || !fields.signature) {
         msgEl.textContent = 'Please fill all fields and confirm.';
