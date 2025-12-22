@@ -460,7 +460,7 @@
           T
         </div>
         <div>
-          <div class="font-semibold text-sm">Tutor Control Center</div>
+          <div class="font-semibold text-sm" data-brand-name>BRAND_NAME</div>
           <div class="text-xs text-slate-400">Physics • Chemistry • Maths</div>
         </div>
       </div>
@@ -1244,7 +1244,7 @@
                   <span class="text-[10px] text-slate-500">Verification</span>
                 </div>
                 <div class="text-[11px] text-slate-500">Business name</div>
-                <div id="businessName" class="text-[11px] font-semibold">Tutor Control Center</div>
+                <div id="businessName" class="text-[11px] font-semibold" data-brand-name>BRAND_NAME</div>
                 <div class="grid grid-cols-2 gap-3 mt-2">
                   <div>
                     <div class="text-[11px] text-slate-500">Contact</div>
@@ -1317,6 +1317,7 @@
                   <span class="hint">Unpaid first</span>
                 </div>
                 <ul id="portalInvoices" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+                <p id="portalInvoiceDisclosure" class="text-[10px] text-slate-500" data-merchant-receipt></p>
               </div>
               <div class="card p-4 space-y-2">
                 <div class="flex items-center justify-between">
@@ -1424,6 +1425,7 @@
               <div class="card p-4 space-y-2">
                 <h3 class="text-sm font-semibold">Invoices</h3>
                 <ul id="parentInvoices" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+                <p id="parentInvoiceDisclosure" class="text-[10px] text-slate-500" data-merchant-receipt></p>
               </div>
               <div class="card p-4 space-y-2">
                 <h3 class="text-sm font-semibold">Resources</h3>
@@ -1433,6 +1435,7 @@
           </div>
         </section>
       </main>
+      <footer class="px-8 py-4 text-[10px] text-slate-500" data-merchant-disclosure></footer>
     </div>
   </div>
 
@@ -1441,7 +1444,7 @@
     class="fixed inset-0 z-50 bg-gradient-to-br from-indigo-50 via-white to-cyan-50 text-slate-900 hidden overflow-y-auto">
     <div class="max-w-5xl mx-auto px-6 py-12">
       <header class="flex items-center justify-between mb-10">
-        <div class="text-xl font-bold text-indigo-700">Tutor Control Center</div>
+        <div class="text-xl font-bold text-indigo-700" data-brand-name>BRAND_NAME</div>
         <div class="flex gap-3">
           <a href="./login.html"
             class="px-4 py-2 rounded-full border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-sm font-semibold">Tutor
@@ -1528,14 +1531,16 @@
             <h3 class="text-sm font-semibold">Business & contact</h3>
             <p class="text-[11px] text-slate-600 mt-1">Private tutoring services for Physics, Chemistry, and Maths.</p>
             <div class="mt-2 space-y-1 text-[11px]">
-              <div><span class="text-slate-500">Contact:</span> <span id="landingContactEmail" class="font-semibold">—</span></div>
+              <div><span class="text-slate-500">Contact:</span> <span id="landingContactEmail" class="font-semibold" data-support-email>SUPPORT_EMAIL</span></div>
               <div><span class="text-slate-500">Service:</span> One-on-one sessions and parent/student portals.</div>
             </div>
+            <p class="text-[10px] text-slate-500 mt-2" data-about-operator-merchant></p>
           </div>
           <div class="card p-4 bg-white/70 backdrop-blur border border-slate-200">
             <h3 class="text-sm font-semibold">Payments</h3>
             <ul class="mt-2 space-y-1 text-[11px] text-slate-600">
               <li>• Online card payments via Yoco</li>
+              <li data-yoco-merchant-line></li>
               <li>• Invoices issued monthly, prepaid</li>
               <li>• Secure access codes for parents/students</li>
             </ul>
@@ -1550,6 +1555,7 @@
           </div>
         </div>
       </section>
+      <footer class="mt-10 text-[10px] text-slate-500" data-merchant-disclosure></footer>
     </div>
   </div>
 
@@ -1575,6 +1581,9 @@
     </div>
   </div>
 
+  <script src="./business-config.js"></script>
+  <script src="./business-ui.js"></script>
+
   <script>
     /***********************
      * STATE & PERSISTENCE *
@@ -1586,6 +1595,14 @@
     const tourQuery = new URLSearchParams(window.location.search).get('tour') === '1';
     const tourMode = tourQuery || sessionStorage.getItem(TOUR_MODE_KEY) === '1';
     if (tourMode) sessionStorage.setItem(TOUR_MODE_KEY, '1');
+
+    const BUSINESS = window.BUSINESS_CONFIG || {};
+    const BRAND_NAME = BUSINESS.brandName || 'BRAND_NAME';
+    const OPERATOR_NAME = BUSINESS.operatorName || 'OPERATOR_NAME';
+    const MERCHANT_NAME = BUSINESS.merchantName || 'MERCHANT_NAME';
+    const SUPPORT_EMAIL = BUSINESS.supportEmail || 'SUPPORT_EMAIL';
+    const BUSINESS_ADDRESS = BUSINESS.businessAddress || 'BUSINESS_ADDRESS';
+    const TERMS_EFFECTIVE_DATE = BUSINESS.termsEffectiveDate || 'TERMS_EFFECTIVE_DATE';
 
     function enableTourMode() {
       sessionStorage.setItem(TOUR_MODE_KEY, '1');
@@ -2772,8 +2789,6 @@
       await initSupabaseAuth();
       setupNav();
       setupTopbar();
-      const landingEmail = document.getElementById('landingContactEmail');
-      if (landingEmail) landingEmail.textContent = OWNER_EMAIL || '—';
       document.querySelectorAll('[data-tour-trigger]').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.preventDefault();
@@ -3083,7 +3098,7 @@
       const sessMeta = document.getElementById('profileSessionMeta');
       const businessEmailEl = document.getElementById('businessContactEmail');
       const businessPaymentEl = document.getElementById('businessPaymentProvider');
-      if (businessEmailEl) businessEmailEl.textContent = OWNER_EMAIL || '—';
+      if (businessEmailEl) businessEmailEl.textContent = SUPPORT_EMAIL || '—';
       if (businessPaymentEl) businessPaymentEl.textContent = 'Yoco';
       if (!user) {
         if (tourMode) {
@@ -4615,7 +4630,7 @@
 
     const policyContent = {
       privacy: `
-<h3 class="text-sm font-semibold mb-2">Privacy Policy (Last Updated: 28 November 2025)</h3>
+<h3 class="text-sm font-semibold mb-2">Privacy Policy (Last Updated: ${TERMS_EFFECTIVE_DATE})</h3>
 <p class="text-[11px] mb-2">This Privacy Policy describes how personal information is collected, used, and protected in connection with the tutoring dashboard (“Dashboard”). By creating an account or using the Dashboard, you consent to these practices.</p>
 <ul class="list-disc list-inside text-[11px] space-y-2">
   <li><strong>Information Collected:</strong> name, email, password (Supabase Auth), subjects, sessions, homework status, resources accessed, invoices/payment status (no card/bank details), and device-only preferences (localStorage/IndexedDB).</li>
@@ -4625,11 +4640,11 @@
   <li><strong>Your Rights:</strong> Access, correct, export, or delete your data; withdraw at any time.</li>
   <li><strong>Retention:</strong> Kept while you are an active student; deletable on request when lessons end.</li>
   <li><strong>Minors:</strong> Only essential data is collected; no non-academic use; guardian instructions are followed.</li>
-  <li><strong>Contact:</strong> erichuang.shangjing@outlook.com</li>
+  <li><strong>Contact:</strong> ${SUPPORT_EMAIL}</li>
 </ul>
       `,
       tos: `
-<h3 class="text-sm font-semibold mb-2">Terms of Service (Last Updated: 28 November 2025)</h3>
+<h3 class="text-sm font-semibold mb-2">Terms of Service (Last Updated: ${TERMS_EFFECTIVE_DATE})</h3>
 <ul class="list-disc list-inside text-[11px] space-y-2">
   <li><strong>Eligibility:</strong> Limited to students receiving tutoring; under 18 requires guardian approval.</li>
   <li><strong>Account Responsibilities:</strong> Keep credentials confidential; use only for tutoring; report unauthorized access.</li>
@@ -4640,7 +4655,16 @@
   <li><strong>Privacy:</strong> Data handled per the Privacy Policy; use of the Dashboard signifies acceptance.</li>
   <li><strong>Limitation of Liability:</strong> Dashboard provided “as is”; no liability for outages, third-party downtime, device failures, or academic outcomes.</li>
   <li><strong>Termination:</strong> Access may be restricted for violations/misuse or when tutoring concludes; you may request deletion anytime.</li>
-  <li><strong>Contact:</strong> erichuang.shangjing@outlook.com</li>
+  <li><strong>Contact:</strong> ${SUPPORT_EMAIL}</li>
+</ul>
+<h4 class="text-[11px] font-semibold mt-3">Payments and Merchant Details</h4>
+<ul class="list-disc list-inside text-[11px] space-y-2">
+  <li><strong>Merchant of record:</strong> ${MERCHANT_NAME}</li>
+  <li><strong>Payment processor:</strong> Yoco</li>
+  <li><strong>Operator/service delivery:</strong> ${OPERATOR_NAME}</li>
+  <li><strong>Contact email:</strong> ${SUPPORT_EMAIL}</li>
+  <li><strong>Business address:</strong> ${BUSINESS_ADDRESS}</li>
+  <li><strong>Refund policy:</strong> Refunds are considered case-by-case for unused sessions; contact support to request a review.</li>
 </ul>
       `
     };
@@ -6766,7 +6790,9 @@
 
 Just a friendly reminder about invoice ${inv.id} for ${name}, issued on ${inv.issueDate}, for R ${Number(inv.total || 0).toFixed(2)}. The due date was ${inv.dueDate || 'n/a'}.
 
-If you have already made payment, please ignore this message. Otherwise, I’d appreciate it if you could settle it at your convenience.
+If you have already made payment, please ignore this message. Otherwise, please pay via Yoco (merchant: ${MERCHANT_NAME}).
+
+Merchant: ${MERCHANT_NAME}. Service Provider/Operator: ${OPERATOR_NAME}.
 
 Best regards,
 [Your name]
@@ -7663,9 +7689,14 @@ Best regards,
               </button>` : ''}
           </div>
         </form>
+        <div class="mt-2 text-[10px] text-slate-500" data-yoco-merchant-line></div>
+        <div class="text-[10px] text-slate-500" data-merchant-receipt></div>
       `;
       openModal(html, () => {
         const form = document.getElementById('invoiceForm');
+        if (window.applyBusinessText) {
+          window.applyBusinessText(document.getElementById('modalContainer'));
+        }
         const sessionBox = form.querySelector('#invoiceSessions');
 
         const renderSessionChoices = () => {
