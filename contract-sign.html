@@ -570,6 +570,54 @@ Date: [date]
         .replaceAll('[date]', fields.date_parent || fields.date);
     }
 
+    function withTimeout(promise, ms, label) {
+      let timer;
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
+      });
+      return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+    }
+
+    async function buildScreenshotPdf(fields, contractTextSnapshot) {
+      let pdfBase64 = '';
+      let pdfName = 'signed_contract.pdf';
+      const contractEl = document.getElementById('contractPage');
+      const jsPDF = window.jspdf?.jsPDF;
+      if (!contractEl || !window.html2canvas || !jsPDF) {
+        return { pdfBase64, pdfName };
+      }
+      const canvas = await withTimeout(
+        window.html2canvas(contractEl, {
+          scale: 2,
+          backgroundColor: '#ffffff',
+          useCORS: true
+        }),
+        12000,
+        'Screenshot render'
+      );
+      const imgData = canvas.toDataURL('image/png');
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        doc.addPage();
+        doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      const dataUri = doc.output('datauristring');
+      pdfBase64 = dataUri.split(',')[1] || '';
+      const safeName = (fields.student_name || 'student').replace(/[^a-z0-9_-]+/gi, '_');
+      pdfName = `signed_contract_${safeName}.pdf`;
+      return { pdfBase64, pdfName };
+    }
+
     form.onsubmit = async (e) => {
       e.preventDefault();
       if (!studentId) {
@@ -583,44 +631,20 @@ Date: [date]
       }
       const name = fields.parent_name;
       const email = fields.parent_email;
-      msgEl.textContent = 'Signing...';
+      msgEl.textContent = 'Preparing contract...';
       try {
         const contractTextSnapshot = buildContractSnapshot(fields);
+        msgEl.textContent = 'Preparing screenshot...';
         let pdfBase64 = '';
         let pdfName = 'signed_contract.pdf';
         try {
-          const contractEl = document.getElementById('contractPage');
-          const jsPDF = window.jspdf?.jsPDF;
-          if (contractEl && window.html2canvas && jsPDF) {
-            const canvas = await window.html2canvas(contractEl, {
-              scale: 2,
-              backgroundColor: '#ffffff',
-              useCORS: true
-            });
-            const imgData = canvas.toDataURL('image/png');
-            const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-            const pageWidth = doc.internal.pageSize.getWidth();
-            const pageHeight = doc.internal.pageSize.getHeight();
-            const imgWidth = pageWidth;
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            let heightLeft = imgHeight;
-            let position = 0;
-            doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-            heightLeft -= pageHeight;
-            while (heightLeft > 0) {
-              position = heightLeft - imgHeight;
-              doc.addPage();
-              doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-              heightLeft -= pageHeight;
-            }
-            const dataUri = doc.output('datauristring');
-            pdfBase64 = dataUri.split(',')[1] || '';
-            const safeName = (fields.student_name || 'student').replace(/[^a-z0-9_-]+/gi, '_');
-            pdfName = `signed_contract_${safeName}.pdf`;
-          }
+          const result = await buildScreenshotPdf(fields, contractTextSnapshot);
+          pdfBase64 = result.pdfBase64;
+          pdfName = result.pdfName;
         } catch (err) {
           console.warn('Failed to generate contract PDF', err);
         }
+        msgEl.textContent = 'Submitting signature...';
         const resp = await fetch(`${SUPABASE_URL}/functions/v1/sign-contract`, {
           method: 'POST',
           headers: {
