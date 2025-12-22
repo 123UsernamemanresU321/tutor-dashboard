@@ -761,7 +761,7 @@
                       <span id="studentContractBadge"
                         class="px-2 py-1 text-[11px] rounded-lg bg-rose-100 text-rose-700 font-semibold">INVALID –
                         CONTRACT NOT SIGNED</span>
-                      <button id="studentContractLinkBtn" data-owner-only
+                      <button id="studentContractLinkBtn"
                         class="px-2 py-1 text-[10px] rounded-lg border border-slate-300 hover:bg-slate-50">Copy parent
                         link</button>
                       <button id="studentContractDeleteBtn" data-owner-only
@@ -4776,7 +4776,9 @@
 
     function copyContractLink(studentId) {
       const basePath = window.location.pathname.replace(/[^/]*$/, '');
-      const link = `${window.location.origin}${basePath}contract-sign.html?student_id=${encodeURIComponent(studentId)}&v=v1`;
+      const student = getStudentById(studentId);
+      const studentName = student?.name ? `&student_name=${encodeURIComponent(student.name)}` : '';
+      const link = `${window.location.origin}${basePath}contract-sign.html?student_id=${encodeURIComponent(studentId)}&v=v1${studentName}`;
       navigator.clipboard?.writeText(link).then(() => {
         alert('Parent signing link copied to clipboard.');
       }).catch(() => {
