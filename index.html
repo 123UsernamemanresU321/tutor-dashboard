@@ -561,7 +561,7 @@
         </div>
       </header>
       <div id="tourBanner" class="tour-banner hidden px-6 py-2 text-xs">
-        Tour mode: explore freely. Changes stay in this browser only.
+        Tour mode (verification): explore the full product safely. Changes stay in this browser only.
       </div>
       <div id="readOnlyBanner" class="read-only-banner hidden px-6 py-2 text-xs">
         Read-only mode: sign in as the owner to edit.
@@ -1238,6 +1238,31 @@
                 <div class="text-[10px] text-slate-500 mt-2" id="profileSessionMeta"></div>
               </div>
 
+              <div class="card p-5 space-y-2">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-sm font-semibold">Business & policies</h3>
+                  <span class="text-[10px] text-slate-500">Verification</span>
+                </div>
+                <div class="text-[11px] text-slate-500">Business name</div>
+                <div id="businessName" class="text-[11px] font-semibold">Tutor Control Center</div>
+                <div class="grid grid-cols-2 gap-3 mt-2">
+                  <div>
+                    <div class="text-[11px] text-slate-500">Contact</div>
+                    <div id="businessContactEmail" class="text-[11px] font-semibold">—</div>
+                  </div>
+                  <div>
+                    <div class="text-[11px] text-slate-500">Payment provider</div>
+                    <div id="businessPaymentProvider" class="text-[11px] font-semibold">Yoco</div>
+                  </div>
+                </div>
+                <div class="text-[11px] text-slate-500 mt-2">Policies</div>
+                <div class="flex flex-wrap gap-2 text-[11px]">
+                  <a class="text-indigo-600 hover:underline" href="./tos.html">Terms of Service</a>
+                  <a class="text-indigo-600 hover:underline" href="./privacy.html">Privacy Policy</a>
+                </div>
+                <div class="text-[10px] text-slate-500">Refunds and cancellations are covered in the Terms.</div>
+              </div>
+
               <div class="card p-5 space-y-3 border border-rose-200 bg-rose-50">
                 <div class="flex items-center justify-between">
                   <h3 class="text-sm font-semibold text-rose-700">Delete account</h3>
@@ -1493,6 +1518,38 @@
           </div>
         </div>
       </div>
+      <section class="mt-12 space-y-4">
+        <div>
+          <h2 class="text-lg font-semibold">Business verification snapshot</h2>
+          <p class="text-xs text-slate-500">Clear policies, contact details, and payment information help providers verify the service.</p>
+        </div>
+        <div class="grid md:grid-cols-3 gap-4 text-xs">
+          <div class="card p-4 bg-white/70 backdrop-blur border border-slate-200">
+            <h3 class="text-sm font-semibold">Business & contact</h3>
+            <p class="text-[11px] text-slate-600 mt-1">Private tutoring services for Physics, Chemistry, and Maths.</p>
+            <div class="mt-2 space-y-1 text-[11px]">
+              <div><span class="text-slate-500">Contact:</span> <span id="landingContactEmail" class="font-semibold">—</span></div>
+              <div><span class="text-slate-500">Service:</span> One-on-one sessions and parent/student portals.</div>
+            </div>
+          </div>
+          <div class="card p-4 bg-white/70 backdrop-blur border border-slate-200">
+            <h3 class="text-sm font-semibold">Payments</h3>
+            <ul class="mt-2 space-y-1 text-[11px] text-slate-600">
+              <li>• Online card payments via Yoco</li>
+              <li>• Invoices issued monthly, prepaid</li>
+              <li>• Secure access codes for parents/students</li>
+            </ul>
+          </div>
+          <div class="card p-4 bg-white/70 backdrop-blur border border-slate-200">
+            <h3 class="text-sm font-semibold">Policies</h3>
+            <ul class="mt-2 space-y-1 text-[11px]">
+              <li><a class="text-indigo-600 hover:underline" href="./tos.html">Terms of Service</a></li>
+              <li><a class="text-indigo-600 hover:underline" href="./privacy.html">Privacy Policy</a></li>
+            </ul>
+            <p class="text-[10px] text-slate-500 mt-2">Refunds and cancellations are detailed in the Terms.</p>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 
@@ -2517,7 +2574,7 @@
       {
         view: 'students',
         title: 'Students and login codes',
-        body: 'Create profiles, generate login codes, and track contracts and notes.'
+        body: 'Create profiles, generate login codes, and track contracts and tutoring notes.'
       },
       {
         view: 'schedule',
@@ -2532,7 +2589,12 @@
       {
         view: 'finance',
         title: 'Invoices and balances',
-        body: 'Create invoices, review balances, and send reminders.'
+        body: 'Create prepaid invoices, review balances, and send payment reminders.'
+      },
+      {
+        view: 'profile',
+        title: 'Business, policies, and payments',
+        body: 'Contact details, payment provider (Yoco), and policy links are published here for verification.'
       },
       {
         view: 'parent-portal',
@@ -2710,6 +2772,8 @@
       await initSupabaseAuth();
       setupNav();
       setupTopbar();
+      const landingEmail = document.getElementById('landingContactEmail');
+      if (landingEmail) landingEmail.textContent = OWNER_EMAIL || '—';
       document.querySelectorAll('[data-tour-trigger]').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.preventDefault();
@@ -3017,6 +3081,10 @@
       const roleEl = document.getElementById('profileRole');
       const uidEl = document.getElementById('profileUid');
       const sessMeta = document.getElementById('profileSessionMeta');
+      const businessEmailEl = document.getElementById('businessContactEmail');
+      const businessPaymentEl = document.getElementById('businessPaymentProvider');
+      if (businessEmailEl) businessEmailEl.textContent = OWNER_EMAIL || '—';
+      if (businessPaymentEl) businessPaymentEl.textContent = 'Yoco';
       if (!user) {
         if (tourMode) {
           if (emailEl) emailEl.textContent = 'tour@demo.local';
