@@ -279,6 +279,18 @@
       border-bottom: 1px solid #f59e0b;
     }
 
+    .tour-banner {
+      background: linear-gradient(135deg, #e0f2fe, #f0f9ff);
+      color: #0c4a6e;
+      border-bottom: 1px solid #7dd3fc;
+    }
+
+    .tour-pill {
+      border: 1px solid #7dd3fc;
+      background: #e0f2fe;
+      color: #0369a1;
+    }
+
     .owner-locked {
       opacity: 0.55;
       pointer-events: none;
@@ -532,6 +544,14 @@
             class="hidden inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl border border-slate-300 text-xs font-medium hover:bg-slate-50">
             ⏏ Sign out
           </button>
+          <span id="tourBadge"
+            class="hidden inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl text-xs font-medium tour-pill">
+            🚩 Tour mode
+          </span>
+          <button id="exitTourBtn"
+            class="hidden inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl border border-slate-300 text-xs font-medium hover:bg-slate-50">
+            Exit tour
+          </button>
 
           <!-- Theme toggle -->
           <button id="themeToggleBtn"
@@ -540,6 +560,9 @@
           </button>
         </div>
       </header>
+      <div id="tourBanner" class="tour-banner hidden px-6 py-2 text-xs">
+        Tour mode: explore freely. Changes stay in this browser only.
+      </div>
       <div id="readOnlyBanner" class="read-only-banner hidden px-6 py-2 text-xs">
         Read-only mode: sign in as the owner to edit.
       </div>
@@ -1398,6 +1421,10 @@
           <a href="./login.html"
             class="px-4 py-2 rounded-full border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-sm font-semibold">Tutor
             sign in</a>
+          <button data-tour-trigger
+            class="px-4 py-2 rounded-full border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-sm font-semibold">
+            Take a tour
+          </button>
           <a href="./login.html"
             class="px-4 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold">Enter
             login code</a>
@@ -1417,7 +1444,12 @@
             <a href="./login.html"
               class="px-4 py-2 rounded-full border border-slate-300 text-sm font-semibold hover:bg-slate-100">Tutor
               sign in</a>
+            <button data-tour-trigger
+              class="px-4 py-2 rounded-full border border-indigo-300 text-indigo-700 text-sm font-semibold hover:bg-indigo-50">
+              Take a guided tour
+            </button>
           </div>
+          <p class="text-[11px] text-slate-500">Tour mode is a local demo. Changes stay in your browser only.</p>
           <ul class="text-slate-700 text-sm space-y-2 mt-4">
             <li>• Parent & student portals with contract gating</li>
             <li>• Prepaid monthly invoicing and balances</li>
@@ -1491,6 +1523,28 @@
      * STATE & PERSISTENCE *
      ***********************/
     const STORAGE_KEY = 'tutoringDashboardState_v1';
+    const TOUR_STORAGE_KEY = 'tutoringDashboardTourState_v1';
+    const TOUR_MODE_KEY = 'tutoringDashboardTourMode';
+    const TOUR_START_KEY = 'tutoringDashboardTourStart';
+    const tourQuery = new URLSearchParams(window.location.search).get('tour') === '1';
+    const tourMode = tourQuery || sessionStorage.getItem(TOUR_MODE_KEY) === '1';
+    if (tourMode) sessionStorage.setItem(TOUR_MODE_KEY, '1');
+
+    function enableTourMode() {
+      sessionStorage.setItem(TOUR_MODE_KEY, '1');
+      sessionStorage.setItem(TOUR_START_KEY, '1');
+      const url = new URL(window.location.href);
+      url.searchParams.set('tour', '1');
+      window.location.href = url.toString();
+    }
+
+    function exitTourMode() {
+      sessionStorage.removeItem(TOUR_MODE_KEY);
+      sessionStorage.removeItem(TOUR_START_KEY);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('tour');
+      window.location.href = url.toString();
+    }
 
     /***********************
      * SUPABASE CONFIG      *
@@ -1500,12 +1554,13 @@
     const FUNCTIONS_URL = SUPABASE_URL + '/functions/v1';
     const OWNER_EMAIL = 'erichuang.shangjing@outlook.com';
     const CODE_EMAIL_SUFFIX = '@codes.tutor';
-    // If true, try Supabase Storage uploads; if false, always fall back to local data URL to avoid 400/RLS spam until backend is fixed.
-    const ALLOW_STORAGE_UPLOADS = true;
+    // If true, try Supabase Storage uploads; if false, always fall back to local data URL.
+    const ALLOW_STORAGE_UPLOADS = !tourMode;
     // hCaptcha config
     const HCAPTCHA_ENABLED = true;
     const HCAPTCHA_SITEKEY = '3ff631fc-4c9c-43ee-a486-3232939eedb2';
     const supabaseAvailable =
+      !tourMode &&
       typeof supabase !== 'undefined' &&
       SUPABASE_URL.startsWith('https://') &&
       !SUPABASE_URL.includes('YOUR_PROJECT') &&
@@ -1563,19 +1618,329 @@
       }
     };
 
+    function getStorageKey() {
+      return tourMode ? TOUR_STORAGE_KEY : STORAGE_KEY;
+    }
+
+    function buildDemoState() {
+      const today = new Date();
+      const addDays = (base, days) => {
+        const d = new Date(base);
+        d.setDate(d.getDate() + days);
+        return d;
+      };
+      const toIso = (d) => d.toISOString().slice(0, 10);
+      const demo = deepClone(defaultState);
+
+      const studentAId = 'demo-stu-1';
+      const studentBId = 'demo-stu-2';
+      const parentId = 'demo-par-1';
+      const invoiceA = 'INV-2024-01';
+      const invoiceB = 'INV-2024-02';
+      const resA = 'demo-res-1';
+      const resB = 'demo-res-2';
+      const resC = 'demo-res-3';
+      const contractA = '11111111-1111-4111-8111-111111111111';
+
+      demo.settings = Object.assign({}, demo.settings, {
+        weeklyGoalHours: 12,
+        monthlyIncomeGoal: 12000,
+        reflection: 'Focus on momentum, stoichiometry, and exam confidence.',
+        defaultSessionDuration: 1.5
+      });
+
+      demo.students = [
+        {
+          id: studentAId,
+          name: 'Ava Naidoo',
+          gradeLevel: 'Grade 11',
+          rate: 320,
+          subjects: ['Physics', 'Maths'],
+          notes: 'Targets 85%+ final results.',
+          studentEmail: 'ava.naidoo@example.com',
+          loginCode: 'AVAN8QK2',
+          contractSigned: true,
+          contractSignedAt: toIso(addDays(today, -28)),
+          contractVersion: 'v1',
+          contractSignerName: 'Priya Naidoo',
+          contractSignerEmail: 'priya.naidoo@example.com',
+          lastContractId: contractA
+        },
+        {
+          id: studentBId,
+          name: 'Liam Patel',
+          gradeLevel: 'Grade 10',
+          rate: 280,
+          subjects: ['Chemistry'],
+          notes: 'Needs help with balancing equations.',
+          studentEmail: 'liam.patel@example.com',
+          loginCode: 'LIAM7P2Q',
+          contractSigned: false,
+          contractSignedAt: null,
+          contractVersion: 'v1',
+          contractSignerName: '',
+          contractSignerEmail: '',
+          lastContractId: ''
+        }
+      ];
+
+      demo.parents = [
+        {
+          id: parentId,
+          name: 'Priya Naidoo',
+          email: 'priya.naidoo@example.com',
+          phone: '+27 82 123 4567',
+          notes: 'Prefers WhatsApp updates.',
+          verified: true,
+          loginCode: 'PRYA4K9Z'
+        }
+      ];
+
+      demo.parentLinks = [
+        { id: 'demo-link-1', parentId, studentId: studentAId, relationship: 'Mother' },
+        { id: 'demo-link-2', parentId, studentId: studentBId, relationship: 'Mother' }
+      ];
+
+      demo.sessions = [
+        {
+          id: 'demo-sess-1',
+          studentIds: [studentAId],
+          date: toIso(addDays(today, 2)),
+          startTime: '16:00',
+          durationHours: 1.5,
+          subject: 'Physics',
+          topic: 'Momentum and collisions',
+          notes: 'Bring worksheet 4.',
+          completed: false,
+          invoiceId: invoiceA
+        },
+        {
+          id: 'demo-sess-2',
+          studentIds: [studentAId, studentBId],
+          date: toIso(addDays(today, 6)),
+          startTime: '15:30',
+          durationHours: 2,
+          subject: 'Maths',
+          topic: 'Trigonometry revision',
+          notes: 'Review identities.',
+          completed: false,
+          invoiceId: ''
+        },
+        {
+          id: 'demo-sess-3',
+          studentIds: [studentBId],
+          date: toIso(addDays(today, -3)),
+          startTime: '17:00',
+          durationHours: 1.25,
+          subject: 'Chemistry',
+          topic: 'Stoichiometry recap',
+          notes: 'Check limiting reagent.',
+          completed: true,
+          invoiceId: invoiceB
+        }
+      ];
+
+      demo.resources = [
+        {
+          id: resA,
+          title: 'Momentum worksheet',
+          subject: 'Physics',
+          level: 'Grade 11',
+          description: 'Practice problems on impulse and collisions.',
+          tags: ['mechanics', 'exam'],
+          favorite: true
+        },
+        {
+          id: resB,
+          title: 'Stoichiometry notes',
+          subject: 'Chemistry',
+          level: 'Grade 10',
+          description: 'Step-by-step mole calculations.',
+          tags: ['foundations', 'worked'],
+          favorite: false
+        },
+        {
+          id: resC,
+          title: 'Trig summary sheet',
+          subject: 'Maths',
+          level: 'Grade 11',
+          description: 'Key identities and unit circle.',
+          tags: ['revision', 'quick'],
+          favorite: false
+        }
+      ];
+
+      demo.homework = [
+        {
+          id: 'demo-hw-1',
+          studentId: studentAId,
+          resourceId: resA,
+          status: 'To do',
+          dueDate: toIso(addDays(today, 5)),
+          assignedDate: toIso(addDays(today, -1))
+        },
+        {
+          id: 'demo-hw-2',
+          studentId: studentBId,
+          resourceId: resB,
+          status: 'In progress',
+          dueDate: toIso(addDays(today, 4)),
+          assignedDate: toIso(addDays(today, -2))
+        }
+      ];
+
+      demo.invoices = [
+        {
+          id: invoiceA,
+          studentId: studentAId,
+          issueDate: toIso(addDays(today, -2)),
+          dueDate: toIso(addDays(today, 7)),
+          baseAmount: 960,
+          total: 960,
+          lateFeePercent: 10,
+          shortNoticePercent: 25,
+          lateApplied: false,
+          shortApplied: false,
+          paid: false,
+          notes: 'Prepaid month of January.'
+        },
+        {
+          id: invoiceB,
+          studentId: studentBId,
+          issueDate: toIso(addDays(today, -15)),
+          dueDate: toIso(addDays(today, -5)),
+          baseAmount: 560,
+          total: 560,
+          lateFeePercent: 10,
+          shortNoticePercent: 25,
+          lateApplied: false,
+          shortApplied: false,
+          paid: true,
+          notes: 'Paid via EFT.'
+        }
+      ];
+
+      demo.documents = [
+        {
+          id: 'demo-doc-1',
+          studentId: studentAId,
+          title: 'Report card',
+          status: 'Received',
+          date: toIso(addDays(today, -20))
+        }
+      ];
+
+      demo.contracts = [
+        {
+          id: contractA,
+          studentId: studentAId,
+          fileName: 'Tutoring_Contract_Ava.pdf',
+          status: 'Signed',
+          notes: 'Signed digitally.',
+          uploadedAt: toIso(addDays(today, -28)),
+          signedUrl: 'https://example.com/contract-demo.pdf'
+        },
+        {
+          id: 'demo-contract-2',
+          studentId: studentBId,
+          fileName: 'Tutoring_Contract_Liam.pdf',
+          status: 'Pending',
+          notes: 'Awaiting signature.',
+          uploadedAt: toIso(addDays(today, -7)),
+          signedUrl: ''
+        }
+      ];
+
+      demo.contractSignatures = [
+        {
+          id: contractA,
+          studentId: studentAId,
+          parentName: 'Priya Naidoo',
+          signedAt: toIso(addDays(today, -28)),
+          renderedPdfUrl: 'https://example.com/contract-demo.pdf'
+        }
+      ];
+
+      demo.studentTodos = [
+        {
+          id: 'demo-todo-1',
+          studentId: studentAId,
+          text: 'Confirm exam timetable',
+          dueDate: toIso(addDays(today, 10)),
+          done: false
+        },
+        {
+          id: 'demo-todo-2',
+          studentId: studentBId,
+          text: 'Send stoichiometry quiz',
+          dueDate: '',
+          done: true
+        }
+      ];
+
+      demo.studentCheckins = [
+        {
+          id: 'demo-checkin-1',
+          studentId: studentAId,
+          date: toIso(addDays(today, -1)),
+          text: 'Confidence improving on momentum questions.'
+        }
+      ];
+
+      demo.messages = [
+        {
+          id: 'demo-msg-1',
+          studentId: studentAId,
+          sender: 'owner',
+          text: 'Great work today. Please review the worksheet before next session.',
+          created_at: addDays(today, -1).toISOString()
+        },
+        {
+          id: 'demo-msg-2',
+          studentId: studentBId,
+          sender: 'student',
+          text: 'Can we go over molar ratios again?',
+          created_at: addDays(today, -2).toISOString()
+        }
+      ];
+
+      demo.activityLog = [
+        {
+          id: 'demo-act-1',
+          action: 'Added student',
+          detail: 'Ava Naidoo',
+          created_at: addDays(today, -30).toISOString()
+        },
+        {
+          id: 'demo-act-2',
+          action: 'Uploaded contract',
+          detail: 'Tutoring_Contract_Ava.pdf',
+          created_at: addDays(today, -28).toISOString()
+        },
+        {
+          id: 'demo-act-3',
+          action: 'Sent invoice',
+          detail: invoiceA + ' to Ava Naidoo',
+          created_at: addDays(today, -2).toISOString()
+        }
+      ];
+
+      return demo;
+    }
+
     let state = loadState();
 
     function loadState() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return deepClone(defaultState);
+        const raw = localStorage.getItem(getStorageKey());
+        if (!raw) return tourMode ? buildDemoState() : deepClone(defaultState);
         const parsed = JSON.parse(raw);
         const merged = Object.assign(deepClone(defaultState), parsed);
         merged.settings = Object.assign(deepClone(defaultState.settings), parsed.settings || {});
         return merged;
       } catch (e) {
         console.error('Failed to load state', e);
-        return deepClone(defaultState);
+        return tourMode ? buildDemoState() : deepClone(defaultState);
       }
     }
 
@@ -1770,9 +2135,9 @@
       }
       normalizeIdsToUuid();
       enforceUuidFields();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(getStorageKey(), JSON.stringify(state));
       updateKPIsAndCharts();
-      if (isSupabaseReady()) {
+      if (!tourMode && isSupabaseReady()) {
         syncStateToSupabase().catch(err => console.error('Supabase sync failed', err));
       }
     }
@@ -2143,10 +2508,100 @@
       return prefix + '_' + Math.random().toString(36).slice(2, 10);
     }
 
+    const TOUR_STEPS = [
+      {
+        view: 'dashboard',
+        title: 'Welcome to the tutor dashboard',
+        body: 'This is a safe demo. Explore KPIs and weekly focus. Changes stay local.'
+      },
+      {
+        view: 'students',
+        title: 'Students and login codes',
+        body: 'Create profiles, generate login codes, and track contracts and notes.'
+      },
+      {
+        view: 'schedule',
+        title: 'Schedule lessons',
+        body: 'Plan sessions, avoid clashes, and mark sessions complete.'
+      },
+      {
+        view: 'resources',
+        title: 'Resources and homework',
+        body: 'Upload resources, tag them, and assign homework to students.'
+      },
+      {
+        view: 'finance',
+        title: 'Invoices and balances',
+        body: 'Create invoices, review balances, and send reminders.'
+      },
+      {
+        view: 'parent-portal',
+        title: 'Parent portal view',
+        body: 'Parents see upcoming sessions, homework, invoices, and messages.'
+      },
+      {
+        view: 'portal',
+        title: 'Student portal view',
+        body: 'Students see sessions, homework, resources, and the AI study helper.'
+      }
+    ];
+
+    function startGuidedTour(startIndex = 0) {
+      if (!tourMode) return;
+      sessionStorage.removeItem(TOUR_START_KEY);
+      showTourStep(startIndex);
+    }
+
+    function showTourStep(index) {
+      const step = TOUR_STEPS[index];
+      if (!step) {
+        closeModal();
+        return;
+      }
+      switchView(step.view);
+      const isLast = index === TOUR_STEPS.length - 1;
+      const backDisabled = index === 0 ? 'opacity-40 pointer-events-none' : '';
+      const html = `
+        <h2 class="text-sm font-semibold mb-1">${step.title}</h2>
+        <p class="text-[11px] text-slate-600 mb-3">${step.body}</p>
+        <div class="flex items-center justify-between gap-2">
+          <button id="tourBackBtn" class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs ${backDisabled}" ${index === 0 ? 'disabled' : ''}>
+            Back
+          </button>
+          <div class="flex gap-2">
+            <button id="tourExitBtn" class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs">
+              Exit tour
+            </button>
+            <button id="tourNextBtn" class="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs">
+              ${isLast ? 'Finish tour' : 'Next'}
+            </button>
+          </div>
+        </div>
+        <div class="text-[10px] text-slate-400 mt-2">Step ${index + 1} of ${TOUR_STEPS.length}</div>
+      `;
+      openModal(html, () => {
+        const backBtn = document.getElementById('tourBackBtn');
+        const nextBtn = document.getElementById('tourNextBtn');
+        const exitBtn = document.getElementById('tourExitBtn');
+        if (backBtn) backBtn.onclick = () => showTourStep(index - 1);
+        if (nextBtn) {
+          nextBtn.onclick = () => {
+            if (isLast) {
+              closeModal();
+              return;
+            }
+            showTourStep(index + 1);
+          };
+        }
+        if (exitBtn) exitBtn.onclick = () => exitTourMode();
+      });
+    }
+
     /****************
      * AI HELPERS   *
      ****************/
     async function callLLM(mode, payload) {
+      if (tourMode) throw new Error('AI helpers are disabled in tour mode.');
       if (!supabaseAvailable) throw new Error('Supabase not configured.');
       const token = supabaseSession?.access_token || SUPABASE_ANON_KEY;
       const res = await fetch(`${FUNCTIONS_URL}/call-llm`, {
@@ -2255,6 +2710,13 @@
       await initSupabaseAuth();
       setupNav();
       setupTopbar();
+      document.querySelectorAll('[data-tour-trigger]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          enableTourMode();
+        });
+      });
+      applyTourUI();
       applySettingsToUI();
       if (!supabaseAvailable || supabaseSession) {
         await tryLoadRemoteThenLocal();
@@ -2262,6 +2724,10 @@
         renderAllViews();
       }
       updateReadOnlyUI();
+      if (tourMode && (sessionStorage.getItem(TOUR_START_KEY) === '1' || tourQuery)) {
+        sessionStorage.removeItem(TOUR_START_KEY);
+        startGuidedTour();
+      }
 
       // expose functions for inline onclick handlers
       window.openSessionModal = openSessionModal;
@@ -2375,6 +2841,10 @@
           supabaseSession = null;
           toggleAuthOverlay(true);
         };
+      }
+      const exitTourBtn = document.getElementById('exitTourBtn');
+      if (exitTourBtn) {
+        exitTourBtn.onclick = () => exitTourMode();
       }
 
       // Settings bindings
@@ -2548,6 +3018,19 @@
       const uidEl = document.getElementById('profileUid');
       const sessMeta = document.getElementById('profileSessionMeta');
       if (!user) {
+        if (tourMode) {
+          if (emailEl) emailEl.textContent = 'tour@demo.local';
+          if (createdEl) createdEl.textContent = 'Local demo';
+          if (lastEl) lastEl.textContent = '—';
+          if (badge) {
+            badge.textContent = 'Tour mode';
+            badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-sky-100 text-sky-700';
+          }
+          if (roleEl) roleEl.textContent = 'Owner (tour)';
+          if (uidEl) uidEl.textContent = 'tour-local';
+          if (sessMeta) sessMeta.textContent = 'Local-only session';
+          return;
+        }
         if (emailEl) emailEl.textContent = 'Not signed in';
         if (createdEl) createdEl.textContent = '—';
         if (lastEl) lastEl.textContent = '—';
@@ -2590,7 +3073,7 @@
 
     function renderStudentPortal() {
       const email = getSessionEmail();
-      const student = state.students.find(s => s.studentEmail === email);
+      const student = tourMode ? getTourStudent() : state.students.find(s => s.studentEmail === email);
       const sessionsUl = document.getElementById('portalSessions');
       const hwUl = document.getElementById('portalHomework');
       const invUl = document.getElementById('portalInvoices');
@@ -2730,8 +3213,8 @@
     }
 
     function renderParentPortal() {
-      const parent = getParentProfileBySession();
-      const students = getChildrenForParent();
+      const parent = tourMode ? getTourParent() : getParentProfileBySession();
+      const students = tourMode && parent ? getParentLinkedStudents(parent.id) : getChildrenForParent();
       const sList = document.getElementById('parentStudentsList');
       if (sList) {
         sList.innerHTML = students.length ? students.map(s => {
@@ -3012,7 +3495,7 @@
           throw error || new Error(data?.error || 'Deletion failed (backend).');
         }
         // Clear local state and sign out
-        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(getStorageKey());
         state = deepClone(defaultState);
         await supabaseClient.auth.signOut();
         alert('Your account has been deleted.');
@@ -3240,13 +3723,39 @@
       return state.parents.find(p => p.email === email);
     }
 
+    function getTourStudent() {
+      if (!tourMode) return null;
+      return state.students.find(s => s.contractSigned) || state.students[0] || null;
+    }
+
+    function getTourParent() {
+      if (!tourMode) return null;
+      return state.parents[0] || null;
+    }
+
     function isOwner() {
       if (!supabaseAvailable) return true;
       if (getSessionRole() === 'owner') return true;
       return !!(supabaseSession && getSessionEmail() === OWNER_EMAIL.toLowerCase());
     }
 
+    function applyTourUI() {
+      const tourBanner = document.getElementById('tourBanner');
+      if (tourBanner) tourBanner.classList.toggle('hidden', !tourMode);
+      const tourBadge = document.getElementById('tourBadge');
+      if (tourBadge) tourBadge.classList.toggle('hidden', !tourMode);
+      const exitBtn = document.getElementById('exitTourBtn');
+      if (exitBtn) exitBtn.classList.toggle('hidden', !tourMode);
+      const signOutBtn = document.getElementById('signOutBtn');
+      if (tourMode && signOutBtn) signOutBtn.classList.add('hidden');
+      if (tourMode) {
+        document.getElementById('navPortalBtn')?.classList.remove('hidden');
+        document.getElementById('navParentPortalBtn')?.classList.remove('hidden');
+      }
+    }
+
     function updateReadOnlyUI() {
+      applyTourUI();
       if (supabaseAvailable && !supabaseSession) {
         // Session not resolved yet; keep UI as-is
         return;
