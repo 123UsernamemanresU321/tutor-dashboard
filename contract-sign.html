@@ -155,6 +155,7 @@
   </div>
   </form>
 
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script>
     const SUPABASE_URL = 'https://wdsqnbebutuhwckjpwqf.supabase.co';
@@ -588,22 +589,30 @@ Date: [date]
         let pdfBase64 = '';
         let pdfName = 'signed_contract.pdf';
         try {
+          const contractEl = document.getElementById('contractPage');
           const jsPDF = window.jspdf?.jsPDF;
-          if (jsPDF) {
-            const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-            const margin = 40;
-            const pageWidth = doc.internal.pageSize.getWidth() - margin * 2;
-            const lineHeight = 14;
-            const lines = doc.splitTextToSize(contractTextSnapshot, pageWidth);
-            let y = margin;
-            lines.forEach(line => {
-              if (y > doc.internal.pageSize.getHeight() - margin) {
-                doc.addPage();
-                y = margin;
-              }
-              doc.text(line, margin, y);
-              y += lineHeight;
+          if (contractEl && window.html2canvas && jsPDF) {
+            const canvas = await window.html2canvas(contractEl, {
+              scale: 2,
+              backgroundColor: '#ffffff',
+              useCORS: true
             });
+            const imgData = canvas.toDataURL('image/png');
+            const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const imgWidth = pageWidth;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            let heightLeft = imgHeight;
+            let position = 0;
+            doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+            while (heightLeft > 0) {
+              position = heightLeft - imgHeight;
+              doc.addPage();
+              doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+              heightLeft -= pageHeight;
+            }
             const dataUri = doc.output('datauristring');
             pdfBase64 = dataUri.split(',')[1] || '';
             const safeName = (fields.student_name || 'student').replace(/[^a-z0-9_-]+/gi, '_');
