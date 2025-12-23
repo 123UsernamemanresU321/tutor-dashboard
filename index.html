@@ -1252,7 +1252,7 @@
                   </div>
                   <div>
                     <div class="text-[11px] text-slate-500">Payment provider</div>
-                    <div id="businessPaymentProvider" class="text-[11px] font-semibold">Yoco</div>
+                    <div id="businessPaymentProvider" class="text-[11px] font-semibold">PayFast</div>
                   </div>
                 </div>
                 <div class="text-[11px] text-slate-500 mt-2">Policies</div>
@@ -1539,7 +1539,7 @@
           <div class="card p-4 bg-white/70 backdrop-blur border border-slate-200">
             <h3 class="text-sm font-semibold">Payments</h3>
             <ul class="mt-2 space-y-1 text-[11px] text-slate-600">
-              <li>• Online card payments via Yoco</li>
+              <li>• Online card payments via PayFast</li>
               <li data-yoco-merchant-line></li>
               <li>• Invoices issued monthly, prepaid</li>
               <li>• Secure access codes for parents/students</li>
@@ -2611,7 +2611,7 @@
       {
         view: 'profile',
         title: 'Business, policies, and payments',
-        body: 'Contact details, payment provider (Yoco), and policy links are published here for verification.'
+        body: 'Contact details, payment provider (PayFast), and policy links are published here for verification.'
       },
       {
         view: 'parent-portal',
@@ -3099,7 +3099,7 @@
       const businessEmailEl = document.getElementById('businessContactEmail');
       const businessPaymentEl = document.getElementById('businessPaymentProvider');
       if (businessEmailEl) businessEmailEl.textContent = SUPPORT_EMAIL || '—';
-      if (businessPaymentEl) businessPaymentEl.textContent = 'Yoco';
+      if (businessPaymentEl) businessPaymentEl.textContent = 'PayFast';
       if (!user) {
         if (tourMode) {
           if (emailEl) emailEl.textContent = 'tour@demo.local';
@@ -4660,7 +4660,7 @@
 <h4 class="text-[11px] font-semibold mt-3">Payments and Merchant Details</h4>
 <ul class="list-disc list-inside text-[11px] space-y-2">
   <li><strong>Merchant of record:</strong> ${MERCHANT_NAME}</li>
-  <li><strong>Payment processor:</strong> Yoco</li>
+  <li><strong>Payment processor:</strong> PayFast</li>
   <li><strong>Operator/service delivery:</strong> ${OPERATOR_NAME}</li>
   <li><strong>Contact email:</strong> ${SUPPORT_EMAIL}</li>
   <li><strong>Business address:</strong> ${BUSINESS_ADDRESS}</li>
@@ -6792,7 +6792,7 @@
 
 Just a friendly reminder about invoice ${inv.id} for ${name}, issued on ${inv.issueDate}, for R ${Number(inv.total || 0).toFixed(2)}. The due date was ${inv.dueDate || 'n/a'}.
 
-If you have already made payment, please ignore this message. Otherwise, please pay via Yoco (merchant: ${MERCHANT_NAME}).
+If you have already made payment, please ignore this message. Otherwise, please pay via PayFast (merchant: ${MERCHANT_NAME}).
 
 Merchant: ${MERCHANT_NAME}. Service Provider/Operator: ${OPERATOR_NAME}.
 
