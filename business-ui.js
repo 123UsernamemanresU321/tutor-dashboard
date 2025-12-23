@@ -32,16 +32,16 @@
       el.textContent = tokens.termsEffectiveDate;
     });
     root.querySelectorAll('[data-merchant-disclosure]').forEach(el => {
-      el.textContent = `Operated by ${tokens.operatorName}, trading under ${tokens.merchantName}. Payments processed by Yoco under ${tokens.merchantName}.`;
+      el.textContent = `Operated by ${tokens.operatorName}, trading under ${tokens.merchantName}. Payments processed by PayFast under ${tokens.merchantName}.`;
     });
     root.querySelectorAll('[data-yoco-merchant-line]').forEach(el => {
-      el.textContent = `Payments are processed securely by Yoco (merchant: ${tokens.merchantName}).`;
+      el.textContent = `Payments are processed securely by PayFast (merchant: ${tokens.merchantName}).`;
     });
     root.querySelectorAll('[data-merchant-receipt]').forEach(el => {
       el.textContent = `Merchant: ${tokens.merchantName}. Service Provider/Operator: ${tokens.operatorName}.`;
     });
     root.querySelectorAll('[data-about-operator-merchant]').forEach(el => {
-      el.textContent = `Tutoring is delivered by ${tokens.operatorName}. Payments are handled through Yoco under ${tokens.merchantName} as merchant of record.`;
+      el.textContent = `Tutoring is delivered by ${tokens.operatorName}. Payments are handled through PayFast under ${tokens.merchantName} as merchant of record.`;
     });
   }
 
