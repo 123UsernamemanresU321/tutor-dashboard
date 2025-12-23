@@ -252,8 +252,7 @@
           throw new Error(details);
         }
         if (data?.success === false) {
-          const dbg = data?.debug ? ` [debug: ${JSON.stringify(data.debug)}]` : '';
-          throw new Error((data?.error || 'Invalid code') + dbg);
+          throw new Error(data?.error || 'Invalid code');
         }
         if (!data?.access_token || !data?.refresh_token) {
           throw new Error(data?.error || 'Login failed. Ask your tutor for a new code.');
