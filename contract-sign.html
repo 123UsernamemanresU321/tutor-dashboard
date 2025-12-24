@@ -27,7 +27,7 @@
     <h1>Tutoring Services Agreement (Minor Tutor Version)</h1>
     <p class="muted">Please read the full agreement and complete the fields inline. When done, click “Sign & Download PDF”.</p>
 
-    <p>Agreement date: <input class="field-inline" name="date" data-field required></p>
+    <p>Agreement date: <input class="field-inline" name="date" data-field type="date" required></p>
 
     <p class="section-title">PARTIES</p>
     <p><span class="inline-label">Tutor's Legal Guardian (Contracting Party):</span><br>
@@ -52,7 +52,7 @@
     Date of birth: <input class="field-inline" name="student_dob" data-field type="date" required><br>
     School: <input class="field-inline" name="student_school" data-field required></p>
 
-    <p>The Guardian and the Client are the “Parties.” The Guardian contracts on behalf of the Minor Tutor.</p>
+    <p>The Guardian and the Client are the “Parties.” The Guardian contracts on behalf of the Minor Tutor. The Minor Tutor signs only to acknowledge professional expectations; legal rights and obligations under this Agreement are between the Guardian and the Client.</p>
 
     <p class="section-title">1. DEFINITIONS</p>
     <ul>
@@ -74,11 +74,11 @@
     <p>Sessions normally last 60 minutes at agreed times. If the Tutor is late, time is extended/credited; if the Student is late, the Session still ends on time.</p>
 
     <p class="section-title">5. FEES, INVOICING & PAYMENT</p>
-    <p>Standard rate: ZAR 200 per 60-minute Session. Invoices issued monthly in advance, payable by the date of the lesson; if unpaid by the lesson date, all further lessons are terminated until paid. Payment instructions will be provided on each invoice; reference: Student surname + invoice number.</p>
-    <p>Late payments may incur reasonable fees and suspension of sessions.</p>
+    <p>Standard rate: ZAR 200 per 60-minute Session. Invoices are issued monthly in advance and must be paid before the first scheduled Session covered by that invoice. Payment is required before Sessions take place; if an invoice is unpaid by the relevant due date, sessions may be suspended until payment is received. Payment instructions will be provided on each invoice; reference: Student surname + invoice number.</p>
+    <p>If payment is overdue, the Guardian may suspend sessions and may charge a reasonable admin fee for rebooking or additional processing, if applicable and communicated in writing.</p>
 
     <p class="section-title">6. CANCELLATIONS & RESCHEDULING</p>
-    <p>Client may cancel/reschedule with ≥24h notice (no fee; subject to availability). &lt;24h or no-show: full fee payable, no automatic make-up. Tutor cancellations: notice + reschedule or credit/refund. Make-ups to be rescheduled and attended within 8 weeks; maximum 2 reschedules.</p>
+    <p>Client may cancel/reschedule with ≥24h notice (no fee; subject to availability). &lt;24h notice or no-show: full fee payable and no automatic make-up. If, at the Guardian’s discretion, a make-up is offered, it must be scheduled and attended within 8 weeks of the original Session; maximum 2 reschedules per make-up.</p>
 
     <p class="section-title">7. HOLIDAYS & EXAM SEASONS</p>
     <p>Schedule confirmed in advance. Prepaid packages valid <input class="field-inline" name="package_months" data-field value="6" readonly> months unless agreed otherwise.</p>
@@ -96,7 +96,7 @@
     <p>Tutor keeps professional boundaries; no unsafe meetings or social media connections; Parent supervises Student. Guardian may report risk of harm.</p>
 
     <p class="section-title">12. DATA PROTECTION</p>
-    <p>Guardian processes personal info for tutoring, scheduling, progress, invoicing, compliance. Data may be stored with third-party tools (inside/outside SA). Parent consents and is authorized for the Student.</p>
+    <p>Guardian processes personal info for tutoring, scheduling, progress, invoicing, compliance. Data may be stored with third-party tools (inside/outside SA). Parent consents and is authorized for the Student. Data requests should be sent to the Guardian at 17449125@qq.com.</p>
 
     <p class="section-title">13. CONFIDENTIALITY & IP</p>
     <p>Tutor keeps academic info confidential (except law/safety/consent). Teaching materials remain Tutor IP; personal study use only.</p>
@@ -135,7 +135,7 @@
     <p>Concerns should be raised in writing; the Guardian will respond in good faith and work to resolve issues promptly.</p>
 
     <p class="section-title">25. DATA RETENTION</p>
-    <p>Session records, invoices, and signed contract records are retained for a reasonable period for operational and legal purposes, then securely deleted.</p>
+    <p>Session records, invoices, and signed contract records are retained for a reasonable period for operational and legal purposes. Records may be retained for up to 5 years for accounting and legal compliance, unless a longer period is required by law, after which they are securely deleted.</p>
 
     <p class="section-title">26. TERM & TERMINATION</p>
     <p>Either may terminate with 30 days’ notice; immediate termination for nonpayment/abuse/breach. On termination, outstanding fees due; prepaid refunded/credited less delivered sessions and valid charges.</p>
@@ -150,7 +150,7 @@
     <p>Entire agreement; changes in writing; invalid clauses severable; electronic signatures valid.</p>
 
     <p class="section-title">30. ELECTRONIC SIGNATURES & ONLINE ACCEPTANCE</p>
-    <p>Typing a name, ticking a confirmation box, or clicking “Sign & Accept” constitutes a legally binding electronic signature under ECTA.</p>
+    <p>Typing a name, ticking a confirmation box, or clicking “Sign & Accept” constitutes a legally binding electronic signature under ECTA. By clicking “Sign & Download PDF”, you confirm that this action is your electronic signature and that you intend to be legally bound.</p>
 
     <p class="section-title">31. SYSTEM STATUS</p>
     <p>Dashboard may show “INVALID – CONTRACT NOT SIGNED” until signed; services may be withheld while invalid; status can revert to invalid on termination/breach.</p>
@@ -184,9 +184,11 @@
     const studentId = params.get('student_id');
     const studentNameParam = (params.get('student_name') || '').trim();
     const version = params.get('v') || 'v1';
+    const signingToken = (params.get('token') || '').trim();
     const statusEl = document.getElementById('status');
     const msgEl = document.getElementById('message');
     const form = document.getElementById('signForm');
+    const signBtn = document.getElementById('signBtn');
     let studentNameForText = '';
     const contractTemplate = `
 TUTORING SERVICES AGREEMENT (Minor Tutor Version)
@@ -214,7 +216,7 @@ Student name: [Student full name]
 Date of birth: [Student DOB]
 School: [School]
 
-The Tutor's Legal Guardian ("Guardian") and the Client are collectively the "Parties". The Guardian enters into this Agreement in their personal capacity and on behalf of the Minor Tutor, who will perform the tutoring services. All legal rights and obligations under this Agreement rest with the Guardian and the Client; the Minor Tutor signs only to acknowledge the professional expectations.
+The Guardian and the Client are the “Parties.” The Guardian contracts on behalf of the Minor Tutor. The Minor Tutor signs only to acknowledge professional expectations; legal rights and obligations under this Agreement are between the Guardian and the Client.
 1. DEFINITIONS
 In this Agreement:
 
@@ -260,41 +262,10 @@ In this Agreement:
 - If the Minor Tutor is late, the Minor Tutor will either extend the Session (where possible) or credit the missed time to a future Session.
 - If the Student joins late, the Session will still end at the scheduled time, and the full Fee will remain payable.
 5. FEES, INVOICING & PAYMENT
-5.1 The standard rate is [Rxxx] per [60/90]-minute Session ("Standard Rate"), unless otherwise agreed in Writing.
-
-5.2 The Guardian may offer packages (e.g. [x]-Session blocks) at agreed rates. Details of any package and its price will be shared in Writing.
-
-5.3 The Guardian will issue invoices [e.g. monthly in arrears / in advance / per block]. Invoices are payable within [7/10/14] days of the invoice date.
-
-5.4 Payments must be made by [bank transfer / EFT] to:
-Account name: [Account name]
-Bank: [Bank]
-Account no.: [xxx]
-Branch code: [xxx]
-Reference: Student surname + invoice number
-
-5.5 If payment is not received by the due date, the Guardian may:
-- Charge a reasonable late payment fee of [e.g. 5%] of the overdue amount per month (or part thereof); and/or
-- Suspend further Sessions until all outstanding amounts are settled.
-6. CANCELLATIONS, RESCHEDULING & MAKE-UP SESSIONS
-6.1 The Client may cancel or reschedule a Session by giving at least 24 hours' written notice.
-
-6.2 If the Client cancels or reschedules with at least 24 hours' notice:
-- No cancellation fee will be charged; and
-- The Session may be rescheduled, subject to the Minor Tutor's availability.
-
-6.3 If the Client cancels or reschedules with less than 24 hours' notice, or the Student fails to attend ("no-show"):
-- The full Fee for that Session is payable; and
-- There is no automatic right to a make-up Session. Any make-up is at the Guardian's discretion.
-
-6.4 If the Minor Tutor needs to cancel a Session:
-- The Guardian will give as much notice as reasonably possible; and
-- The Client may choose between (a) rescheduling, or (b) a credit/refund for that Session.
-
-6.5 Make-up Sessions:
-- Must be taken within [e.g. 8 weeks] of the original missed Session or by the end of the current school term, whichever comes first;
-- Are subject to the Minor Tutor's scheduling availability;
-- A maximum of [e.g. 2] reschedules per specific Session is allowed. After that, the Session is forfeited and the Fee remains payable.
+Standard rate: ZAR 200 per 60-minute Session. Invoices are issued monthly in advance and must be paid before the first scheduled Session covered by that invoice. Payment is required before Sessions take place; if an invoice is unpaid by the relevant due date, sessions may be suspended until payment is received. Payment instructions will be provided on each invoice; reference: Student surname + invoice number.
+If payment is overdue, the Guardian may suspend sessions and may charge a reasonable admin fee for rebooking or additional processing, if applicable and communicated in writing.
+6. CANCELLATIONS & RESCHEDULING
+Client may cancel/reschedule with ≥24h notice (no fee; subject to availability). <24h notice or no-show: full fee payable and no automatic make-up. If, at the Guardian’s discretion, a make-up is offered, it must be scheduled and attended within 8 weeks of the original Session; maximum 2 reschedules per make-up.
 7. HOLIDAYS, LONG BREAKS & EXAM SEASONS
 7.1 The Parties will confirm in advance how Sessions will run during school holidays.
 
@@ -373,7 +344,7 @@ The Minor Tutor will:
 - Consents to the transfer of such Personal Information to third-party service providers (including those located outside South Africa) for secure data storage and communication;
 - Confirms that they are legally authorised to give such consent on behalf of the Student.
 
-12.5 The Client may request access to, or correction of, Personal Information held by the Guardian, subject to reasonable written request.
+12.5 The Client may request access to, or correction of, Personal Information held by the Guardian, subject to reasonable written request. Data requests should be sent to [Guardian email].
 
 12.6 The Guardian will take reasonable technical and organisational measures to protect Personal Information but cannot guarantee absolute security of data transmitted over the internet.
 13. CONFIDENTIALITY & INTELLECTUAL PROPERTY
@@ -456,7 +427,7 @@ without the Guardian's prior written consent.
 24. COMPLAINTS & FEEDBACK
 24.1 The Client may raise concerns in writing. The Guardian will respond in good faith within a reasonable time and attempt to resolve issues promptly.
 25. DATA RETENTION
-25.1 Session records, invoices, and signed contract records will be retained for a reasonable period for operational and legal purposes and then securely deleted.
+25.1 Session records, invoices, and signed contract records will be retained for a reasonable period for operational and legal purposes. Records may be retained for up to 5 years for accounting and legal compliance, unless a longer period is required by law, after which they are securely deleted.
 26. TERM & TERMINATION
 26.1 This Agreement starts on the date stated above and continues until terminated in accordance with this clause.
 
@@ -499,7 +470,9 @@ The Parties must promptly notify each other of any change in contact details.
 
 30.2 Under the Electronic Communications and Transactions Act 25 of 2002 (ECTA), a typed name, tick-box confirmation, click on a "Sign & Accept" button, or similar electronic action constitutes a legally binding electronic signature.
 
-30.3 The Parties agree that electronic signatures have the same force and effect as handwritten signatures and that a timestamped electronic record of acceptance stored in the Guardian's systems is sufficient proof of signature and consent.
+30.3 By clicking “Sign & Download PDF”, the Client confirms that this action is their electronic signature and that they intend to be legally bound.
+
+30.4 The Parties agree that electronic signatures have the same force and effect as handwritten signatures and that a timestamped electronic record of acceptance stored in the Guardian's systems is sufficient proof of signature and consent.
 31. SYSTEM STATUS & STUDENT DASHBOARD VALIDITY
 31.1 The Student's online dashboard and account may display a status of "INVALID - CONTRACT NOT SIGNED" until this Agreement has been accepted and electronically signed by the Client.
 
@@ -528,8 +501,19 @@ Date: [date]
 
     if (!studentId) {
       statusEl.textContent = 'Missing student_id in the link.';
+    } else if (!signingToken) {
+      statusEl.textContent = 'Signing link is missing or expired. Please request a new signing link.';
+      if (signBtn) {
+        signBtn.disabled = true;
+        signBtn.style.opacity = '0.6';
+        signBtn.style.cursor = 'not-allowed';
+      }
     } else {
       statusEl.textContent = 'Ready to sign';
+    }
+
+    function normalizeSpaces(value) {
+      return String(value || '').replace(/\s+/g, ' ').trim();
     }
 
     function getFieldsFromInputs() {
@@ -543,20 +527,20 @@ Date: [date]
         guardian_phone: get('guardian_phone'),
         tutor_name: get('tutor_name') || get('guardian_name'),
         tutor_email: get('tutor_email') || get('guardian_email'),
-        parent_name: get('parent_name'),
+        parent_name: normalizeSpaces(get('parent_name')),
         parent_id: get('parent_id'),
         parent_email: get('parent_email'),
         parent_phone: get('parent_phone'),
-        student_name: get('student_name'),
+        student_name: normalizeSpaces(get('student_name')),
         student_dob: get('student_dob'),
-        student_school: get('student_school'),
+        student_school: normalizeSpaces(get('student_school')),
         address: get('address'),
-        relationship: get('relationship'),
+        relationship: normalizeSpaces(get('relationship')),
         guardian_signature: get('guardian_signature'),
-        parent_signature: get('parent_signature'),
+        parent_signature: normalizeSpaces(get('parent_signature')),
         date_guardian: get('date_guardian') || today,
         date_parent: get('date_parent') || today,
-        signature: get('parent_signature')
+        signature: normalizeSpaces(get('parent_signature'))
       };
     }
 
@@ -589,8 +573,8 @@ Date: [date]
       setIfEmpty('package_months', '6');
     }
 
-    function buildContractSnapshot(fields) {
-      return contractTemplate
+    function buildContractSnapshot(fields, executionRecord) {
+      const base = contractTemplate
         .replaceAll('[date]', fields.date)
         .replaceAll('[Guardian full name]', fields.guardian_name)
         .replaceAll('[Guardian email]', fields.guardian_email)
@@ -610,6 +594,7 @@ Date: [date]
         .replaceAll('[Guardian signature typed/online]', fields.guardian_signature || '')
         .replaceAll('[Parent signature typed/online]', fields.parent_signature || '')
         .replaceAll('[date]', fields.date_parent || fields.date);
+      return executionRecord ? `${base}\n${executionRecord}` : base;
     }
 
     form.onsubmit = async (e) => {
@@ -618,16 +603,38 @@ Date: [date]
         msgEl.textContent = 'Missing student_id in the link.';
         return;
       }
+      if (!signingToken) {
+        msgEl.textContent = 'Signing link is missing or expired. Please request a new signing link.';
+        return;
+      }
       const fields = getFieldsFromInputs();
-      if (!fields.parent_name || !fields.parent_email || !fields.student_name || !fields.student_dob || !fields.student_school || !form.confirm.checked || !fields.signature) {
+      if (!fields.parent_name || !fields.parent_email || !fields.student_name || !fields.student_dob || !fields.student_school || !fields.relationship || !form.confirm.checked || !fields.signature) {
         msgEl.textContent = 'Please fill all fields and confirm.';
         return;
+      }
+      if (fields.parent_phone) {
+        const digits = fields.parent_phone.replace(/\D/g, '');
+        if (digits.length < 7) {
+          msgEl.textContent = 'Please enter a valid phone number.';
+          return;
+        }
       }
       const name = fields.parent_name;
       const email = fields.parent_email;
       msgEl.textContent = 'Preparing contract...';
       try {
-        const contractTextSnapshot = buildContractSnapshot(fields);
+        const userAgent = navigator.userAgent || '';
+        const executionRecord = [
+          '',
+          'EXECUTION RECORD',
+          `Timestamp (ISO): ${new Date().toISOString()}`,
+          `Parent email: ${email}`,
+          `Parent typed signature: ${fields.parent_signature}`,
+          `Student ID: ${studentId}`,
+          `Contract version: ${version}`,
+          `User agent: ${userAgent}`
+        ].join('\n');
+        const contractTextSnapshot = buildContractSnapshot(fields, executionRecord);
         msgEl.textContent = 'Generating PDF...';
         let pdfBase64 = '';
         let pdfName = 'signed_contract.pdf';
@@ -662,6 +669,7 @@ Date: [date]
           },
           body: JSON.stringify({
             student_id: studentId,
+            signing_token: signingToken,
             name,
             email,
             version,
@@ -676,7 +684,7 @@ Date: [date]
             student_dob: fields.student_dob,
             student_school: fields.student_school,
             relationship: fields.relationship,
-            user_agent: navigator.userAgent || ''
+            user_agent: userAgent
           })
         });
         const text = await resp.text();
