@@ -4791,9 +4791,10 @@
       }
 
       let token = '';
+      const parentProfile = parentMode ? getParentProfileBySession() : null;
       try {
         const { data, error } = await supabaseClient.functions.invoke('issue-contract-sign-token', {
-          body: { student_id: studentId, parent_email: student?.parentEmail || null }
+          body: { student_id: studentId, parent_email: parentProfile?.email || student?.parentEmail || null }
         });
         if (error || !data?.token) {
           throw new Error(data?.error || error?.message || 'Failed to issue signing link');
