@@ -4810,7 +4810,7 @@
       navigator.clipboard?.writeText(link).then(() => {
         alert('Parent signing link copied to clipboard.');
       }).catch(() => {
-        prompt('Copy this link and send to the parent:', link);
+        prompt('Copy this link:', link);
       });
     }
 
