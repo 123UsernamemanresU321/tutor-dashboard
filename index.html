@@ -4774,11 +4774,31 @@
       presenceMap = new Map();
     }
 
-    function copyContractLink(studentId) {
+    async function copyContractLink(studentId) {
       const basePath = window.location.pathname.replace(/[^/]*$/, '');
       const student = getStudentById(studentId);
       const studentName = student?.name ? `&student_name=${encodeURIComponent(student.name)}` : '';
-      const link = `${window.location.origin}${basePath}contract-sign.html?student_id=${encodeURIComponent(studentId)}&v=v1${studentName}`;
+      if (!isSupabaseReady()) {
+        alert('Unable to generate signing link while offline. Please try again when connected.');
+        return;
+      }
+
+      let token = '';
+      try {
+        const { data, error } = await supabaseClient.functions.invoke('issue-contract-sign-token', {
+          body: { student_id: studentId, parent_email: student?.parentEmail || null }
+        });
+        if (error || !data?.token) {
+          throw new Error(data?.error || error?.message || 'Failed to issue signing link');
+        }
+        token = data.token;
+      } catch (err) {
+        console.warn('issue-contract-sign-token failed', err);
+        alert('Unable to generate signing link. Please try again.');
+        return;
+      }
+
+      const link = `${window.location.origin}${basePath}contract-sign.html?student_id=${encodeURIComponent(studentId)}&v=v1&token=${encodeURIComponent(token)}${studentName}`;
       navigator.clipboard?.writeText(link).then(() => {
         alert('Parent signing link copied to clipboard.');
       }).catch(() => {
