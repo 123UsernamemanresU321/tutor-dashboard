@@ -3305,6 +3305,9 @@
           const signed = !!s.contractSigned;
           const contractLabel = signed ? 'VALID – CONTRACT SIGNED' : 'INVALID – CONTRACT NOT SIGNED';
           const contractClass = signed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700';
+          const contractAction = signed
+            ? '<button class="px-2 py-1 rounded-lg border border-slate-300 opacity-60 cursor-not-allowed" disabled>Contract signed</button>'
+            : `<button class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50" onclick="copyContractLink('${s.id}')">Copy contract link</button>`;
           return `
             <li class="border border-slate-200 rounded-lg px-3 py-2 bg-white/80 space-y-1" data-student-id="${s.id}">
               <div class="flex items-center justify-between">
@@ -3318,7 +3321,7 @@
               <div class="text-[10px] text-slate-500">Email: ${s.studentEmail || '—'}</div>
               <div class="text-[10px] text-slate-500">${sig ? `Signed by ${sig.parentName || 'Parent'} on ${sig.signedAt ? new Date(sig.signedAt).toLocaleDateString() : ''}` : 'No signed contract yet.'}</div>
               <div class="flex flex-wrap items-center gap-2 text-[10px]">
-                <button class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50" onclick="copyContractLink('${s.id}')">Copy contract link</button>
+                ${contractAction}
                 <button id="btn-summary-${s.id}" class="px-2 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50" onclick="parentSummaryAI('${s.id}')">AI summary (30d)</button>
               </div>
               <div id="ai-summary-${s.id}" class="text-[10px] text-slate-600 whitespace-pre-wrap"></div>
@@ -4777,6 +4780,10 @@
     async function copyContractLink(studentId) {
       const basePath = window.location.pathname.replace(/[^/]*$/, '');
       const student = getStudentById(studentId);
+      if (student?.contractSigned) {
+        alert('Contract already signed. No link is needed.');
+        return;
+      }
       const studentName = student?.name ? `&student_name=${encodeURIComponent(student.name)}` : '';
       if (!isSupabaseReady()) {
         alert('Unable to generate signing link while offline. Please try again when connected.');
