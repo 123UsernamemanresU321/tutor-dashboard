@@ -3021,7 +3021,7 @@
      * REALTIME UPDATES
      ***********************/
     function setupRealtime() {
-      if (!supabaseClient || !supabaseSession) return;
+      if (!supabaseClient || !supabaseSession || !isOwner()) return;
       const tables = ['students', 'lesson_sessions', 'homework', 'invoices', 'messages', 'resources', 'documents', 'contracts', 'student_todos', 'student_checkins', 'parent_contract_signatures', 'presence'];
       tables.forEach(table => {
         supabaseClient
@@ -3864,11 +3864,17 @@
         if (session) {
           document.getElementById('signOutBtn')?.classList.remove('hidden');
           loadAccountEmails().catch(err => console.warn('Account email fetch failed', err));
-          tryLoadRemoteThenLocal().then(() => {
-            renderAllViews();
-            setupRealtime();
-            startPresence();
-          });
+          tryLoadRemoteThenLocal()
+            .then(() => {
+              renderAllViews();
+              try {
+                setupRealtime();
+                startPresence();
+              } catch (err) {
+                console.warn('Post-login setup failed', err);
+              }
+            })
+            .catch(err => console.warn('Initial load failed', err));
         } else {
           document.getElementById('signOutBtn')?.classList.add('hidden');
           state = deepClone(defaultState);
@@ -4544,7 +4550,7 @@
         return out;
       }
 
-      if (sessionLoginCode && (sessionRole === 'student' || sessionRole === 'parent')) {
+      if (sessionLoginCode) {
         try {
           const { data: snapshot, error: snapErr } = await supabaseClient.functions.invoke('portal-snapshot', {
             body: { code: sessionLoginCode, role: sessionRole },
@@ -4555,7 +4561,8 @@
             return await mapSnapshotToState(snapshot);
           }
         } catch (err) {
-          console.warn('Portal snapshot fetch failed; falling back to direct queries', err);
+          console.warn('Portal snapshot fetch failed; using local cache to avoid CORS issues', err);
+          return loadState();
         }
       }
 
@@ -4950,7 +4957,7 @@
      * PRESENCE       *
      ******************/
     async function refreshPresence() {
-      if (!isSupabaseReady()) return;
+      if (!isSupabaseReady() || !isOwner()) return;
       try {
         const { data, error } = await supabaseClient.from('presence').select('*');
         if (error) throw error;
@@ -4969,7 +4976,7 @@
     }
 
     function startPresence() {
-      if (!isSupabaseReady()) return;
+      if (!isSupabaseReady() || !isOwner()) return;
       stopPresence();
       const run = async () => {
         try {
