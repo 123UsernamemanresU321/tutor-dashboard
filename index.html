@@ -1773,6 +1773,48 @@
       };
     }
 
+    async function startPayfastPayment(invoiceId) {
+      if (!supabaseAvailable || !supabaseSession) {
+        alert('Please sign in to pay invoices.');
+        return;
+      }
+      const inv = getInvoiceById(invoiceId);
+      if (!inv) {
+        alert('Invoice not found.');
+        return;
+      }
+      if (inv.paid) {
+        alert('This invoice is already marked as paid.');
+        return;
+      }
+      try {
+        const { data, error } = await supabaseClient.functions.invoke('payfast-create-payment', {
+          body: { invoice_id: inv.id },
+          headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
+        });
+        if (error) throw error;
+        if (!data?.fields || !data?.process_url) {
+          throw new Error(data?.error || 'Failed to prepare PayFast payment.');
+        }
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = data.process_url;
+        Object.entries(data.fields).forEach(([key, value]) => {
+          if (value == null || value === '') return;
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = String(value);
+          form.appendChild(input);
+        });
+        document.body.appendChild(form);
+        form.submit();
+      } catch (err) {
+        console.error('PayFast init failed', err);
+        alert(err?.message || 'Unable to start PayFast payment.');
+      }
+    }
+
     const defaultState = {
       students: [],
       parents: [],
@@ -2933,7 +2975,7 @@
     window.addEventListener('unhandledrejection', (event) => {
       const reason = String(event.reason?.message || event.reason || '');
       const lower = reason.toLowerCase();
-      if (lower.includes('output')) {
+      if (lower.includes('output') || lower.includes('resp.payload')) {
         event.preventDefault();
         return true;
       }
@@ -2944,7 +2986,7 @@
     window.onunhandledrejection = (event) => {
       const reason = String(event.reason?.message || event.reason || '');
       const lower = reason.toLowerCase();
-      if (lower.includes('output')) {
+      if (lower.includes('output') || lower.includes('resp.payload')) {
         if (event.preventDefault) event.preventDefault();
         return true;
       }
@@ -2989,6 +3031,7 @@
       window.openInvoiceModal = openInvoiceModal;
       window.getInvoiceById = getInvoiceById;
       window.markInvoicePaid = markInvoicePaid;
+      window.startPayfastPayment = startPayfastPayment;
       window.generateReminder = generateReminder;
       window.selectStudent = selectStudent;
       window.toggleResourceFavorite = toggleResourceFavorite;
@@ -3575,6 +3618,7 @@
             </div>
             <div class="flex flex-wrap gap-2 mt-1 text-[10px]">
               <button id="btn-inv-${inv.id}" class="px-2 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50" onclick="explainInvoiceAI('${inv.id}')">Explain with AI</button>
+              ${inv.paid ? '' : `<button class="px-2 py-1 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50" onclick="startPayfastPayment('${inv.id}')">Pay Now</button>`}
             </div>
             <div id="ai-invoice-${inv.id}" class="text-[10px] text-slate-600 whitespace-pre-wrap"></div>
           </li>`;
