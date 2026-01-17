@@ -749,6 +749,7 @@
                     <div>
                       <div id="studentDetailName" class="text-base font-semibold"></div>
                       <div id="studentDetailMeta" class="text-[11px] text-slate-500"></div>
+                      <div id="studentScheduleMeta" class="text-[10px] text-slate-500"></div>
                       <div id="studentContractMeta" class="text-[10px] text-slate-500"></div>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
@@ -1602,6 +1603,8 @@
     const SUPPORT_EMAIL = BUSINESS.supportEmail || 'SUPPORT_EMAIL';
     const BUSINESS_ADDRESS = BUSINESS.businessAddress || 'BUSINESS_ADDRESS';
     const TERMS_EFFECTIVE_DATE = BUSINESS.termsEffectiveDate || 'TERMS_EFFECTIVE_DATE';
+    const DEFAULT_TIMEZONE = 'Africa/Johannesburg';
+    const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     function enableTourMode() {
       sessionStorage.setItem(TOUR_MODE_KEY, '1');
@@ -1632,6 +1635,10 @@
     // hCaptcha config
     const HCAPTCHA_ENABLED = true;
     const HCAPTCHA_SITEKEY = '3ff631fc-4c9c-43ee-a486-3232939eedb2';
+    const PAYFAST_PROVIDER = 'PayFast';
+    const PAYFAST_RETURN_URL = `${window.location.origin}${window.location.pathname}?payfast=success`;
+    const PAYFAST_CANCEL_URL = `${window.location.origin}${window.location.pathname}?payfast=cancel`;
+    const PAYFAST_NOTIFY_URL = `${SUPABASE_URL}/functions/v1/payfast-ipn`;
     const supabaseAvailable =
       !tourMode &&
       typeof supabase !== 'undefined' &&
@@ -1664,6 +1671,106 @@
     function codeToEmail(code) {
       const normalized = normalizeCode(code);
       return normalized ? `${normalized.toLowerCase()}${CODE_EMAIL_SUFFIX}` : '';
+    }
+
+    function normalizeScheduleDays(value) {
+      if (Array.isArray(value)) {
+        return value.map(v => Number(v)).filter(v => Number.isFinite(v) && v >= 0 && v <= 6);
+      }
+      if (typeof value === 'string') {
+        const parts = value.split(',').map(v => v.trim()).filter(Boolean);
+        const map = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+        return parts.map(p => {
+          const lower = p.toLowerCase();
+          if (map[lower] != null) return map[lower];
+          const asNum = Number(p);
+          return Number.isFinite(asNum) ? asNum : null;
+        }).filter(v => v != null && v >= 0 && v <= 6);
+      }
+      return [];
+    }
+
+    function formatScheduleDays(days) {
+      const normalized = normalizeScheduleDays(days);
+      if (!normalized.length) return '';
+      const unique = Array.from(new Set(normalized)).sort();
+      return unique.map(d => WEEKDAY_LABELS[d]).join(', ');
+    }
+
+    function toDateOnly(d) {
+      return d.toISOString().slice(0, 10);
+    }
+
+    function parseDateOnly(value) {
+      if (!value) return null;
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) return null;
+      parsed.setHours(0, 0, 0, 0);
+      return parsed;
+    }
+
+    function endOfMonth(d) {
+      return new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    }
+
+    function maxDate(a, b) {
+      return a && b ? (a > b ? a : b) : (a || b || null);
+    }
+
+    function listScheduleDates(days, start, end) {
+      const results = [];
+      if (!days.length || !start || !end) return results;
+      const cursor = new Date(start);
+      cursor.setHours(0, 0, 0, 0);
+      const endDate = new Date(end);
+      endDate.setHours(0, 0, 0, 0);
+      while (cursor <= endDate) {
+        if (days.includes(cursor.getDay())) results.push(toDateOnly(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      return results;
+    }
+
+    function getSchedulePrefs(student) {
+      const days = normalizeScheduleDays(student.scheduleDays || student.schedule_days || []);
+      const preferredTime = (student.preferredTime || student.preferred_time || '').trim();
+      const scheduleStartDate = student.scheduleStartDate || student.schedule_start_date || '';
+      const timezone = student.scheduleTimezone || student.schedule_timezone || DEFAULT_TIMEZONE;
+      const sessionLengthHours = Number(student.sessionLengthHours || student.session_length_hours || 0) || Number(state.settings.defaultSessionDuration || 1);
+      const scheduleNotes = student.scheduleNotes || student.schedule_notes || '';
+      return { days, preferredTime, scheduleStartDate, timezone, sessionLengthHours, scheduleNotes };
+    }
+
+    function formatScheduleSummary(student) {
+      const prefs = getSchedulePrefs(student);
+      if (!prefs.days.length || !prefs.preferredTime) return 'Schedule: not set';
+      const dayLabel = formatScheduleDays(prefs.days);
+      const startLabel = prefs.scheduleStartDate ? ` • Start ${prefs.scheduleStartDate}` : '';
+      return `Schedule: ${dayLabel} @ ${prefs.preferredTime}${startLabel}`;
+    }
+
+    function computeInvoiceTotal(baseAmount, inv) {
+      const base = Number(baseAmount || 0);
+      let total = base;
+      if (inv?.lateApplied && inv?.lateFeePercent) {
+        total += base * (Number(inv.lateFeePercent) / 100);
+      }
+      if (inv?.shortApplied && inv?.shortNoticePercent) {
+        total += base * (Number(inv.shortNoticePercent) / 100);
+      }
+      return Number(total.toFixed(2));
+    }
+
+    function buildPayfastPayload(inv) {
+      const student = getStudentById(inv.studentId);
+      const studentLabel = student?.name ? ` - ${student.name}` : '';
+      return {
+        itemName: `${BRAND_NAME} tutoring invoice ${inv.id}${studentLabel}`,
+        amount: Number(inv.total || 0).toFixed(2),
+        returnUrl: PAYFAST_RETURN_URL,
+        cancelUrl: PAYFAST_CANCEL_URL,
+        notifyUrl: PAYFAST_NOTIFY_URL
+      };
     }
 
     const defaultState = {
@@ -1737,7 +1844,13 @@
           contractVersion: 'v1',
           contractSignerName: 'Priya Naidoo',
           contractSignerEmail: 'priya.naidoo@example.com',
-          lastContractId: contractA
+          lastContractId: contractA,
+          scheduleDays: [1, 3, 5],
+          preferredTime: '16:00',
+          scheduleTimezone: DEFAULT_TIMEZONE,
+          scheduleStartDate: toIso(addDays(today, -28)),
+          sessionLengthHours: 1.5,
+          scheduleNotes: 'After school'
         },
         {
           id: studentBId,
@@ -1753,7 +1866,13 @@
           contractVersion: 'v1',
           contractSignerName: '',
           contractSignerEmail: '',
-          lastContractId: ''
+          lastContractId: '',
+          scheduleDays: [2, 4],
+          preferredTime: '17:00',
+          scheduleTimezone: DEFAULT_TIMEZONE,
+          scheduleStartDate: toIso(addDays(today, 2)),
+          sessionLengthHours: 1.5,
+          scheduleNotes: 'Evenings'
         }
       ];
 
@@ -1875,7 +1994,14 @@
           lateApplied: false,
           shortApplied: false,
           paid: false,
-          notes: 'Prepaid month of January.'
+          notes: 'Prepaid month of January.',
+          servicePeriodStart: toIso(addDays(today, -1)),
+          servicePeriodEnd: toIso(endOfMonth(today)),
+          numSessions: 3,
+          invoiceType: 'monthly',
+          autoGenerated: true,
+          paidAt: '',
+          paymentProvider: ''
         },
         {
           id: invoiceB,
@@ -1889,7 +2015,14 @@
           lateApplied: false,
           shortApplied: false,
           paid: true,
-          notes: 'Paid via EFT.'
+          notes: 'Paid via EFT.',
+          servicePeriodStart: toIso(addDays(today, -20)),
+          servicePeriodEnd: toIso(endOfMonth(addDays(today, -20))),
+          numSessions: 2,
+          invoiceType: 'monthly',
+          autoGenerated: true,
+          paidAt: addDays(today, -12).toISOString(),
+          paymentProvider: PAYFAST_PROVIDER
         }
       ];
 
@@ -2050,6 +2183,12 @@
         s.contractSignerEmail = s.contractSignerEmail || s.contract_signer_email || '';
         s.lastContractId = s.lastContractId || s.last_contract_id || '';
         s.loginCode = normalizeCode(s.loginCode || s.login_code || '');
+        s.scheduleDays = normalizeScheduleDays(s.scheduleDays || s.schedule_days || []);
+        s.preferredTime = (s.preferredTime || s.preferred_time || '').trim();
+        s.scheduleTimezone = s.scheduleTimezone || s.schedule_timezone || DEFAULT_TIMEZONE;
+        s.scheduleStartDate = s.scheduleStartDate || s.schedule_start_date || '';
+        s.sessionLengthHours = Number(s.sessionLengthHours || s.session_length_hours || 0) || Number(defaultState.settings.defaultSessionDuration || 1);
+        s.scheduleNotes = s.scheduleNotes || s.schedule_notes || '';
       });
       st.parents.forEach(p => {
         p.id = cleanId(p.id);
@@ -2074,7 +2213,17 @@
         c.studentId = cleanId(c.studentId);
         c.storage_path = stripBucketPrefix(stripBucketPrefix(c.storage_path, 'signed_contracts'), 'contracts');
       });
-      st.invoices.forEach(i => { i.id = cleanId(i.id); i.studentId = cleanId(i.studentId); });
+      st.invoices.forEach(i => {
+        i.id = cleanId(i.id);
+        i.studentId = cleanId(i.studentId);
+        i.servicePeriodStart = i.servicePeriodStart || i.service_period_start || '';
+        i.servicePeriodEnd = i.servicePeriodEnd || i.service_period_end || '';
+        i.numSessions = Number(i.numSessions ?? i.num_sessions ?? 0);
+        i.invoiceType = i.invoiceType || i.invoice_type || 'manual';
+        i.autoGenerated = !!(i.autoGenerated ?? i.auto_generated);
+        i.paidAt = i.paidAt || i.paid_at || '';
+        i.paymentProvider = i.paymentProvider || i.payment_provider || '';
+      });
       st.studentTodos.forEach(t => { t.id = cleanId(t.id); t.studentId = cleanId(t.studentId); });
       st.studentCheckins.forEach(c => { c.id = cleanId(c.id); c.studentId = cleanId(c.studentId); });
       if (!Array.isArray(st.contractSignatures)) st.contractSignatures = [];
@@ -2264,7 +2413,13 @@
         contract_signer_name: s.contractSignerName || null,
         contract_signer_email: s.contractSignerEmail || null,
         last_contract_id: s.lastContractId || null,
-        login_code: normalizeCode(s.loginCode)
+        login_code: normalizeCode(s.loginCode),
+        schedule_days: s.scheduleDays || [],
+        preferred_time: s.preferredTime || null,
+        schedule_timezone: s.scheduleTimezone || DEFAULT_TIMEZONE,
+        schedule_start_date: s.scheduleStartDate || null,
+        session_length_hours: s.sessionLengthHours || null,
+        schedule_notes: s.scheduleNotes || null
       }));
       await upsertAndPrune('students', students, 'id');
 
@@ -2398,7 +2553,14 @@
         late_applied: inv.lateApplied,
         short_applied: inv.shortApplied,
         paid: inv.paid,
-        notes: inv.notes
+        notes: inv.notes,
+        service_period_start: inv.servicePeriodStart || null,
+        service_period_end: inv.servicePeriodEnd || null,
+        num_sessions: inv.numSessions ?? null,
+        invoice_type: inv.invoiceType || 'manual',
+        auto_generated: !!inv.autoGenerated,
+        paid_at: inv.paidAt || null,
+        payment_provider: inv.paymentProvider || null
       }));
       await upsertAndPrune('invoices', invoices, 'id');
 
@@ -2546,7 +2708,14 @@
         late_applied: inv.lateApplied,
         short_applied: inv.shortApplied,
         paid: inv.paid,
-        notes: inv.notes
+        notes: inv.notes,
+        service_period_start: inv.servicePeriodStart || null,
+        service_period_end: inv.servicePeriodEnd || null,
+        num_sessions: inv.numSessions ?? null,
+        invoice_type: inv.invoiceType || 'manual',
+        auto_generated: !!inv.autoGenerated,
+        paid_at: inv.paidAt || null,
+        payment_provider: inv.paymentProvider || null
       });
       if (error) throw new Error('Supabase invoice upsert failed: ' + error.message);
     }
@@ -3218,7 +3387,13 @@
         invUl.innerHTML = myInv.length ? myInv.map(inv => `
           <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
             <div class="font-medium">Invoice ${inv.id}</div>
-            <div class="text-[10px] text-slate-500">Issued ${inv.issueDate || 'n/a'} • Due ${inv.dueDate || 'n/a'} • R ${Number(inv.total || 0).toFixed(2)} • ${inv.paid ? 'Paid' : 'Unpaid'}</div>
+            <div class="text-[10px] text-slate-500">
+              Issued ${inv.issueDate || 'n/a'} • Due ${inv.dueDate || 'n/a'}
+              ${inv.servicePeriodStart && inv.servicePeriodEnd ? ` • ${inv.servicePeriodStart} → ${inv.servicePeriodEnd}` : ''}
+              ${inv.numSessions ? ` • ${inv.numSessions} sessions` : ''}
+              • R ${Number(inv.total || 0).toFixed(2)} • ${inv.paid ? 'Paid' : 'Unpaid'}
+              ${(inv.invoiceType || inv.invoice_type) === 'adjustment' ? ' • Adjustment' : ''}
+            </div>
           </li>
         `).join('') : '<li class="text-slate-500 text-xs">No invoices yet.</li>';
       }
@@ -3391,7 +3566,13 @@
           const s = getStudentById(inv.studentId);
           return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
             <div class="font-medium">Invoice ${inv.id}</div>
-            <div class="text-[10px] text-slate-500">${s?.name || ''} • Issued ${inv.issueDate || 'n/a'} • Due ${inv.dueDate || 'n/a'} • R ${Number(inv.total || 0).toFixed(2)} • ${inv.paid ? 'Paid' : 'Unpaid'}</div>
+            <div class="text-[10px] text-slate-500">
+              ${s?.name || ''} • Issued ${inv.issueDate || 'n/a'} • Due ${inv.dueDate || 'n/a'}
+              ${inv.servicePeriodStart && inv.servicePeriodEnd ? ` • ${inv.servicePeriodStart} → ${inv.servicePeriodEnd}` : ''}
+              ${inv.numSessions ? ` • ${inv.numSessions} sessions` : ''}
+              • R ${Number(inv.total || 0).toFixed(2)} • ${inv.paid ? 'Paid' : 'Unpaid'}
+              ${(inv.invoiceType || inv.invoice_type) === 'adjustment' ? ' • Adjustment' : ''}
+            </div>
             <div class="flex flex-wrap gap-2 mt-1 text-[10px]">
               <button id="btn-inv-${inv.id}" class="px-2 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50" onclick="explainInvoiceAI('${inv.id}')">Explain with AI</button>
             </div>
@@ -4038,7 +4219,13 @@
           contractSignerName: s.contract_signer_name,
           contractSignerEmail: s.contract_signer_email,
           lastContractId: s.last_contract_id,
-          loginCode: normalizeCode(s.login_code)
+          loginCode: normalizeCode(s.login_code),
+          scheduleDays: normalizeScheduleDays(s.schedule_days || []),
+          preferredTime: s.preferred_time || '',
+          scheduleTimezone: s.schedule_timezone || DEFAULT_TIMEZONE,
+          scheduleStartDate: s.schedule_start_date || '',
+          sessionLengthHours: s.session_length_hours || null,
+          scheduleNotes: s.schedule_notes || ''
         }));
         merged.parents = (parentsRes?.data || []).map(p => ({
           id: p.id,
@@ -4113,7 +4300,14 @@
           lateApplied: inv.late_applied,
           shortApplied: inv.short_applied,
           paid: inv.paid,
-          notes: inv.notes
+          notes: inv.notes,
+          servicePeriodStart: inv.service_period_start,
+          servicePeriodEnd: inv.service_period_end,
+          numSessions: inv.num_sessions,
+          invoiceType: inv.invoice_type || 'manual',
+          autoGenerated: !!inv.auto_generated,
+          paidAt: inv.paid_at,
+          paymentProvider: inv.payment_provider || ''
         }));
         merged.studentTodos = (todosRes.data || []).map(t => ({
           id: t.id,
@@ -4227,7 +4421,13 @@
           contractSignerName: s.contract_signer_name,
           contractSignerEmail: s.contract_signer_email,
           lastContractId: s.last_contract_id,
-          loginCode: normalizeCode(s.login_code)
+          loginCode: normalizeCode(s.login_code),
+          scheduleDays: normalizeScheduleDays(s.schedule_days || []),
+          preferredTime: s.preferred_time || '',
+          scheduleTimezone: s.schedule_timezone || DEFAULT_TIMEZONE,
+          scheduleStartDate: s.schedule_start_date || '',
+          sessionLengthHours: s.session_length_hours || null,
+          scheduleNotes: s.schedule_notes || ''
         }));
         out.parents = (snap.parents || []).map(p => ({
           id: p.id,
@@ -4292,7 +4492,14 @@
           lateApplied: inv.late_applied,
           shortApplied: inv.short_applied,
           paid: inv.paid,
-          notes: inv.notes
+          notes: inv.notes,
+          servicePeriodStart: inv.service_period_start,
+          servicePeriodEnd: inv.service_period_end,
+          numSessions: inv.num_sessions,
+          invoiceType: inv.invoice_type || 'manual',
+          autoGenerated: !!inv.auto_generated,
+          paidAt: inv.paid_at,
+          paymentProvider: inv.payment_provider || ''
         }));
         out.contractSignatures = (snap.contractSignatures || []).map(cs => ({
           id: cs.id,
@@ -4458,7 +4665,13 @@
         contractSignerName: s.contract_signer_name,
         contractSignerEmail: s.contract_signer_email,
         lastContractId: s.last_contract_id,
-        loginCode: normalizeCode(s.login_code)
+        loginCode: normalizeCode(s.login_code),
+        scheduleDays: normalizeScheduleDays(s.schedule_days || []),
+        preferredTime: s.preferred_time || '',
+        scheduleTimezone: s.schedule_timezone || DEFAULT_TIMEZONE,
+        scheduleStartDate: s.schedule_start_date || '',
+        sessionLengthHours: s.session_length_hours || null,
+        scheduleNotes: s.schedule_notes || ''
       }));
       merged.parents = (parentsRes.data || []).map(p => ({
         id: p.id,
@@ -4544,7 +4757,14 @@
         lateApplied: inv.late_applied,
         shortApplied: inv.short_applied,
         paid: inv.paid,
-        notes: inv.notes
+        notes: inv.notes,
+        servicePeriodStart: inv.service_period_start,
+        servicePeriodEnd: inv.service_period_end,
+        numSessions: inv.num_sessions,
+        invoiceType: inv.invoice_type || 'manual',
+        autoGenerated: !!inv.auto_generated,
+        paidAt: inv.paid_at,
+        paymentProvider: inv.payment_provider || ''
       }));
       merged.contractSignatures = (contractSignaturesRes?.data || []).map(cs => ({
         id: cs.id,
@@ -4814,6 +5034,7 @@
     }
 
     function renderAllViews() {
+      if (refreshAutoBilling()) saveState();
       updateKPIsAndCharts();
       renderStudentsView();
       renderScheduleView();
@@ -5521,6 +5742,8 @@
       document.getElementById('studentDetailName').textContent = s.name;
       document.getElementById('studentDetailMeta').textContent =
         `${s.gradeLevel || ''} • ${s.subjects?.join(', ') || ''} • Rate: ${s.rate ? 'R ' + s.rate + '/h' : '—'}`;
+      const scheduleMeta = document.getElementById('studentScheduleMeta');
+      if (scheduleMeta) scheduleMeta.textContent = formatScheduleSummary(s);
       const contractBadge = document.getElementById('studentContractBadge');
       const contractLinkBtn = document.getElementById('studentContractLinkBtn');
       const contractDeleteBtn = document.getElementById('studentContractDeleteBtn');
@@ -5763,10 +5986,14 @@
       });
 
       state.invoices.filter(inv => inv.studentId === studentId).forEach(inv => {
+        const periodLabel = inv.servicePeriodStart && inv.servicePeriodEnd
+          ? ` ${inv.servicePeriodStart}→${inv.servicePeriodEnd}`
+          : '';
+        const countLabel = inv.numSessions ? ` ${inv.numSessions} sessions` : '';
         events.push({
           date: inv.issueDate,
           type: 'Invoice',
-          description: `${inv.id} – R ${inv.total?.toFixed(2) || inv.total} (${inv.paid ? 'Paid' : 'Unpaid'})`
+          description: `${inv.id} – R ${inv.total?.toFixed(2) || inv.total} (${inv.paid ? 'Paid' : 'Unpaid'})${periodLabel}${countLabel}`
         });
       });
 
@@ -5878,8 +6105,11 @@
             <div class="font-medium">${inv.id}</div>
             <div class="text-[10px] text-slate-500">
               Issued ${inv.issueDate} • Due ${inv.dueDate || '—'}
+              ${inv.servicePeriodStart && inv.servicePeriodEnd ? ` • Period ${inv.servicePeriodStart} → ${inv.servicePeriodEnd}` : ''}
+              ${inv.numSessions ? ` • ${inv.numSessions} sessions` : ''}
               • Total R ${Number(inv.total || 0).toFixed(2)}
               • ${inv.paid ? 'Paid' : 'Unpaid'}
+              ${(inv.invoiceType || inv.invoice_type) === 'adjustment' ? ' • Adjustment' : ''}
               ${inv.lateApplied && inv.lateFeePercent ? ` • Late fee ${inv.lateFeePercent}%` : ''}
               ${inv.shortApplied && inv.shortNoticePercent ? ` • Short notice ${inv.shortNoticePercent}%` : ''}
             </div>
@@ -6121,6 +6351,7 @@
           stu.contractSigned = true;
           stu.contractSignedAt = new Date().toISOString();
           stu.lastContractId = contractId;
+          refreshAutoBilling();
         } else {
           stu.contractSigned = false;
           stu.contractSignedAt = null;
@@ -6341,12 +6572,232 @@
       return h * 60 + m;
     }
 
+    function getScheduleAnchorDate(student) {
+      const prefs = getSchedulePrefs(student);
+      const signedRaw = student.contractSignedAt || '';
+      let anchor = parseDateOnly(signedRaw) || new Date();
+      const start = parseDateOnly(prefs.scheduleStartDate);
+      if (start && start > anchor) anchor = start;
+      anchor.setHours(0, 0, 0, 0);
+      return anchor;
+    }
+
+    function findFirstScheduleDate(days, start, end) {
+      const dates = listScheduleDates(days, start, end);
+      return dates[0] || '';
+    }
+
+    function generateInvoiceIdForPeriod(studentId, periodStart) {
+      const monthTag = (periodStart || '').replace(/-/g, '').slice(0, 6) || 'INV';
+      const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+      return `INV-${monthTag}-${suffix}`;
+    }
+
+    function ensureMonthlyInvoiceForStudent(student, today) {
+      const prefs = getSchedulePrefs(student);
+      if (!student.contractSigned || !prefs.days.length || !prefs.preferredTime) return false;
+      const anchor = getScheduleAnchorDate(student);
+      let serviceStart = findFirstScheduleDate(prefs.days, anchor, endOfMonth(anchor));
+      if (!serviceStart) {
+        const nextMonth = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1);
+        serviceStart = findFirstScheduleDate(prefs.days, nextMonth, endOfMonth(nextMonth));
+      }
+      if (!serviceStart) return false;
+      const serviceEnd = toDateOnly(endOfMonth(new Date(serviceStart)));
+      const existing = state.invoices.find(inv => inv.studentId === student.id
+        && (inv.invoiceType || inv.invoice_type) === 'monthly'
+        && (inv.servicePeriodStart || inv.service_period_start) === serviceStart
+        && (inv.servicePeriodEnd || inv.service_period_end) === serviceEnd);
+      if (existing) {
+        let changed = false;
+        if (!existing.invoiceType) { existing.invoiceType = 'monthly'; changed = true; }
+        if (!existing.autoGenerated) { existing.autoGenerated = true; changed = true; }
+        if (!existing.paymentProvider) { existing.paymentProvider = PAYFAST_PROVIDER; changed = true; }
+        if (!existing.servicePeriodStart) { existing.servicePeriodStart = serviceStart; changed = true; }
+        if (!existing.servicePeriodEnd) { existing.servicePeriodEnd = serviceEnd; changed = true; }
+        if (!existing.dueDate) { existing.dueDate = serviceStart; changed = true; }
+        if (!existing.issueDate) { existing.issueDate = toDateOnly(today); changed = true; }
+        if (!existing.notes) {
+          existing.notes = `Monthly prepaid sessions (${serviceStart} to ${serviceEnd}).`;
+          changed = true;
+        }
+        if (!existing.paid) {
+          if (recalculateMonthlyInvoice(existing, student, today)) changed = true;
+        }
+        return changed;
+      }
+      const billableStart = maxDate(today, parseDateOnly(serviceStart));
+      const dates = listScheduleDates(prefs.days, billableStart, parseDateOnly(serviceEnd));
+      const numSessions = dates.length;
+      if (!numSessions) return false;
+      const baseAmount = Number((numSessions * Number(student.rate || 0)).toFixed(2));
+      const inv = {
+        id: generateInvoiceIdForPeriod(student.id, serviceStart),
+        studentId: student.id,
+        issueDate: toDateOnly(today),
+        dueDate: serviceStart,
+        baseAmount,
+        total: baseAmount,
+        lateFeePercent: 0,
+        shortNoticePercent: 0,
+        lateApplied: false,
+        shortApplied: false,
+        paid: false,
+        notes: `Monthly prepaid sessions (${serviceStart} to ${serviceEnd}).`,
+        servicePeriodStart: serviceStart,
+        servicePeriodEnd: serviceEnd,
+        numSessions,
+        invoiceType: 'monthly',
+        autoGenerated: true,
+        paidAt: '',
+        paymentProvider: PAYFAST_PROVIDER
+      };
+      state.invoices.push(inv);
+      logActivity('Created invoice', inv.id);
+      return true;
+    }
+
+    function recalculateMonthlyInvoice(inv, student, today) {
+      const prefs = getSchedulePrefs(student);
+      if (!prefs.days.length || inv.paid) return false;
+      const serviceStart = parseDateOnly(inv.servicePeriodStart || inv.service_period_start);
+      const serviceEnd = parseDateOnly(inv.servicePeriodEnd || inv.service_period_end);
+      if (!serviceStart || !serviceEnd) return false;
+      const billableStart = maxDate(serviceStart, today);
+      const dates = listScheduleDates(prefs.days, billableStart, serviceEnd);
+      const numSessions = dates.length;
+      const baseAmount = Number((numSessions * Number(student.rate || 0)).toFixed(2));
+      const total = computeInvoiceTotal(baseAmount, inv);
+      let changed = false;
+      if (numSessions !== inv.numSessions) { inv.numSessions = numSessions; changed = true; }
+      if (baseAmount !== inv.baseAmount) { inv.baseAmount = baseAmount; changed = true; }
+      if (total !== inv.total) { inv.total = total; changed = true; }
+      return changed;
+    }
+
+    function scheduleSessionsForInvoice(inv, student, today) {
+      if ((inv.invoiceType || inv.invoice_type) !== 'monthly' || !inv.paid) return false;
+      const prefs = getSchedulePrefs(student);
+      if (!prefs.days.length || !prefs.preferredTime) return false;
+      const serviceStart = parseDateOnly(inv.servicePeriodStart || inv.service_period_start);
+      const serviceEnd = parseDateOnly(inv.servicePeriodEnd || inv.service_period_end);
+      if (!serviceStart || !serviceEnd) return false;
+      const paidAtDate = parseDateOnly(inv.paidAt) || today;
+      const scheduleStart = maxDate(serviceStart, paidAtDate);
+      const dates = listScheduleDates(prefs.days, scheduleStart, serviceEnd);
+      let changed = false;
+      dates.forEach(dateStr => {
+        const existing = state.sessions.filter(s => s.studentIds.includes(student.id) && s.date === dateStr);
+        if (existing.length) {
+          existing.forEach(s => {
+            if (!s.invoiceId) {
+              s.invoiceId = inv.id;
+              changed = true;
+            }
+          });
+          return;
+        }
+        state.sessions.push({
+          id: generateId('sess'),
+          studentIds: [student.id],
+          date: dateStr,
+          startTime: prefs.preferredTime,
+          durationHours: prefs.sessionLengthHours || Number(state.settings.defaultSessionDuration || 1),
+          subject: student.subjects?.[0] || 'Tutoring',
+          topic: 'Auto-scheduled session',
+          notes: '',
+          completed: false,
+          invoiceId: inv.id
+        });
+        changed = true;
+      });
+      if (inv.paid && !inv.paidAt) {
+        inv.paidAt = new Date().toISOString();
+        changed = true;
+      }
+      if (inv.paid && !inv.paymentProvider) {
+        inv.paymentProvider = PAYFAST_PROVIDER;
+        changed = true;
+      }
+      return changed;
+    }
+
+    function refreshAutoBilling() {
+      if (readOnlyMode || studentMode || parentMode) return false;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      let changed = false;
+      state.students.forEach(student => {
+        if (ensureMonthlyInvoiceForStudent(student, today)) changed = true;
+      });
+      state.invoices.forEach(inv => {
+        const student = getStudentById(inv.studentId);
+        if (!student) return;
+        if ((inv.invoiceType || inv.invoice_type) === 'monthly' && inv.autoGenerated && !inv.paid) {
+          if (recalculateMonthlyInvoice(inv, student, today)) changed = true;
+        }
+        if ((inv.invoiceType || inv.invoice_type) === 'monthly' && inv.paid) {
+          if (scheduleSessionsForInvoice(inv, student, today)) changed = true;
+        }
+      });
+      return changed;
+    }
+
+    function isWithin24Hours(sess) {
+      const start = new Date(sess.date + 'T' + (sess.startTime || '00:00'));
+      const diffMs = start - new Date();
+      return diffMs > 0 && diffMs <= 24 * 60 * 60 * 1000;
+    }
+
+    function hasLateChangeInvoice(studentId, dateStr) {
+      return state.invoices.some(inv => inv.studentId === studentId
+        && (inv.invoiceType || inv.invoice_type) === 'adjustment'
+        && (inv.servicePeriodStart || inv.service_period_start) === dateStr);
+    }
+
+    function createLateChangeInvoices(sess, actionLabel) {
+      const nowStr = new Date().toISOString().slice(0, 10);
+      sess.studentIds.forEach(sid => {
+        if (hasLateChangeInvoice(sid, sess.date)) return;
+        const student = getStudentById(sid);
+        const rate = Number(student?.rate || 0);
+        const sessionHours = Number(sess.durationHours || 1);
+        const baseAmount = Number((rate * sessionHours).toFixed(2));
+        const inv = {
+          id: generateId('inv'),
+          studentId: sid,
+          issueDate: nowStr,
+          dueDate: nowStr,
+          baseAmount,
+          total: baseAmount,
+          lateFeePercent: 0,
+          shortNoticePercent: 0,
+          lateApplied: false,
+          shortApplied: false,
+          paid: false,
+          notes: `Lesson on ${sess.date} ${actionLabel} within 24 hours.`,
+          servicePeriodStart: sess.date,
+          servicePeriodEnd: sess.date,
+          numSessions: 1,
+          invoiceType: 'adjustment',
+          autoGenerated: true,
+          paidAt: '',
+          paymentProvider: PAYFAST_PROVIDER
+        };
+        state.invoices.push(inv);
+        logActivity('Created invoice', inv.id);
+      });
+    }
+
     function hasPaidInvoiceForDate(studentId, dateStr) {
       const target = new Date(dateStr);
       return state.invoices.some(inv => {
         if (inv.studentId !== studentId || !inv.paid) return false;
-        const startOk = !inv.service_period_start || new Date(inv.service_period_start) <= target;
-        const endOk = !inv.service_period_end || new Date(inv.service_period_end) >= target;
+        if ((inv.invoiceType || inv.invoice_type) === 'adjustment') return false;
+        const startVal = inv.servicePeriodStart || inv.service_period_start || '';
+        const endVal = inv.servicePeriodEnd || inv.service_period_end || '';
+        const startOk = !startVal || new Date(startVal) <= target;
+        const endOk = !endVal || new Date(endVal) >= target;
         return startOk && endOk;
       });
     }
@@ -6802,7 +7253,13 @@
       if (!guardEdit()) return;
       const inv = getInvoiceById(id);
       if (!inv) return;
-      inv.paid = true;
+      if (!inv.paid) {
+        inv.paid = true;
+        inv.paidAt = new Date().toISOString();
+        inv.paymentProvider = PAYFAST_PROVIDER;
+        const student = getStudentById(inv.studentId);
+        if (student) scheduleSessionsForInvoice(inv, student, new Date());
+      }
       saveState();
       renderFinanceView();
       if (selectedStudentId) renderStudentFinance(selectedStudentId);
@@ -6872,6 +7329,12 @@ Best regards,
       const emailOptions = getAvailableStudentEmails(student?.studentEmail).map(e => `<option value="${e}">${e}</option>`).join('');
 
       const existingCode = normalizeCode(student?.loginCode);
+      const selectedScheduleDays = new Set(normalizeScheduleDays(student?.scheduleDays || student?.schedule_days || []));
+      const preferredTime = student?.preferredTime || student?.preferred_time || '';
+      const scheduleStartDate = student?.scheduleStartDate || student?.schedule_start_date || '';
+      const scheduleTimezone = student?.scheduleTimezone || student?.schedule_timezone || DEFAULT_TIMEZONE;
+      const sessionLengthHours = Number(student?.sessionLengthHours || student?.session_length_hours || state.settings.defaultSessionDuration || 1);
+      const scheduleNotes = student?.scheduleNotes || student?.schedule_notes || '';
       const codeSection = `
         <div class="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
           <h3 class="text-xs font-semibold text-indigo-900 mb-2">🔑 Student Login Code</h3>
@@ -6927,6 +7390,52 @@ Best regards,
           <div>
             <label class="block text-[11px] mb-1">Notes</label>
             <textarea name="notes" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${student?.notes || ''}</textarea>
+          </div>
+          <div class="border border-slate-200 rounded-lg p-2 bg-slate-50">
+            <div class="text-[11px] font-semibold mb-1">Schedule preferences</div>
+            <div class="text-[10px] text-slate-500 mb-2">Used to auto-create monthly invoices and draft lesson dates.</div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[11px] mb-1">Days of week</label>
+                <div class="flex flex-wrap gap-2 text-[11px]">
+                  ${WEEKDAY_LABELS.map((label, idx) => `
+                    <label class="flex items-center gap-1">
+                      <input type="checkbox" name="scheduleDays" value="${idx}" ${selectedScheduleDays.has(idx) ? 'checked' : ''}>
+                      <span>${label}</span>
+                    </label>
+                  `).join('')}
+                </div>
+              </div>
+              <div>
+                <label class="block text-[11px] mb-1">Preferred time</label>
+                <input type="time" name="preferredTime" value="${preferredTime}"
+                       class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-2">
+              <div>
+                <label class="block text-[11px] mb-1">Start date</label>
+                <input type="date" name="scheduleStartDate" value="${scheduleStartDate}"
+                       class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+              </div>
+              <div>
+                <label class="block text-[11px] mb-1">Session length (hours)</label>
+                <input type="number" step="0.25" name="sessionLengthHours" value="${sessionLengthHours}"
+                       class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-2">
+              <div>
+                <label class="block text-[11px] mb-1">Timezone</label>
+                <input name="scheduleTimezone" value="${scheduleTimezone}"
+                       class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+              </div>
+              <div>
+                <label class="block text-[11px] mb-1">Schedule notes</label>
+                <input name="scheduleNotes" value="${scheduleNotes}"
+                       class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="Optional">
+              </div>
+            </div>
           </div>
           <div class="flex justify-between items-center mt-3">
             <button type="submit" class="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium">
@@ -6992,11 +7501,21 @@ Best regards,
             contractSignedAt: student?.contractSignedAt || null,
             contractVersion: student?.contractVersion || 'v1',
             contractSignerName: student?.contractSignerName || '',
-            contractSignerEmail: student?.contractSignerEmail || ''
+            contractSignerEmail: student?.contractSignerEmail || '',
+            scheduleDays: [...form.querySelectorAll('input[name="scheduleDays"]:checked')].map(i => Number(i.value)),
+            preferredTime: form.preferredTime.value.trim(),
+            scheduleStartDate: form.scheduleStartDate.value,
+            sessionLengthHours: Number(form.sessionLengthHours.value || state.settings.defaultSessionDuration || 1),
+            scheduleTimezone: form.scheduleTimezone.value.trim() || DEFAULT_TIMEZONE,
+            scheduleNotes: form.scheduleNotes.value.trim()
           };
 
           if (!newStudent.name) {
             alert('Name is required.');
+            return;
+          }
+          if (newStudent.scheduleDays.length && !newStudent.preferredTime) {
+            alert('Select a preferred time for the schedule.');
             return;
           }
 
@@ -7013,6 +7532,7 @@ Best regards,
           state.students.push(newStudent);
           logActivity('Added student', newStudent.name);
         }
+        refreshAutoBilling();
         saveState();
         closeModal();
         renderStudentsView();
@@ -7172,6 +7692,12 @@ Best regards,
             notes: form.notes.value.trim(),
             completed: session?.completed || false
           };
+          const isLateChange = isEdit && session
+            && isWithin24Hours(session)
+            && (session.date !== newSession.date || (session.startTime || '') !== (newSession.startTime || ''));
+          if (isLateChange) {
+            createLateChangeInvoices(session, 'moved');
+          }
           if (isEdit) {
             const idx = state.sessions.findIndex(s => s.id === session.id);
             state.sessions[idx] = newSession;
@@ -7229,6 +7755,10 @@ Best regards,
 
     async function deleteSessionAndLinks(sessionId) {
       // remove locally
+      const sess = getSessionById(sessionId);
+      if (sess && isWithin24Hours(sess)) {
+        createLateChangeInvoices(sess, 'cancelled');
+      }
       state.sessions = state.sessions.filter(s => s.id !== sessionId);
       saveState();
       // remove remotely if connected
@@ -7616,6 +8146,13 @@ Best regards,
     function openInvoiceModal(inv) {
       if (!guardEdit()) return;
       const isEdit = !!inv;
+      const servicePeriodStart = inv?.servicePeriodStart || inv?.service_period_start || '';
+      const servicePeriodEnd = inv?.servicePeriodEnd || inv?.service_period_end || '';
+      const numSessions = inv?.numSessions ?? inv?.num_sessions ?? '';
+      const invoiceType = inv?.invoiceType || inv?.invoice_type || 'manual';
+      const autoGenerated = !!(inv?.autoGenerated ?? inv?.auto_generated);
+      const paidAt = inv?.paidAt || inv?.paid_at || '';
+      const paymentProvider = inv?.paymentProvider || inv?.payment_provider || '';
       const html = `
         <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit invoice' : 'Create invoice'}</h2>
         <form id="invoiceForm" class="space-y-2">
@@ -7660,6 +8197,18 @@ Best regards,
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
             </div>
           </div>
+          <div class="text-[10px] text-slate-500">
+            ${servicePeriodStart && servicePeriodEnd ? `Service period: ${servicePeriodStart} → ${servicePeriodEnd}` : 'Service period: n/a'}
+            ${numSessions ? ` • ${numSessions} sessions` : ''}
+            ${invoiceType ? ` • Type: ${invoiceType}` : ''}
+          </div>
+          <input type="hidden" name="servicePeriodStart" value="${servicePeriodStart}">
+          <input type="hidden" name="servicePeriodEnd" value="${servicePeriodEnd}">
+          <input type="hidden" name="numSessions" value="${numSessions}">
+          <input type="hidden" name="invoiceType" value="${invoiceType}">
+          <input type="hidden" name="autoGenerated" value="${autoGenerated ? '1' : ''}">
+          <input type="hidden" name="paidAt" value="${paidAt}">
+          <input type="hidden" name="paymentProvider" value="${paymentProvider}">
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-[11px] mb-1">Late fee %</label>
@@ -7788,7 +8337,14 @@ Best regards,
             lateApplied: form.applyLate.checked,
             shortApplied: form.applyShort.checked,
             paid: form.paid.checked,
-            notes: form.notes.value.trim()
+            notes: form.notes.value.trim(),
+            servicePeriodStart: form.servicePeriodStart.value || servicePeriodStart || '',
+            servicePeriodEnd: form.servicePeriodEnd.value || servicePeriodEnd || '',
+            numSessions: Number(form.numSessions.value || numSessions || 0),
+            invoiceType: form.invoiceType.value || invoiceType || 'manual',
+            autoGenerated: !!form.autoGenerated.value || autoGenerated,
+            paidAt: form.paidAt.value || paidAt || '',
+            paymentProvider: form.paymentProvider.value || paymentProvider || ''
           };
           if (!newInv.studentId) {
             alert('Select a student.');
@@ -7797,6 +8353,13 @@ Best regards,
           if (!newInv.id) {
             alert('Invoice ID is required.');
             return;
+          }
+          if (newInv.paid && !inv?.paid) {
+            newInv.paidAt = new Date().toISOString();
+            newInv.paymentProvider = PAYFAST_PROVIDER;
+          }
+          if (!newInv.paid) {
+            newInv.paidAt = '';
           }
           try {
             if (isSupabaseReady()) {
@@ -7820,6 +8383,10 @@ Best regards,
               if (idx >= 0) state.invoices[idx] = newInv;
               else state.invoices.push(newInv);
               logActivity('Created invoice', newInv.id);
+            }
+            if (newInv.paid) {
+              const student = getStudentById(newInv.studentId);
+              if (student) scheduleSessionsForInvoice(newInv, student, new Date());
             }
             saveState();
             closeModal();
