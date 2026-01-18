@@ -5580,7 +5580,8 @@
       const parentProfile = parentMode ? getParentProfileBySession() : null;
       try {
         const { data, error } = await supabaseClient.functions.invoke('issue-contract-sign-token', {
-          body: { student_id: studentId, parent_email: parentProfile?.email || student?.parentEmail || null }
+          body: { student_id: studentId, parent_email: parentProfile?.email || student?.parentEmail || null },
+          headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
         });
         if (error || !data?.token) {
           throw new Error(data?.error || error?.message || 'Failed to issue signing link');
