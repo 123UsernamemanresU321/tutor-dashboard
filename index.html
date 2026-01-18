@@ -1726,6 +1726,16 @@
       return (code || '').trim().toUpperCase();
     }
 
+    function normalizeTimeValue(value) {
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      const match = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/);
+      if (!match) return raw;
+      const hours = match[1].padStart(2, '0');
+      const minutes = match[2].padStart(2, '0');
+      return `${hours}:${minutes}`;
+    }
+
     function codeToEmail(code) {
       const normalized = normalizeCode(code);
       return normalized ? `${normalized.toLowerCase()}${CODE_EMAIL_SUFFIX}` : '';
@@ -1752,7 +1762,7 @@
       if (!Array.isArray(value)) return [];
       const slots = value.map(raw => {
         const day = Number(raw?.dayOfWeek ?? raw?.day_of_week ?? raw?.day ?? raw?.dow);
-        const startTime = String(raw?.startTime ?? raw?.start_time ?? '').trim();
+        const startTime = normalizeTimeValue(raw?.startTime ?? raw?.start_time ?? '');
         const durationRaw = raw?.durationHours ?? raw?.duration_hours ?? raw?.duration ?? '';
         const durationHours = Number(durationRaw || 0) || Number(state.settings.defaultSessionDuration || 1);
         const timezone = String(raw?.timezone || raw?.tz || fallbackTimezone || DEFAULT_TIMEZONE).trim() || DEFAULT_TIMEZONE;
@@ -1766,7 +1776,7 @@
       if (!Array.isArray(slots)) return [];
       return slots.map(slot => ({
         day_of_week: Number(slot.dayOfWeek),
-        start_time: String(slot.startTime || '').trim(),
+        start_time: normalizeTimeValue(slot.startTime || ''),
         duration_hours: Number(slot.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1),
         timezone: String(slot.timezone || fallbackTimezone || DEFAULT_TIMEZONE).trim() || DEFAULT_TIMEZONE
       })).filter(s => Number.isFinite(s.day_of_week) && s.day_of_week >= 0 && s.day_of_week <= 6 && s.start_time);
@@ -1786,7 +1796,7 @@
       let slots = normalizeScheduleSlots(rawSlots, fallbackTimezone);
       if (!slots.length) {
         const days = normalizeScheduleDays(student?.scheduleDays || student?.schedule_days || []);
-        const preferredTime = (student?.preferredTime || student?.preferred_time || '').trim();
+        const preferredTime = normalizeTimeValue(student?.preferredTime || student?.preferred_time || '');
         if (days.length && preferredTime) {
           const durationHours = Number(student?.sessionLengthHours || student?.session_length_hours || 0)
             || Number(state.settings.defaultSessionDuration || 1);
@@ -2424,6 +2434,7 @@
         s.id = cleanId(s.id);
         s.studentIds = (s.studentIds || []).map(cleanId);
         s.invoiceId = cleanId(s.invoiceId);
+        s.startTime = normalizeTimeValue(s.startTime || s.start_time || '');
       });
       st.resources.forEach(r => {
         r.id = cleanId(r.id);
@@ -2457,7 +2468,7 @@
         i.adjustmentReason = i.adjustmentReason || i.adjustment_reason || '';
         i.relatedSessionId = i.relatedSessionId || i.related_session_id || '';
         i.moveToDate = i.moveToDate || i.move_to_date || '';
-        i.moveToTime = i.moveToTime || i.move_to_time || '';
+        i.moveToTime = normalizeTimeValue(i.moveToTime || i.move_to_time || '');
         i.moveToDurationHours = Number(i.moveToDurationHours || i.move_to_duration_hours || 0) || 0;
         i.moveRequestedAt = i.moveRequestedAt || i.move_requested_at || '';
         i.moveAppliedAt = i.moveAppliedAt || i.move_applied_at || '';
@@ -2682,7 +2693,7 @@
         id: cleanId(sess.id),
         user_id: uid,
         date: sess.date,
-        start_time: (sess.startTime || '').trim() || null,
+        start_time: normalizeTimeValue(sess.startTime || '') || null,
         duration_hours: Number(sess.durationHours || 0) || null,
         subject: sess.subject,
         topic: sess.topic,
@@ -4677,7 +4688,7 @@
           return {
             id: sess.id,
             date: sess.date,
-            startTime: sess.start_time,
+            startTime: normalizeTimeValue(sess.start_time),
             durationHours: sess.duration_hours,
             subject: sess.subject,
             topic: sess.topic,
@@ -4743,7 +4754,7 @@
           loginCode: normalizeCode(s.login_code),
           scheduleSlots: normalizeScheduleSlots(s.schedule_slots || [], s.schedule_timezone || DEFAULT_TIMEZONE),
           scheduleDays: normalizeScheduleDays(s.schedule_days || []),
-          preferredTime: s.preferred_time || '',
+          preferredTime: normalizeTimeValue(s.preferred_time || ''),
           scheduleTimezone: s.schedule_timezone || DEFAULT_TIMEZONE,
           scheduleStartDate: s.schedule_start_date || '',
           sessionLengthHours: s.session_length_hours || null,
@@ -4840,7 +4851,7 @@
           adjustmentReason: inv.adjustment_reason || '',
           relatedSessionId: inv.related_session_id || '',
           moveToDate: inv.move_to_date || '',
-          moveToTime: inv.move_to_time || '',
+          moveToTime: normalizeTimeValue(inv.move_to_time || ''),
           moveToDurationHours: inv.move_to_duration_hours || null,
           moveRequestedAt: inv.move_requested_at || '',
           moveAppliedAt: inv.move_applied_at || ''
@@ -4960,7 +4971,7 @@
           loginCode: normalizeCode(s.login_code),
           scheduleSlots: normalizeScheduleSlots(s.schedule_slots || [], s.schedule_timezone || DEFAULT_TIMEZONE),
           scheduleDays: normalizeScheduleDays(s.schedule_days || []),
-          preferredTime: s.preferred_time || '',
+          preferredTime: normalizeTimeValue(s.preferred_time || ''),
           scheduleTimezone: s.schedule_timezone || DEFAULT_TIMEZONE,
           scheduleStartDate: s.schedule_start_date || '',
           sessionLengthHours: s.session_length_hours || null,
@@ -4984,7 +4995,7 @@
         out.sessions = (snap.sessions || []).map(sess => ({
           id: sess.id,
           date: sess.date,
-          startTime: sess.start_time,
+          startTime: normalizeTimeValue(sess.start_time),
           durationHours: sess.duration_hours,
           subject: sess.subject,
           topic: sess.topic,
@@ -5047,7 +5058,7 @@
           adjustmentReason: inv.adjustment_reason || '',
           relatedSessionId: inv.related_session_id || '',
           moveToDate: inv.move_to_date || '',
-          moveToTime: inv.move_to_time || '',
+          moveToTime: normalizeTimeValue(inv.move_to_time || ''),
           moveToDurationHours: inv.move_to_duration_hours || null,
           moveRequestedAt: inv.move_requested_at || '',
           moveAppliedAt: inv.move_applied_at || ''
@@ -5220,7 +5231,7 @@
         loginCode: normalizeCode(s.login_code),
         scheduleSlots: normalizeScheduleSlots(s.schedule_slots || [], s.schedule_timezone || DEFAULT_TIMEZONE),
         scheduleDays: normalizeScheduleDays(s.schedule_days || []),
-        preferredTime: s.preferred_time || '',
+        preferredTime: normalizeTimeValue(s.preferred_time || ''),
         scheduleTimezone: s.schedule_timezone || DEFAULT_TIMEZONE,
         scheduleStartDate: s.schedule_start_date || '',
         sessionLengthHours: s.session_length_hours || null,
@@ -5250,7 +5261,7 @@
         return {
           id: sess.id,
           date: sess.date,
-          startTime: sess.start_time,
+          startTime: normalizeTimeValue(sess.start_time),
           durationHours: sess.duration_hours,
           subject: sess.subject,
           topic: sess.topic,
@@ -5328,7 +5339,7 @@
         adjustmentReason: inv.adjustment_reason || '',
         relatedSessionId: inv.related_session_id || '',
         moveToDate: inv.move_to_date || '',
-        moveToTime: inv.move_to_time || '',
+        moveToTime: normalizeTimeValue(inv.move_to_time || ''),
         moveToDurationHours: inv.move_to_duration_hours || null,
         moveRequestedAt: inv.move_requested_at || '',
         moveAppliedAt: inv.move_applied_at || ''
@@ -7298,10 +7309,11 @@
       occurrences.forEach(occ => {
         const dateStr = occ.date;
         const slot = occ.slot;
+        const slotTime = normalizeTimeValue(slot.startTime || '');
         const existing = state.sessions.filter(s =>
           s.studentIds.includes(student.id) &&
           s.date === dateStr &&
-          (s.startTime || '') === (slot.startTime || '')
+          normalizeTimeValue(s.startTime || '') === slotTime
         );
         if (existing.length) {
           existing.forEach(s => {
@@ -7316,7 +7328,7 @@
           id: generateId('sess'),
           studentIds: [student.id],
           date: dateStr,
-          startTime: slot.startTime,
+          startTime: slotTime,
           durationHours: slot.durationHours || Number(state.settings.defaultSessionDuration || 1),
           subject: student.subjects?.[0] || 'Tutoring',
           topic: 'Auto-scheduled session',
@@ -7500,18 +7512,19 @@
         const sess = getSessionById(sessionId);
         if (!sess) return;
         if (!inv.moveToDate || !inv.moveToTime) return;
+        const moveTime = normalizeTimeValue(inv.moveToTime || '');
         const durationHours = Number(inv.moveToDurationHours || 0) || Number(sess.durationHours || 1);
         const duplicate = state.sessions.some(s => (
           s.studentIds.some(id => sess.studentIds.includes(id)) &&
           s.date === inv.moveToDate &&
-          (s.startTime || '') === (inv.moveToTime || '')
+          normalizeTimeValue(s.startTime || '') === moveTime
         ));
         if (!duplicate) {
           state.sessions.push({
             id: generateId('sess'),
             studentIds: [...sess.studentIds],
             date: inv.moveToDate,
-            startTime: inv.moveToTime,
+            startTime: moveTime,
             durationHours,
             subject: sess.subject,
             topic: sess.topic || 'Rescheduled session',
@@ -7837,7 +7850,7 @@
         adjustmentReason: inv.adjustment_reason || '',
         relatedSessionId: inv.related_session_id || '',
         moveToDate: inv.move_to_date || '',
-        moveToTime: inv.move_to_time || '',
+        moveToTime: normalizeTimeValue(inv.move_to_time || ''),
         moveToDurationHours: inv.move_to_duration_hours || null,
         moveRequestedAt: inv.move_requested_at || '',
         moveAppliedAt: inv.move_applied_at || ''
@@ -8279,7 +8292,7 @@ Best regards,
           const row = document.createElement('div');
           row.className = 'schedule-slot-row grid grid-cols-[1.1fr_1fr_1fr_auto] gap-2 items-end';
           const dayOfWeek = Number(slot.dayOfWeek ?? slot.day_of_week ?? 1);
-          const startTime = String(slot.startTime || slot.start_time || '16:00').trim();
+          const startTime = normalizeTimeValue(slot.startTime || slot.start_time || '16:00');
           const durationHours = Number(slot.durationHours || slot.duration_hours || defaultSlotDuration || 1);
           row.innerHTML = `
             <div>
@@ -8325,7 +8338,7 @@ Best regards,
           const collectedSlots = [];
           for (const row of slotRows) {
             const day = Number(row.querySelector('.slot-day')?.value);
-            const startTime = String(row.querySelector('.slot-time')?.value || '').trim();
+            const startTime = normalizeTimeValue(row.querySelector('.slot-time')?.value || '');
             const duration = Number(row.querySelector('.slot-duration')?.value || 0);
             if (!startTime || !Number.isFinite(day) || day < 0 || day > 6 || duration <= 0) {
               alert('Each schedule slot needs a day, start time, and duration.');
@@ -8538,7 +8551,7 @@ Best regards,
             id: session?.id || generateId('sess'),
             studentIds: selectedIds,
             date: form.date.value,
-            startTime: form.startTime.value,
+            startTime: normalizeTimeValue(form.startTime.value),
             durationHours: Number(form.durationHours.value || 1),
             subject: form.subject.value,
             topic: form.topic.value.trim(),
