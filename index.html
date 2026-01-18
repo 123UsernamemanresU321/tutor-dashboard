@@ -6701,7 +6701,22 @@
       return date;
     }
 
+    function getScheduleVisibleSessions() {
+      if (parentMode) {
+        const parent = getParentProfileBySession();
+        const students = parent ? getParentLinkedStudents(parent.id) : getChildrenForParent();
+        const ids = new Set(students.map(s => s.id));
+        return state.sessions.filter(s => s.studentIds.some(id => ids.has(id)));
+      }
+      if (studentMode) {
+        const studentId = getSessionStudentId();
+        if (studentId) return state.sessions.filter(s => s.studentIds.includes(studentId));
+      }
+      return state.sessions;
+    }
+
     function renderScheduleView() {
+      const scheduleSessions = getScheduleVisibleSessions();
       const label = document.getElementById('scheduleWeekLabel');
       const end = new Date(currentWeekStart);
       end.setDate(end.getDate() + 6);
@@ -6715,7 +6730,7 @@
         const day = new Date(currentWeekStart);
         day.setDate(day.getDate() + i);
         const isoDate = day.toISOString().slice(0, 10);
-        const sessions = state.sessions.filter(s => s.date === isoDate);
+        const sessions = scheduleSessions.filter(s => s.date === isoDate);
         const totalHours = sessions.reduce((acc, s) => acc + Number(s.durationHours || 0), 0);
         dayLoads.push({ totalHours, dayName: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i] });
         const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i];
@@ -6778,7 +6793,7 @@
 
       const todayIso = new Date().toISOString().slice(0, 10);
       const todayList = document.getElementById('todaySessionsList');
-      const todaySessions = state.sessions.filter(s => s.date === todayIso)
+      const todaySessions = scheduleSessions.filter(s => s.date === todayIso)
         .sort((a, b) => (a.startTime || '00:00').localeCompare(b.startTime || '00:00'));
       if (!todaySessions.length) {
         todayList.innerHTML = '<li class="text-slate-500">No sessions today.</li>';
@@ -6807,7 +6822,7 @@
     function renderClashes() {
       const ul = document.getElementById('clashList');
       const clashes = [];
-      const sessions = [...state.sessions].sort((a, b) => (a.date + 'T' + (a.startTime || '00:00')).localeCompare(b.date + 'T' + (b.startTime || '00:00')));
+      const sessions = [...getScheduleVisibleSessions()].sort((a, b) => (a.date + 'T' + (a.startTime || '00:00')).localeCompare(b.date + 'T' + (b.startTime || '00:00')));
       for (let i = 0; i < sessions.length; i++) {
         for (let j = i + 1; j < sessions.length; j++) {
           const a = sessions[i], b = sessions[j];
@@ -6843,7 +6858,7 @@
     function renderTightTransitions() {
       const list = document.getElementById('tightTransitionsList');
       const byDate = {};
-      state.sessions.forEach(s => {
+      getScheduleVisibleSessions().forEach(s => {
         if (!byDate[s.date]) byDate[s.date] = [];
         byDate[s.date].push(s);
       });
@@ -7138,7 +7153,7 @@
       lines.push('BEGIN:VCALENDAR');
       lines.push('VERSION:2.0');
       lines.push('PRODID:-//Tutor Dashboard//ICS');
-      state.sessions.forEach(sess => {
+      getScheduleVisibleSessions().forEach(sess => {
         const dtStart = new Date(sess.date + 'T' + (sess.startTime || '00:00'));
         const durationMs = Number(sess.durationHours || 1) * 60 * 60 * 1000;
         const dtEnd = new Date(dtStart.getTime() + durationMs);
