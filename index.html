@@ -2641,13 +2641,13 @@
         id: cleanId(sess.id),
         user_id: uid,
         date: sess.date,
-        start_time: sess.startTime,
-        duration_hours: sess.durationHours,
+        start_time: (sess.startTime || '').trim() || null,
+        duration_hours: Number(sess.durationHours || 0) || null,
         subject: sess.subject,
         topic: sess.topic,
         notes: sess.notes,
-        completed: sess.completed,
-        invoice_id: cleanId(sess.invoiceId)
+        completed: !!sess.completed,
+        invoice_id: sess.invoiceId ? cleanId(sess.invoiceId) : null
       }));
       try {
         await upsertAndPrune('lesson_sessions', sessions, 'id');
