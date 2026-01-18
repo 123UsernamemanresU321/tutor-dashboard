@@ -2006,6 +2006,7 @@
       parents: [],
       parentLinks: [],
       sessions: [],
+      sessionCancellations: [],
       resources: [],
       invoices: [],
       documents: [],
@@ -2408,7 +2409,7 @@
     }
 
     function sanitizeState(st) {
-      ['students', 'parents', 'parentLinks', 'sessions', 'resources', 'homework', 'documents', 'contracts', 'invoices', 'studentTodos', 'studentCheckins', 'messages'].forEach(key => {
+      ['students', 'parents', 'parentLinks', 'sessions', 'sessionCancellations', 'resources', 'homework', 'documents', 'contracts', 'invoices', 'studentTodos', 'studentCheckins', 'messages'].forEach(key => {
         if (!Array.isArray(st[key])) st[key] = [];
       });
       if (!Array.isArray(st.activityLog)) st.activityLog = [];
@@ -2456,6 +2457,17 @@
         s.studentIds = (s.studentIds || []).map(cleanId);
         s.invoiceId = cleanId(s.invoiceId);
         s.startTime = normalizeTimeValue(s.startTime || s.start_time || '');
+      });
+      st.sessionCancellations.forEach(c => {
+        c.id = cleanId(c.id);
+        c.studentId = cleanId(c.studentId || c.student_id || '');
+        c.date = c.date || c.session_date || '';
+        c.startTime = normalizeTimeValue(c.startTime || c.start_time || '');
+        c.durationHours = Number(c.durationHours || c.duration_hours || 0) || 0;
+        c.sessionId = cleanId(c.sessionId || c.session_id || '');
+        c.invoiceId = cleanId(c.invoiceId || c.invoice_id || '');
+        c.reason = (c.reason || '').trim();
+        c.cancelledAt = c.cancelledAt || c.cancelled_at || '';
       });
       st.resources.forEach(r => {
         r.id = cleanId(r.id);
@@ -2527,6 +2539,12 @@
       state.parents.forEach(p => { p.id = forceUuid(p.id); });
       state.parentLinks.forEach(pl => { pl.id = forceUuid(pl.id); pl.parentId = forceUuid(pl.parentId); pl.studentId = forceUuid(pl.studentId); });
       state.sessions.forEach(sess => { sess.id = forceUuid(sess.id); sess.studentIds = (sess.studentIds || []).map(forceUuid); sess.invoiceId = cleanId(sess.invoiceId); });
+      state.sessionCancellations.forEach(c => {
+        c.id = forceUuid(c.id);
+        c.studentId = forceUuid(c.studentId);
+        c.sessionId = cleanId(c.sessionId);
+        c.invoiceId = cleanId(c.invoiceId);
+      });
       state.resources.forEach(r => { r.id = forceUuid(r.id); });
       state.homework.forEach(hw => { hw.id = forceUuid(hw.id); hw.studentId = forceUuid(hw.studentId); hw.resourceId = forceUuid(hw.resourceId); });
       state.documents.forEach(d => { d.id = forceUuid(d.id); d.studentId = forceUuid(d.studentId); });
@@ -2547,6 +2565,7 @@
         parents: new Map(),
         parentLinks: new Map(),
         sessions: new Map(),
+        sessionCancellations: new Map(),
         resources: new Map(),
         homework: new Map(),
         documents: new Map(),
@@ -2572,6 +2591,7 @@
       state.parents.forEach(p => ensureId(p, 'parents', maps.parents));
       state.parentLinks.forEach(pl => ensureId(pl, 'parentLinks', maps.parentLinks));
       state.sessions.forEach(sess => ensureId(sess, 'sessions', maps.sessions));
+      state.sessionCancellations.forEach(c => ensureId(c, 'sessionCancellations', maps.sessionCancellations));
       state.resources.forEach(r => ensureId(r, 'resources', maps.resources));
       state.homework.forEach(hw => ensureId(hw, 'homework', maps.homework));
       state.documents.forEach(d => ensureId(d, 'documents', maps.documents));
@@ -2595,6 +2615,12 @@
             seen.add(id);
             return true;
           });
+      });
+      state.sessionCancellations.forEach(c => {
+        const sid = cleanId(c.studentId);
+        const sessId = cleanId(c.sessionId);
+        c.studentId = maps.students.get(sid) || sid;
+        c.sessionId = maps.sessions.get(sessId) || sessId;
       });
       state.homework.forEach(hw => {
         const sid = cleanId(hw.studentId);
@@ -2757,6 +2783,28 @@
           .from('session_students')
           .upsert(sessionStudents, { onConflict: 'session_id,student_id', ignoreDuplicates: true });
         if (error) console.error('session_students insert failed', error);
+      }
+
+      const cancellations = state.sessionCancellations
+        .map(c => ({
+          id: cleanId(c.id),
+          user_id: uid,
+          student_id: cleanId(c.studentId),
+          session_date: c.date,
+          start_time: normalizeTimeValue(c.startTime || '') || null,
+          duration_hours: Number(c.durationHours || 0) || null,
+          session_id: c.sessionId ? cleanId(c.sessionId) : null,
+          invoice_id: c.invoiceId || null,
+          reason: c.reason || null,
+          cancelled_at: c.cancelledAt || null
+        }))
+        .filter(c => c.student_id && c.session_date && c.start_time);
+      if (cancellations.length) {
+        try {
+          await upsertAndPrune('session_cancellations', cancellations, 'id');
+        } catch (err) {
+          console.warn('Session cancellations sync skipped', err);
+        }
       }
 
       const resources = state.resources.map(r => ({
@@ -3340,7 +3388,7 @@
      ***********************/
     function setupRealtime() {
       if (!supabaseClient || !supabaseSession || !isOwner()) return;
-      const tables = ['students', 'lesson_sessions', 'homework', 'invoices', 'messages', 'resources', 'documents', 'contracts', 'student_todos', 'student_checkins', 'parent_contract_signatures', 'presence'];
+      const tables = ['students', 'lesson_sessions', 'session_cancellations', 'homework', 'invoices', 'messages', 'resources', 'documents', 'contracts', 'student_todos', 'student_checkins', 'parent_contract_signatures', 'presence'];
       tables.forEach(table => {
         supabaseClient
           .channel(`${table}-changes`)
@@ -4683,6 +4731,7 @@
           parentLinksRes,
           sessionsRes,
           sessionStudentsRes,
+          cancellationsRes,
           resourcesRes,
           homeworkRes,
           documentsRes,
@@ -4699,6 +4748,7 @@
           fetchTable('parent_students'),
           fetchTable('lesson_sessions'),
           fetchTable('session_students'),
+          fetchTable('session_cancellations'),
           fetchTable('resources'),
           fetchTable('homework'),
           fetchTable('documents'),
@@ -4714,6 +4764,9 @@
         [studentsRes, parentsRes, parentLinksRes, sessionsRes, sessionStudentsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes, activityRes, messagesRes, contractSignaturesRes].forEach(res => {
           if (res.error) throw res.error;
         });
+        if (cancellationsRes?.error) {
+          console.warn('Session cancellations fetch failed', cancellationsRes.error);
+        }
 
         const sessions = (sessionsRes.data || []).map(sess => {
           const studentIds = (sessionStudentsRes.data || [])
@@ -4811,6 +4864,17 @@
           relationship: pl.relationship
         }));
         merged.sessions = sessionsWithStudents;
+        merged.sessionCancellations = (cancellationsRes?.data || []).map(c => ({
+          id: c.id,
+          studentId: c.student_id,
+          date: c.session_date,
+          startTime: normalizeTimeValue(c.start_time || ''),
+          durationHours: c.duration_hours || null,
+          sessionId: c.session_id || '',
+          invoiceId: c.invoice_id || '',
+          reason: c.reason || '',
+          cancelledAt: c.cancelled_at || ''
+        }));
         const resources = await Promise.all(
           (resourcesRes.data || []).map(async r => {
             let signedUrl = '';
@@ -4960,6 +5024,13 @@
           localState.invoices.forEach(inv => {
             const id = cleanId(inv.id);
             if (!remoteIds.has(id)) merged.invoices.push(inv);
+          });
+        }
+        if (localState?.sessionCancellations?.length) {
+          const remoteIds = new Set(merged.sessionCancellations.map(c => cleanId(c.id)));
+          localState.sessionCancellations.forEach(c => {
+            const id = cleanId(c.id);
+            if (!remoteIds.has(id)) merged.sessionCancellations.push(c);
           });
         }
         if (localState?.messages?.length) {
@@ -7353,6 +7424,7 @@
         const dateStr = occ.date;
         const slot = occ.slot;
         const slotTime = normalizeTimeValue(slot.startTime || '');
+        const durationHours = Number(slot.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1);
         const existing = state.sessions.filter(s =>
           s.studentIds.includes(student.id) &&
           s.date === dateStr &&
@@ -7367,12 +7439,15 @@
           });
           return;
         }
+        if (isCancelledOccurrence(student.id, dateStr, slotTime, durationHours)) {
+          return;
+        }
         state.sessions.push({
           id: generateId('sess'),
           studentIds: [student.id],
           date: dateStr,
           startTime: slotTime,
-          durationHours: slot.durationHours || Number(state.settings.defaultSessionDuration || 1),
+          durationHours,
           subject: student.subjects?.[0] || 'Tutoring',
           topic: 'Auto-scheduled session',
           notes: '',
@@ -7451,6 +7526,48 @@
         if (isInvoiceVoid(inv)) return false;
         if (inv.moveAppliedAt || inv.move_applied_at) return false;
         return !inv.paid;
+      });
+    }
+
+    function isCancelledOccurrence(studentId, dateStr, startTime, durationHours) {
+      const targetTime = normalizeTimeValue(startTime || '');
+      const targetDuration = Number(durationHours || 0) || 0;
+      return state.sessionCancellations.some(c => {
+        if (cleanId(c.studentId) !== cleanId(studentId)) return false;
+        if ((c.date || '') !== dateStr) return false;
+        if (normalizeTimeValue(c.startTime || '') !== targetTime) return false;
+        const cancelledDuration = Number(c.durationHours || 0) || 0;
+        if (cancelledDuration && targetDuration && Math.abs(cancelledDuration - targetDuration) > 0.01) return false;
+        return true;
+      });
+    }
+
+    function recordSessionCancellation(sess, reason = '') {
+      if (!sess?.date) return;
+      const startTime = normalizeTimeValue(sess.startTime || '');
+      if (!startTime) return;
+      const durationHours = Number(sess.durationHours || 0) || 0;
+      const nowIso = new Date().toISOString();
+      (sess.studentIds || []).forEach(rawId => {
+        const studentId = cleanId(rawId);
+        if (!studentId) return;
+        const exists = state.sessionCancellations.some(c => (
+          cleanId(c.studentId) === studentId &&
+          (c.date || '') === sess.date &&
+          normalizeTimeValue(c.startTime || '') === startTime
+        ));
+        if (exists) return;
+        state.sessionCancellations.push({
+          id: generateId('cancel'),
+          studentId,
+          date: sess.date,
+          startTime,
+          durationHours,
+          sessionId: sess.id || '',
+          invoiceId: sess.invoiceId || '',
+          reason,
+          cancelledAt: nowIso
+        });
       });
     }
 
@@ -8828,6 +8945,7 @@ Best regards,
             return;
           }
         }
+        recordSessionCancellation(sess, diffMs >= 24 * 60 * 60 * 1000 ? 'refund' : 'cancelled');
       }
       state.sessions = state.sessions.filter(s => s.id !== sessionId);
       saveState();
