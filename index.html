@@ -3685,33 +3685,29 @@
             };
             let updatedRow = null;
             if (isSupabaseReady()) {
-              let query = supabaseClient
-                .from('parents')
-                .update({
-                  name,
-                  email: email || null,
-                  phone: phone || null,
-                  notes: notes || null
-                })
-                .select('*');
-              if (parent.id) query = query.eq('id', parent.id);
-              else if (getSessionParentId()) query = query.eq('id', getSessionParentId());
-              else if (getSessionLoginCode()) query = query.eq('login_code', getSessionLoginCode());
-              else if (getSessionEmail()) query = query.eq('email', getSessionEmail());
-              const { data, error } = await query;
+              if (!supabaseSession?.access_token) {
+                throw new Error('Please sign in again.');
+              }
+              const { data, error } = await supabaseClient.functions.invoke('update-parent-profile', {
+                body: { name, email, phone, notes },
+                headers: { Authorization: `Bearer ${supabaseSession.access_token}` }
+              });
               if (error) throw error;
-              updatedRow = data?.[0] || null;
+              if (data?.error) throw new Error(data.error);
+              updatedRow = data?.parent || null;
+              if (!updatedRow) throw new Error('Profile update failed.');
             }
-            if (updatedRow) {
-              parent.name = updatedRow.name;
-              parent.email = (updatedRow.email || '').toLowerCase();
-              parent.phone = updatedRow.phone || '';
-              parent.notes = updatedRow.notes || '';
-            } else {
-              parent.name = updates.name;
-              parent.email = updates.email;
-              parent.phone = updates.phone;
-              parent.notes = updates.notes;
+            if (updatedRow || !isSupabaseReady()) {
+              const applied = updatedRow || {
+                name,
+                email: email || '',
+                phone: phone || '',
+                notes: notes || ''
+              };
+              parent.name = applied.name;
+              parent.email = (applied.email || '').toLowerCase();
+              parent.phone = applied.phone || '';
+              parent.notes = applied.notes || '';
             }
             saveState();
             markParentProfilePrompted(parent);
