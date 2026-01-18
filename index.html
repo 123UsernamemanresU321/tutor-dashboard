@@ -3666,7 +3666,7 @@
             if (status) status.textContent = 'Please enter your name.';
             return;
           }
-          if (email && !/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email)) {
+          if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
             if (status) status.textContent = 'Please enter a valid email or leave it blank.';
             return;
           }
