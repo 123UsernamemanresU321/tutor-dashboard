@@ -1707,6 +1707,65 @@
       return [];
     }
 
+    function normalizeScheduleSlots(value, fallbackTimezone = DEFAULT_TIMEZONE) {
+      if (!Array.isArray(value)) return [];
+      const slots = value.map(raw => {
+        const day = Number(raw?.dayOfWeek ?? raw?.day_of_week ?? raw?.day ?? raw?.dow);
+        const startTime = String(raw?.startTime ?? raw?.start_time ?? '').trim();
+        const durationRaw = raw?.durationHours ?? raw?.duration_hours ?? raw?.duration ?? '';
+        const durationHours = Number(durationRaw || 0) || Number(state.settings.defaultSessionDuration || 1);
+        const timezone = String(raw?.timezone || raw?.tz || fallbackTimezone || DEFAULT_TIMEZONE).trim() || DEFAULT_TIMEZONE;
+        if (!Number.isFinite(day) || day < 0 || day > 6 || !startTime) return null;
+        return { dayOfWeek: day, startTime, durationHours, timezone };
+      }).filter(Boolean);
+      return slots;
+    }
+
+    function serializeScheduleSlots(slots, fallbackTimezone = DEFAULT_TIMEZONE) {
+      if (!Array.isArray(slots)) return [];
+      return slots.map(slot => ({
+        day_of_week: Number(slot.dayOfWeek),
+        start_time: String(slot.startTime || '').trim(),
+        duration_hours: Number(slot.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1),
+        timezone: String(slot.timezone || fallbackTimezone || DEFAULT_TIMEZONE).trim() || DEFAULT_TIMEZONE
+      })).filter(s => Number.isFinite(s.day_of_week) && s.day_of_week >= 0 && s.day_of_week <= 6 && s.start_time);
+    }
+
+    function getScheduleDaysFromSlots(slots) {
+      if (!Array.isArray(slots)) return [];
+      const days = slots
+        .map(slot => Number(slot?.dayOfWeek ?? slot?.day_of_week))
+        .filter(day => Number.isFinite(day) && day >= 0 && day <= 6);
+      return Array.from(new Set(days)).sort((a, b) => a - b);
+    }
+
+    function getScheduleSlots(student) {
+      const fallbackTimezone = student?.scheduleTimezone || student?.schedule_timezone || DEFAULT_TIMEZONE;
+      const rawSlots = student?.scheduleSlots || student?.schedule_slots || [];
+      let slots = normalizeScheduleSlots(rawSlots, fallbackTimezone);
+      if (!slots.length) {
+        const days = normalizeScheduleDays(student?.scheduleDays || student?.schedule_days || []);
+        const preferredTime = (student?.preferredTime || student?.preferred_time || '').trim();
+        if (days.length && preferredTime) {
+          const durationHours = Number(student?.sessionLengthHours || student?.session_length_hours || 0)
+            || Number(state.settings.defaultSessionDuration || 1);
+          slots = days.map(day => ({
+            dayOfWeek: day,
+            startTime: preferredTime,
+            durationHours,
+            timezone: fallbackTimezone
+          }));
+        }
+      }
+      return slots;
+    }
+
+    function formatScheduleSlotLabel(slot) {
+      const dayLabel = WEEKDAY_LABELS[slot.dayOfWeek] || 'Day';
+      const duration = Number(slot.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1);
+      return `${dayLabel} ${slot.startTime} (${duration}h)`;
+    }
+
     function formatScheduleDays(days) {
       const normalized = normalizeScheduleDays(days);
       if (!normalized.length) return '';
@@ -1748,22 +1807,39 @@
       return results;
     }
 
+    function listScheduleOccurrences(slots, start, end) {
+      const results = [];
+      if (!slots.length || !start || !end) return results;
+      const cursor = new Date(start);
+      cursor.setHours(0, 0, 0, 0);
+      const endDate = new Date(end);
+      endDate.setHours(0, 0, 0, 0);
+      while (cursor <= endDate) {
+        const day = cursor.getDay();
+        slots.forEach(slot => {
+          if (slot.dayOfWeek === day) {
+            results.push({ date: toDateOnly(cursor), slot });
+          }
+        });
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      return results;
+    }
+
     function getSchedulePrefs(student) {
-      const days = normalizeScheduleDays(student.scheduleDays || student.schedule_days || []);
-      const preferredTime = (student.preferredTime || student.preferred_time || '').trim();
+      const scheduleSlots = getScheduleSlots(student);
       const scheduleStartDate = student.scheduleStartDate || student.schedule_start_date || '';
       const timezone = student.scheduleTimezone || student.schedule_timezone || DEFAULT_TIMEZONE;
-      const sessionLengthHours = Number(student.sessionLengthHours || student.session_length_hours || 0) || Number(state.settings.defaultSessionDuration || 1);
       const scheduleNotes = student.scheduleNotes || student.schedule_notes || '';
-      return { days, preferredTime, scheduleStartDate, timezone, sessionLengthHours, scheduleNotes };
+      return { scheduleSlots, scheduleStartDate, timezone, scheduleNotes };
     }
 
     function formatScheduleSummary(student) {
       const prefs = getSchedulePrefs(student);
-      if (!prefs.days.length || !prefs.preferredTime) return 'Schedule: not set';
-      const dayLabel = formatScheduleDays(prefs.days);
+      if (!prefs.scheduleSlots.length) return 'Schedule: not set';
+      const slotLabel = prefs.scheduleSlots.map(formatScheduleSlotLabel).join(' • ');
       const startLabel = prefs.scheduleStartDate ? ` • Start ${prefs.scheduleStartDate}` : '';
-      return `Schedule: ${dayLabel} @ ${prefs.preferredTime}${startLabel}`;
+      return `Schedule: ${slotLabel}${startLabel}`;
     }
 
     function computeInvoiceTotal(baseAmount, inv) {
@@ -1776,6 +1852,16 @@
         total += base * (Number(inv.shortNoticePercent) / 100);
       }
       return Number(total.toFixed(2));
+    }
+
+    function isInvoiceVoid(inv) {
+      const status = String(inv?.invoiceStatus || inv?.invoice_status || '').toLowerCase();
+      return status === 'void' || !!inv?.voidedAt || !!inv?.voided_at;
+    }
+
+    function getInvoiceStatusLabel(inv) {
+      if (isInvoiceVoid(inv)) return 'Void';
+      return inv?.paid ? 'Paid' : 'Unpaid';
     }
 
     function buildPayfastPayload(inv) {
@@ -1798,6 +1884,10 @@
       const inv = getInvoiceById(invoiceId);
       if (!inv) {
         alert('Invoice not found.');
+        return;
+      }
+      if (isInvoiceVoid(inv)) {
+        alert('This invoice has been voided.');
         return;
       }
       if (inv.paid) {
@@ -1904,6 +1994,11 @@
           contractSignerName: 'Priya Naidoo',
           contractSignerEmail: 'priya.naidoo@example.com',
           lastContractId: contractA,
+          scheduleSlots: [
+            { dayOfWeek: 1, startTime: '16:00', durationHours: 1.5, timezone: DEFAULT_TIMEZONE },
+            { dayOfWeek: 3, startTime: '16:00', durationHours: 1.5, timezone: DEFAULT_TIMEZONE },
+            { dayOfWeek: 5, startTime: '16:00', durationHours: 1.5, timezone: DEFAULT_TIMEZONE }
+          ],
           scheduleDays: [1, 3, 5],
           preferredTime: '16:00',
           scheduleTimezone: DEFAULT_TIMEZONE,
@@ -1926,6 +2021,10 @@
           contractSignerName: '',
           contractSignerEmail: '',
           lastContractId: '',
+          scheduleSlots: [
+            { dayOfWeek: 2, startTime: '17:00', durationHours: 1.5, timezone: DEFAULT_TIMEZONE },
+            { dayOfWeek: 4, startTime: '17:00', durationHours: 1.5, timezone: DEFAULT_TIMEZONE }
+          ],
           scheduleDays: [2, 4],
           preferredTime: '17:00',
           scheduleTimezone: DEFAULT_TIMEZONE,
@@ -2242,11 +2341,26 @@
         s.contractSignerEmail = s.contractSignerEmail || s.contract_signer_email || '';
         s.lastContractId = s.lastContractId || s.last_contract_id || '';
         s.loginCode = normalizeCode(s.loginCode || s.login_code || '');
-        s.scheduleDays = normalizeScheduleDays(s.scheduleDays || s.schedule_days || []);
-        s.preferredTime = (s.preferredTime || s.preferred_time || '').trim();
-        s.scheduleTimezone = s.scheduleTimezone || s.schedule_timezone || DEFAULT_TIMEZONE;
+        const legacyDays = normalizeScheduleDays(s.scheduleDays || s.schedule_days || []);
+        const legacyPreferredTime = (s.preferredTime || s.preferred_time || '').trim();
+        const legacyDuration = Number(s.sessionLengthHours || s.session_length_hours || 0) || Number(defaultState.settings.defaultSessionDuration || 1);
+        const fallbackTimezone = s.scheduleTimezone || s.schedule_timezone || DEFAULT_TIMEZONE;
+        const normalizedSlots = normalizeScheduleSlots(s.scheduleSlots || s.schedule_slots || [], fallbackTimezone);
+        const derivedSlots = normalizedSlots.length
+          ? normalizedSlots
+          : getScheduleSlots({
+            scheduleDays: legacyDays,
+            preferredTime: legacyPreferredTime,
+            sessionLengthHours: legacyDuration,
+            scheduleTimezone: fallbackTimezone
+          });
+        s.scheduleSlots = derivedSlots;
+        s.scheduleDays = derivedSlots.length ? getScheduleDaysFromSlots(derivedSlots) : legacyDays;
+        s.preferredTime = legacyPreferredTime || (derivedSlots[0]?.startTime || '').trim();
+        s.scheduleTimezone = fallbackTimezone;
         s.scheduleStartDate = s.scheduleStartDate || s.schedule_start_date || '';
-        s.sessionLengthHours = Number(s.sessionLengthHours || s.session_length_hours || 0) || Number(defaultState.settings.defaultSessionDuration || 1);
+        s.sessionLengthHours = Number(s.sessionLengthHours || s.session_length_hours || derivedSlots[0]?.durationHours || 0)
+          || Number(defaultState.settings.defaultSessionDuration || 1);
         s.scheduleNotes = s.scheduleNotes || s.schedule_notes || '';
       });
       st.parents.forEach(p => {
@@ -2283,6 +2397,17 @@
         i.autoGenerated = !!(i.autoGenerated ?? i.auto_generated);
         i.paidAt = i.paidAt || i.paid_at || '';
         i.paymentProvider = i.paymentProvider || i.payment_provider || '';
+        i.invoiceStatus = i.invoiceStatus || i.invoice_status || (i.paid ? 'paid' : 'issued');
+        i.voidedAt = i.voidedAt || i.voided_at || '';
+        i.adjustmentReason = i.adjustmentReason || i.adjustment_reason || '';
+        i.relatedSessionId = i.relatedSessionId || i.related_session_id || '';
+        i.moveToDate = i.moveToDate || i.move_to_date || '';
+        i.moveToTime = i.moveToTime || i.move_to_time || '';
+        i.moveToDurationHours = Number(i.moveToDurationHours || i.move_to_duration_hours || 0) || 0;
+        i.moveRequestedAt = i.moveRequestedAt || i.move_requested_at || '';
+        i.moveAppliedAt = i.moveAppliedAt || i.move_applied_at || '';
+        if (i.voidedAt) i.invoiceStatus = 'void';
+        if (i.paid && i.invoiceStatus !== 'void') i.invoiceStatus = 'paid';
       });
       st.studentTodos.forEach(t => { t.id = cleanId(t.id); t.studentId = cleanId(t.studentId); });
       st.studentCheckins.forEach(c => { c.id = cleanId(c.id); c.studentId = cleanId(c.studentId); });
@@ -2457,30 +2582,38 @@
       await upsertAndPrune('parent_students', parentLinks, 'id');
 
       // prepare rows with user_id
-      const students = state.students.map(s => ({
-        id: cleanId(s.id),
-        user_id: uid,
-        name: s.name,
-        grade_level: s.gradeLevel,
-        rate: s.rate,
-        subjects: s.subjects,
-        notes: s.notes,
-        student_email: (s.studentEmail || '').trim(),
-        created_at: s.createdAt,
-        contract_signed: !!s.contractSigned,
-        contract_signed_at: s.contractSignedAt || null,
-        contract_version: s.contractVersion || 'v1',
-        contract_signer_name: s.contractSignerName || null,
-        contract_signer_email: s.contractSignerEmail || null,
-        last_contract_id: s.lastContractId || null,
-        login_code: normalizeCode(s.loginCode),
-        schedule_days: s.scheduleDays || [],
-        preferred_time: s.preferredTime || null,
-        schedule_timezone: s.scheduleTimezone || DEFAULT_TIMEZONE,
-        schedule_start_date: s.scheduleStartDate || null,
-        session_length_hours: s.sessionLengthHours || null,
-        schedule_notes: s.scheduleNotes || null
-      }));
+      const students = state.students.map(s => {
+        const slots = getScheduleSlots(s);
+        const legacyDays = getScheduleDaysFromSlots(slots);
+        const legacyPreferredTime = (slots[0]?.startTime || s.preferredTime || '').trim() || null;
+        const legacyDuration = Number(slots[0]?.durationHours || s.sessionLengthHours || 0) || null;
+        const scheduleTimezone = (s.scheduleTimezone || slots[0]?.timezone || DEFAULT_TIMEZONE).trim() || DEFAULT_TIMEZONE;
+        return {
+          id: cleanId(s.id),
+          user_id: uid,
+          name: s.name,
+          grade_level: s.gradeLevel,
+          rate: s.rate,
+          subjects: s.subjects,
+          notes: s.notes,
+          student_email: (s.studentEmail || '').trim(),
+          created_at: s.createdAt,
+          contract_signed: !!s.contractSigned,
+          contract_signed_at: s.contractSignedAt || null,
+          contract_version: s.contractVersion || 'v1',
+          contract_signer_name: s.contractSignerName || null,
+          contract_signer_email: s.contractSignerEmail || null,
+          last_contract_id: s.lastContractId || null,
+          login_code: normalizeCode(s.loginCode),
+          schedule_slots: serializeScheduleSlots(slots, scheduleTimezone),
+          schedule_days: legacyDays,
+          preferred_time: legacyPreferredTime,
+          schedule_timezone: scheduleTimezone,
+          schedule_start_date: s.scheduleStartDate || null,
+          session_length_hours: legacyDuration,
+          schedule_notes: s.scheduleNotes || null
+        };
+      });
       await upsertAndPrune('students', students, 'id');
 
       const sessionsClean = state.sessions
@@ -2620,7 +2753,16 @@
         invoice_type: inv.invoiceType || 'manual',
         auto_generated: !!inv.autoGenerated,
         paid_at: inv.paidAt || null,
-        payment_provider: inv.paymentProvider || null
+        payment_provider: inv.paymentProvider || null,
+        invoice_status: inv.invoiceStatus || (inv.paid ? 'paid' : 'issued'),
+        voided_at: inv.voidedAt || null,
+        adjustment_reason: inv.adjustmentReason || null,
+        related_session_id: inv.relatedSessionId || null,
+        move_to_date: inv.moveToDate || null,
+        move_to_time: inv.moveToTime || null,
+        move_to_duration_hours: inv.moveToDurationHours || null,
+        move_requested_at: inv.moveRequestedAt || null,
+        move_applied_at: inv.moveAppliedAt || null
       }));
       await upsertAndPrune('invoices', invoices, 'id');
 
@@ -2775,7 +2917,16 @@
         invoice_type: inv.invoiceType || 'manual',
         auto_generated: !!inv.autoGenerated,
         paid_at: inv.paidAt || null,
-        payment_provider: inv.paymentProvider || null
+        payment_provider: inv.paymentProvider || null,
+        invoice_status: inv.invoiceStatus || (inv.paid ? 'paid' : 'issued'),
+        voided_at: inv.voidedAt || null,
+        adjustment_reason: inv.adjustmentReason || null,
+        related_session_id: inv.relatedSessionId || null,
+        move_to_date: inv.moveToDate || null,
+        move_to_time: inv.moveToTime || null,
+        move_to_duration_hours: inv.moveToDurationHours || null,
+        move_requested_at: inv.moveRequestedAt || null,
+        move_applied_at: inv.moveAppliedAt || null
       });
       if (error) throw new Error('Supabase invoice upsert failed: ' + error.message);
     }
@@ -3452,7 +3603,7 @@
               Issued ${inv.issueDate || 'n/a'} • Due ${inv.dueDate || 'n/a'}
               ${inv.servicePeriodStart && inv.servicePeriodEnd ? ` • ${inv.servicePeriodStart} → ${inv.servicePeriodEnd}` : ''}
               ${inv.numSessions ? ` • ${inv.numSessions} sessions` : ''}
-              • R ${Number(inv.total || 0).toFixed(2)} • ${inv.paid ? 'Paid' : 'Unpaid'}
+              • R ${Number(inv.total || 0).toFixed(2)} • ${getInvoiceStatusLabel(inv)}
               ${(inv.invoiceType || inv.invoice_type) === 'adjustment' ? ' • Adjustment' : ''}
             </div>
           </li>
@@ -3865,12 +4016,12 @@
               ${s?.name || ''} • Issued ${inv.issueDate || 'n/a'} • Due ${inv.dueDate || 'n/a'}
               ${inv.servicePeriodStart && inv.servicePeriodEnd ? ` • ${inv.servicePeriodStart} → ${inv.servicePeriodEnd}` : ''}
               ${inv.numSessions ? ` • ${inv.numSessions} sessions` : ''}
-              • R ${Number(inv.total || 0).toFixed(2)} • ${inv.paid ? 'Paid' : 'Unpaid'}
+              • R ${Number(inv.total || 0).toFixed(2)} • ${getInvoiceStatusLabel(inv)}
               ${(inv.invoiceType || inv.invoice_type) === 'adjustment' ? ' • Adjustment' : ''}
             </div>
             <div class="flex flex-wrap gap-2 mt-1 text-[10px]">
               <button id="btn-inv-${inv.id}" class="px-2 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50" onclick="explainInvoiceAI('${inv.id}')">Explain with AI</button>
-              ${inv.paid ? '' : `<button class="px-2 py-1 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50" onclick="startPayfastPayment('${inv.id}')">Pay Now</button>`}
+              ${!inv.paid && !isInvoiceVoid(inv) ? `<button class="px-2 py-1 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50" onclick="startPayfastPayment('${inv.id}')">Pay Now</button>` : ''}
             </div>
             <div id="ai-invoice-${inv.id}" class="text-[10px] text-slate-600 whitespace-pre-wrap"></div>
           </li>`;
@@ -4522,6 +4673,7 @@
           contractSignerEmail: s.contract_signer_email,
           lastContractId: s.last_contract_id,
           loginCode: normalizeCode(s.login_code),
+          scheduleSlots: normalizeScheduleSlots(s.schedule_slots || [], s.schedule_timezone || DEFAULT_TIMEZONE),
           scheduleDays: normalizeScheduleDays(s.schedule_days || []),
           preferredTime: s.preferred_time || '',
           scheduleTimezone: s.schedule_timezone || DEFAULT_TIMEZONE,
@@ -4609,7 +4761,16 @@
           invoiceType: inv.invoice_type || 'manual',
           autoGenerated: !!inv.auto_generated,
           paidAt: inv.paid_at,
-          paymentProvider: inv.payment_provider || ''
+          paymentProvider: inv.payment_provider || '',
+          invoiceStatus: inv.invoice_status || (inv.paid ? 'paid' : 'issued'),
+          voidedAt: inv.voided_at || '',
+          adjustmentReason: inv.adjustment_reason || '',
+          relatedSessionId: inv.related_session_id || '',
+          moveToDate: inv.move_to_date || '',
+          moveToTime: inv.move_to_time || '',
+          moveToDurationHours: inv.move_to_duration_hours || null,
+          moveRequestedAt: inv.move_requested_at || '',
+          moveAppliedAt: inv.move_applied_at || ''
         }));
         merged.studentTodos = (todosRes.data || []).map(t => ({
           id: t.id,
@@ -4724,6 +4885,7 @@
           contractSignerEmail: s.contract_signer_email,
           lastContractId: s.last_contract_id,
           loginCode: normalizeCode(s.login_code),
+          scheduleSlots: normalizeScheduleSlots(s.schedule_slots || [], s.schedule_timezone || DEFAULT_TIMEZONE),
           scheduleDays: normalizeScheduleDays(s.schedule_days || []),
           preferredTime: s.preferred_time || '',
           scheduleTimezone: s.schedule_timezone || DEFAULT_TIMEZONE,
@@ -4801,7 +4963,16 @@
           invoiceType: inv.invoice_type || 'manual',
           autoGenerated: !!inv.auto_generated,
           paidAt: inv.paid_at,
-          paymentProvider: inv.payment_provider || ''
+          paymentProvider: inv.payment_provider || '',
+          invoiceStatus: inv.invoice_status || (inv.paid ? 'paid' : 'issued'),
+          voidedAt: inv.voided_at || '',
+          adjustmentReason: inv.adjustment_reason || '',
+          relatedSessionId: inv.related_session_id || '',
+          moveToDate: inv.move_to_date || '',
+          moveToTime: inv.move_to_time || '',
+          moveToDurationHours: inv.move_to_duration_hours || null,
+          moveRequestedAt: inv.move_requested_at || '',
+          moveAppliedAt: inv.move_applied_at || ''
         }));
         out.contractSignatures = (snap.contractSignatures || []).map(cs => ({
           id: cs.id,
@@ -4969,6 +5140,7 @@
         contractSignerEmail: s.contract_signer_email,
         lastContractId: s.last_contract_id,
         loginCode: normalizeCode(s.login_code),
+        scheduleSlots: normalizeScheduleSlots(s.schedule_slots || [], s.schedule_timezone || DEFAULT_TIMEZONE),
         scheduleDays: normalizeScheduleDays(s.schedule_days || []),
         preferredTime: s.preferred_time || '',
         scheduleTimezone: s.schedule_timezone || DEFAULT_TIMEZONE,
@@ -5067,7 +5239,16 @@
         invoiceType: inv.invoice_type || 'manual',
         autoGenerated: !!inv.auto_generated,
         paidAt: inv.paid_at,
-        paymentProvider: inv.payment_provider || ''
+        paymentProvider: inv.payment_provider || '',
+        invoiceStatus: inv.invoice_status || (inv.paid ? 'paid' : 'issued'),
+        voidedAt: inv.voided_at || '',
+        adjustmentReason: inv.adjustment_reason || '',
+        relatedSessionId: inv.related_session_id || '',
+        moveToDate: inv.move_to_date || '',
+        moveToTime: inv.move_to_time || '',
+        moveToDurationHours: inv.move_to_duration_hours || null,
+        moveRequestedAt: inv.move_requested_at || '',
+        moveAppliedAt: inv.move_applied_at || ''
       }));
       merged.contractSignatures = (contractSignaturesRes?.data || []).map(cs => ({
         id: cs.id,
@@ -5464,7 +5645,7 @@
       let expected = 0;
       state.invoices.forEach(inv => {
         const d = new Date(inv.issueDate);
-        if (d >= startOfMonth && d < endOfMonth) {
+        if (d >= startOfMonth && d < endOfMonth && !isInvoiceVoid(inv)) {
           expected += Number(inv.total || 0);
         }
       });
@@ -5474,7 +5655,7 @@
         document.getElementById('kpiExpectedIncome').textContent = 'R ' + expected.toFixed(2);
       }
 
-      const overdueCount = studentMode ? 0 : state.invoices.filter(inv => !inv.paid && inv.dueDate && new Date(inv.dueDate) < today).length;
+      const overdueCount = studentMode ? 0 : state.invoices.filter(inv => !inv.paid && !isInvoiceVoid(inv) && inv.dueDate && new Date(inv.dueDate) < today).length;
       document.getElementById('kpiOverdue').textContent = studentMode ? 'N/A' : overdueCount;
 
       // Goals & focus
@@ -6299,7 +6480,7 @@
         events.push({
           date: inv.issueDate,
           type: 'Invoice',
-          description: `${inv.id} – R ${inv.total?.toFixed(2) || inv.total} (${inv.paid ? 'Paid' : 'Unpaid'})${periodLabel}${countLabel}`
+          description: `${inv.id} – R ${inv.total?.toFixed(2) || inv.total} (${getInvoiceStatusLabel(inv)})${periodLabel}${countLabel}`
         });
       });
 
@@ -6397,7 +6578,7 @@
         .sort((a, b) => new Date(b.issueDate) - new Date(a.issueDate));
       let balance = 0;
       invs.forEach(inv => {
-        if (!inv.paid) balance += Number(inv.total || 0);
+        if (!inv.paid && !isInvoiceVoid(inv)) balance += Number(inv.total || 0);
       });
       const balanceLabel = balance > 0 ? 'Owed balance' : 'Balance';
       document.getElementById('studentBalance').textContent = `${balanceLabel}: R ${balance.toFixed(2)}`;
@@ -6414,7 +6595,7 @@
               ${inv.servicePeriodStart && inv.servicePeriodEnd ? ` • Period ${inv.servicePeriodStart} → ${inv.servicePeriodEnd}` : ''}
               ${inv.numSessions ? ` • ${inv.numSessions} sessions` : ''}
               • Total R ${Number(inv.total || 0).toFixed(2)}
-              • ${inv.paid ? 'Paid' : 'Unpaid'}
+              • ${getInvoiceStatusLabel(inv)}
               ${(inv.invoiceType || inv.invoice_type) === 'adjustment' ? ' • Adjustment' : ''}
               ${inv.lateApplied && inv.lateFeePercent ? ` • Late fee ${inv.lateFeePercent}%` : ''}
               ${inv.shortApplied && inv.shortNoticePercent ? ` • Short notice ${inv.shortNoticePercent}%` : ''}
@@ -6903,9 +7084,9 @@
       return anchor;
     }
 
-    function findFirstScheduleDate(days, start, end) {
-      const dates = listScheduleDates(days, start, end);
-      return dates[0] || '';
+    function findFirstScheduleDate(slots, start, end) {
+      const dates = listScheduleOccurrences(slots, start, end);
+      return dates[0]?.date || '';
     }
 
     function generateInvoiceIdForPeriod(studentId, periodStart) {
@@ -6916,12 +7097,12 @@
 
     function ensureMonthlyInvoiceForStudent(student, today) {
       const prefs = getSchedulePrefs(student);
-      if (!student.contractSigned || !prefs.days.length || !prefs.preferredTime) return false;
+      if (!student.contractSigned || !prefs.scheduleSlots.length) return false;
       const anchor = getScheduleAnchorDate(student);
-      let serviceStart = findFirstScheduleDate(prefs.days, anchor, endOfMonth(anchor));
+      let serviceStart = findFirstScheduleDate(prefs.scheduleSlots, anchor, endOfMonth(anchor));
       if (!serviceStart) {
         const nextMonth = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1);
-        serviceStart = findFirstScheduleDate(prefs.days, nextMonth, endOfMonth(nextMonth));
+        serviceStart = findFirstScheduleDate(prefs.scheduleSlots, nextMonth, endOfMonth(nextMonth));
       }
       if (!serviceStart) return false;
       const serviceEnd = toDateOnly(endOfMonth(new Date(serviceStart)));
@@ -6930,6 +7111,7 @@
         && (inv.servicePeriodStart || inv.service_period_start) === serviceStart
         && (inv.servicePeriodEnd || inv.service_period_end) === serviceEnd);
       if (existing) {
+        if (isInvoiceVoid(existing)) return false;
         let changed = false;
         if (!existing.invoiceType) { existing.invoiceType = 'monthly'; changed = true; }
         if (!existing.autoGenerated) { existing.autoGenerated = true; changed = true; }
@@ -6942,16 +7124,24 @@
           existing.notes = `Monthly prepaid sessions (${serviceStart} to ${serviceEnd}).`;
           changed = true;
         }
+        if (!existing.invoiceStatus) {
+          existing.invoiceStatus = existing.paid ? 'paid' : 'issued';
+          changed = true;
+        }
         if (!existing.paid) {
           if (recalculateMonthlyInvoice(existing, student, today)) changed = true;
         }
         return changed;
       }
       const billableStart = maxDate(today, parseDateOnly(serviceStart));
-      const dates = listScheduleDates(prefs.days, billableStart, parseDateOnly(serviceEnd));
-      const numSessions = dates.length;
+      const occurrences = listScheduleOccurrences(prefs.scheduleSlots, billableStart, parseDateOnly(serviceEnd));
+      const numSessions = occurrences.length;
       if (!numSessions) return false;
-      const baseAmount = Number((numSessions * Number(student.rate || 0)).toFixed(2));
+      const baseAmount = Number(occurrences.reduce((sum, occ) => {
+        const rate = Number(student.rate || 0);
+        const hours = Number(occ.slot.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1);
+        return sum + rate * hours;
+      }, 0).toFixed(2));
       const inv = {
         id: generateInvoiceIdForPeriod(student.id, serviceStart),
         studentId: student.id,
@@ -6971,7 +7161,16 @@
         invoiceType: 'monthly',
         autoGenerated: true,
         paidAt: '',
-        paymentProvider: PAYFAST_PROVIDER
+        paymentProvider: PAYFAST_PROVIDER,
+        invoiceStatus: 'issued',
+        voidedAt: '',
+        adjustmentReason: '',
+        relatedSessionId: '',
+        moveToDate: '',
+        moveToTime: '',
+        moveToDurationHours: 0,
+        moveRequestedAt: '',
+        moveAppliedAt: ''
       };
       state.invoices.push(inv);
       logActivity('Created invoice', inv.id);
@@ -6980,14 +7179,18 @@
 
     function recalculateMonthlyInvoice(inv, student, today) {
       const prefs = getSchedulePrefs(student);
-      if (!prefs.days.length || inv.paid) return false;
+      if (!prefs.scheduleSlots.length || inv.paid || isInvoiceVoid(inv)) return false;
       const serviceStart = parseDateOnly(inv.servicePeriodStart || inv.service_period_start);
       const serviceEnd = parseDateOnly(inv.servicePeriodEnd || inv.service_period_end);
       if (!serviceStart || !serviceEnd) return false;
       const billableStart = maxDate(serviceStart, today);
-      const dates = listScheduleDates(prefs.days, billableStart, serviceEnd);
-      const numSessions = dates.length;
-      const baseAmount = Number((numSessions * Number(student.rate || 0)).toFixed(2));
+      const occurrences = listScheduleOccurrences(prefs.scheduleSlots, billableStart, serviceEnd);
+      const numSessions = occurrences.length;
+      const baseAmount = Number(occurrences.reduce((sum, occ) => {
+        const rate = Number(student.rate || 0);
+        const hours = Number(occ.slot.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1);
+        return sum + rate * hours;
+      }, 0).toFixed(2));
       const total = computeInvoiceTotal(baseAmount, inv);
       let changed = false;
       if (numSessions !== inv.numSessions) { inv.numSessions = numSessions; changed = true; }
@@ -6997,18 +7200,24 @@
     }
 
     function scheduleSessionsForInvoice(inv, student, today) {
-      if ((inv.invoiceType || inv.invoice_type) !== 'monthly' || !inv.paid) return false;
+      if ((inv.invoiceType || inv.invoice_type) !== 'monthly' || !inv.paid || isInvoiceVoid(inv)) return false;
       const prefs = getSchedulePrefs(student);
-      if (!prefs.days.length || !prefs.preferredTime) return false;
+      if (!prefs.scheduleSlots.length) return false;
       const serviceStart = parseDateOnly(inv.servicePeriodStart || inv.service_period_start);
       const serviceEnd = parseDateOnly(inv.servicePeriodEnd || inv.service_period_end);
       if (!serviceStart || !serviceEnd) return false;
       const paidAtDate = parseDateOnly(inv.paidAt) || today;
       const scheduleStart = maxDate(serviceStart, paidAtDate);
-      const dates = listScheduleDates(prefs.days, scheduleStart, serviceEnd);
+      const occurrences = listScheduleOccurrences(prefs.scheduleSlots, scheduleStart, serviceEnd);
       let changed = false;
-      dates.forEach(dateStr => {
-        const existing = state.sessions.filter(s => s.studentIds.includes(student.id) && s.date === dateStr);
+      occurrences.forEach(occ => {
+        const dateStr = occ.date;
+        const slot = occ.slot;
+        const existing = state.sessions.filter(s =>
+          s.studentIds.includes(student.id) &&
+          s.date === dateStr &&
+          (s.startTime || '') === (slot.startTime || '')
+        );
         if (existing.length) {
           existing.forEach(s => {
             if (!s.invoiceId) {
@@ -7022,8 +7231,8 @@
           id: generateId('sess'),
           studentIds: [student.id],
           date: dateStr,
-          startTime: prefs.preferredTime,
-          durationHours: prefs.sessionLengthHours || Number(state.settings.defaultSessionDuration || 1),
+          startTime: slot.startTime,
+          durationHours: slot.durationHours || Number(state.settings.defaultSessionDuration || 1),
           subject: student.subjects?.[0] || 'Tutoring',
           topic: 'Auto-scheduled session',
           notes: '',
@@ -7054,13 +7263,15 @@
       state.invoices.forEach(inv => {
         const student = getStudentById(inv.studentId);
         if (!student) return;
-        if ((inv.invoiceType || inv.invoice_type) === 'monthly' && inv.autoGenerated && !inv.paid) {
+        if ((inv.invoiceType || inv.invoice_type) === 'monthly' && inv.autoGenerated && !inv.paid && !isInvoiceVoid(inv)) {
           if (recalculateMonthlyInvoice(inv, student, today)) changed = true;
         }
-        if ((inv.invoiceType || inv.invoice_type) === 'monthly' && inv.paid) {
+        if ((inv.invoiceType || inv.invoice_type) === 'monthly' && inv.paid && !isInvoiceVoid(inv)) {
           if (scheduleSessionsForInvoice(inv, student, today)) changed = true;
         }
       });
+      if (voidExpiredMoveInvoices()) changed = true;
+      if (applyPaidMoveInvoices()) changed = true;
       return changed;
     }
 
@@ -7070,16 +7281,44 @@
       return diffMs > 0 && diffMs <= 24 * 60 * 60 * 1000;
     }
 
-    function hasLateChangeInvoice(studentId, dateStr) {
-      return state.invoices.some(inv => inv.studentId === studentId
-        && (inv.invoiceType || inv.invoice_type) === 'adjustment'
-        && (inv.servicePeriodStart || inv.service_period_start) === dateStr);
+    function hasLateChangeInvoice(studentId, sessionId, reason, dateStr) {
+      return state.invoices.some(inv => {
+        if (inv.studentId !== studentId) return false;
+        if ((inv.invoiceType || inv.invoice_type) !== 'adjustment') return false;
+        if (isInvoiceVoid(inv)) return false;
+        const invReason = inv.adjustmentReason || inv.adjustment_reason || '';
+        if (reason && invReason && invReason !== reason) return false;
+        if (invReason === 'late_move' && inv.paid && (inv.moveAppliedAt || inv.move_applied_at)) return false;
+        const relatedId = inv.relatedSessionId || inv.related_session_id || '';
+        if (sessionId) return relatedId ? relatedId === sessionId : false;
+        if (dateStr) return (inv.servicePeriodStart || inv.service_period_start) === dateStr;
+        return true;
+      });
     }
 
-    function createLateChangeInvoices(sess, actionLabel) {
-      const nowStr = new Date().toISOString().slice(0, 10);
+    function hasPendingMoveInvoice(sessionId) {
+      if (!sessionId) return false;
+      return state.invoices.some(inv => {
+        if ((inv.invoiceType || inv.invoice_type) !== 'adjustment') return false;
+        const reason = inv.adjustmentReason || inv.adjustment_reason || '';
+        if (reason !== 'late_move') return false;
+        const relatedId = inv.relatedSessionId || inv.related_session_id || '';
+        if (relatedId !== sessionId) return false;
+        if (isInvoiceVoid(inv)) return false;
+        if (inv.moveAppliedAt || inv.move_applied_at) return false;
+        return !inv.paid;
+      });
+    }
+
+    function createLateChangeInvoices(sess, actionLabel, movePayload = null) {
+      const now = new Date();
+      const nowStr = now.toISOString().slice(0, 10);
+      const adjustmentReason = actionLabel === 'moved' ? 'late_move' : 'late_cancel';
+      const moveNote = movePayload?.date
+        ? ` Requested move to ${movePayload.date} ${movePayload.startTime || ''}.`
+        : '';
       sess.studentIds.forEach(sid => {
-        if (hasLateChangeInvoice(sid, sess.date)) return;
+        if (hasLateChangeInvoice(sid, sess.id, adjustmentReason, sess.date)) return;
         const student = getStudentById(sid);
         const rate = Number(student?.rate || 0);
         const sessionHours = Number(sess.durationHours || 1);
@@ -7096,24 +7335,87 @@
           lateApplied: false,
           shortApplied: false,
           paid: false,
-          notes: `Lesson on ${sess.date} ${actionLabel} within 24 hours.`,
+          notes: `Lesson on ${sess.date} ${actionLabel} within 24 hours.${moveNote}`,
           servicePeriodStart: sess.date,
           servicePeriodEnd: sess.date,
           numSessions: 1,
           invoiceType: 'adjustment',
           autoGenerated: true,
           paidAt: '',
-          paymentProvider: PAYFAST_PROVIDER
+          paymentProvider: PAYFAST_PROVIDER,
+          invoiceStatus: 'issued',
+          voidedAt: '',
+          adjustmentReason,
+          relatedSessionId: sess.id,
+          moveToDate: movePayload?.date || '',
+          moveToTime: movePayload?.startTime || '',
+          moveToDurationHours: Number(movePayload?.durationHours || 0) || 0,
+          moveRequestedAt: movePayload ? now.toISOString() : '',
+          moveAppliedAt: ''
         };
         state.invoices.push(inv);
         logActivity('Created invoice', inv.id);
       });
     }
 
+    function applyPaidMoveInvoices() {
+      let changed = false;
+      const now = new Date();
+      state.invoices.forEach(inv => {
+        if ((inv.invoiceType || inv.invoice_type) !== 'adjustment') return;
+        const reason = inv.adjustmentReason || inv.adjustment_reason || '';
+        if (reason !== 'late_move') return;
+        if (!inv.paid || isInvoiceVoid(inv) || inv.moveAppliedAt) return;
+        const sessionId = inv.relatedSessionId || inv.related_session_id;
+        const sess = getSessionById(sessionId);
+        if (!sess) return;
+        if (!inv.moveToDate || !inv.moveToTime) return;
+        sess.date = inv.moveToDate;
+        sess.startTime = inv.moveToTime;
+        if (Number(inv.moveToDurationHours || 0)) {
+          sess.durationHours = Number(inv.moveToDurationHours || sess.durationHours || 1);
+        }
+        inv.moveAppliedAt = now.toISOString();
+        if (inv.invoiceStatus !== 'paid') inv.invoiceStatus = 'paid';
+        changed = true;
+      });
+      return changed;
+    }
+
+    function voidExpiredMoveInvoices() {
+      let changed = false;
+      const now = new Date();
+      state.invoices.forEach(inv => {
+        if ((inv.invoiceType || inv.invoice_type) !== 'adjustment') return;
+        const reason = inv.adjustmentReason || inv.adjustment_reason || '';
+        if (reason !== 'late_move') return;
+        if (isInvoiceVoid(inv) || inv.moveAppliedAt) return;
+        const sessionId = inv.relatedSessionId || inv.related_session_id;
+        const sess = getSessionById(sessionId);
+        let start = null;
+        if (sess?.date) {
+          start = new Date(sess.date + 'T' + (sess.startTime || '00:00'));
+        } else if (inv.servicePeriodStart) {
+          start = new Date(inv.servicePeriodStart + 'T00:00');
+        }
+        const paidAt = inv.paidAt ? new Date(inv.paidAt) : null;
+        const paidTooLate = paidAt && start ? paidAt.getTime() > start.getTime() : false;
+        if (start && start.getTime() < now.getTime() && (!inv.paid || paidTooLate)) {
+          inv.invoiceStatus = 'void';
+          inv.voidedAt = now.toISOString();
+          inv.paid = false;
+          inv.paidAt = '';
+          inv.notes = [inv.notes, 'Auto-voided: move fee unpaid after session time.'].filter(Boolean).join(' ');
+          changed = true;
+        }
+      });
+      return changed;
+    }
+
     function hasPaidInvoiceForDate(studentId, dateStr) {
       const target = new Date(dateStr);
       return state.invoices.some(inv => {
-        if (inv.studentId !== studentId || !inv.paid) return false;
+        if (inv.studentId !== studentId || !inv.paid || isInvoiceVoid(inv)) return false;
         if ((inv.invoiceType || inv.invoice_type) === 'adjustment') return false;
         const startVal = inv.servicePeriodStart || inv.service_period_start || '';
         const endVal = inv.servicePeriodEnd || inv.service_period_end || '';
@@ -7398,7 +7700,7 @@
           let balance = 0;
           let unpaidCount = 0;
           invs.forEach(inv => {
-            if (!inv.paid) {
+            if (!inv.paid && !isInvoiceVoid(inv)) {
               balance += Number(inv.total || 0);
               unpaidCount++;
             }
@@ -7415,7 +7717,7 @@
 
       const overdueList = document.getElementById('overdueInvoicesList');
       const today = new Date();
-      const overdue = state.invoices.filter(inv => !inv.paid && inv.dueDate && new Date(inv.dueDate) < today)
+      const overdue = state.invoices.filter(inv => !inv.paid && !isInvoiceVoid(inv) && inv.dueDate && new Date(inv.dueDate) < today)
         .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
 
       if (!overdue.length) {
@@ -7485,9 +7787,9 @@
       if (forecastList && forecastSummary) {
         const soonCutoff = new Date();
         soonCutoff.setDate(soonCutoff.getDate() + 14);
-        const overdueInvoices = state.invoices.filter(inv => !inv.paid && inv.dueDate && new Date(inv.dueDate) < today);
+        const overdueInvoices = state.invoices.filter(inv => !inv.paid && !isInvoiceVoid(inv) && inv.dueDate && new Date(inv.dueDate) < today);
         const dueSoon = state.invoices
-          .filter(inv => !inv.paid && inv.dueDate && new Date(inv.dueDate) >= today && new Date(inv.dueDate) <= soonCutoff)
+          .filter(inv => !inv.paid && !isInvoiceVoid(inv) && inv.dueDate && new Date(inv.dueDate) >= today && new Date(inv.dueDate) <= soonCutoff)
           .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
         const overdueTotal = overdueInvoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
         const dueSoonTotal = dueSoon.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
@@ -7516,7 +7818,7 @@
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       const invs = state.invoices.filter(inv => {
         const d = new Date(inv.issueDate || inv.dueDate || 0);
-        return d >= startOfMonth && d < endOfMonth;
+        return d >= startOfMonth && d < endOfMonth && !isInvoiceVoid(inv);
       });
       const earnings = invs.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
 
@@ -7537,7 +7839,8 @@
       });
 
       // Unpaid invoices
-      const unpaid = state.invoices.filter(inv => !inv.paid).sort((a, b) => new Date(a.dueDate || 0) - new Date(b.dueDate || 0));
+      const unpaid = state.invoices.filter(inv => !inv.paid && !isInvoiceVoid(inv))
+        .sort((a, b) => new Date(a.dueDate || 0) - new Date(b.dueDate || 0));
 
       const reportEarnings = document.getElementById('repEarningsMonth');
       const reportEarningsCount = document.getElementById('repEarningsCount');
@@ -7574,16 +7877,27 @@
       if (!guardEdit()) return;
       const inv = getInvoiceById(id);
       if (!inv) return;
+      if (isInvoiceVoid(inv)) {
+        alert('This invoice has been voided.');
+        return;
+      }
       if (!inv.paid) {
+        const student = getStudentById(inv.studentId);
+        if ((inv.invoiceType || inv.invoice_type) === 'monthly' && student) {
+          recalculateMonthlyInvoice(inv, student, new Date());
+        }
         inv.paid = true;
         inv.paidAt = new Date().toISOString();
         inv.paymentProvider = PAYFAST_PROVIDER;
-        const student = getStudentById(inv.studentId);
+        inv.invoiceStatus = 'paid';
         if (student) scheduleSessionsForInvoice(inv, student, new Date());
+        applyPaidMoveInvoices();
       }
       saveState();
       renderFinanceView();
       if (selectedStudentId) renderStudentFinance(selectedStudentId);
+      renderScheduleView();
+      renderStudentsView();
     }
 
     function generateReminder(id) {
@@ -7650,11 +7964,10 @@ Best regards,
       const emailOptions = getAvailableStudentEmails(student?.studentEmail).map(e => `<option value="${e}">${e}</option>`).join('');
 
       const existingCode = normalizeCode(student?.loginCode);
-      const selectedScheduleDays = new Set(normalizeScheduleDays(student?.scheduleDays || student?.schedule_days || []));
-      const preferredTime = student?.preferredTime || student?.preferred_time || '';
+      const scheduleSlots = getScheduleSlots(student || {});
       const scheduleStartDate = student?.scheduleStartDate || student?.schedule_start_date || '';
       const scheduleTimezone = student?.scheduleTimezone || student?.schedule_timezone || DEFAULT_TIMEZONE;
-      const sessionLengthHours = Number(student?.sessionLengthHours || student?.session_length_hours || state.settings.defaultSessionDuration || 1);
+      const defaultSlotDuration = Number(state.settings.defaultSessionDuration || 1);
       const scheduleNotes = student?.scheduleNotes || student?.schedule_notes || '';
       const codeSection = `
         <div class="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
@@ -7715,47 +8028,27 @@ Best regards,
           <div class="border border-slate-200 rounded-lg p-2 bg-slate-50">
             <div class="text-[11px] font-semibold mb-1">Schedule preferences</div>
             <div class="text-[10px] text-slate-500 mb-2">Used to auto-create monthly invoices and draft lesson dates.</div>
-            <div class="grid grid-cols-2 gap-2">
-              <div>
-                <label class="block text-[11px] mb-1">Days of week</label>
-                <div class="flex flex-wrap gap-2 text-[11px]">
-                  ${WEEKDAY_LABELS.map((label, idx) => `
-                    <label class="flex items-center gap-1">
-                      <input type="checkbox" name="scheduleDays" value="${idx}" ${selectedScheduleDays.has(idx) ? 'checked' : ''}>
-                      <span>${label}</span>
-                    </label>
-                  `).join('')}
-                </div>
-              </div>
-              <div>
-                <label class="block text-[11px] mb-1">Preferred time</label>
-                <input type="time" name="preferredTime" value="${preferredTime}"
-                       class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
-              </div>
-            </div>
-            <div class="grid grid-cols-2 gap-2 mt-2">
+            <div id="scheduleSlotsContainer" class="space-y-2"></div>
+            <div id="scheduleSlotsEmpty" class="text-[10px] text-slate-500">No weekly slots added yet.</div>
+            <button type="button" id="addScheduleSlotBtn" class="mt-2 px-2 py-1 rounded-lg border border-slate-300 text-[11px]">
+              + Add weekly slot
+            </button>
+            <div class="grid grid-cols-2 gap-2 mt-3">
               <div>
                 <label class="block text-[11px] mb-1">Start date</label>
                 <input type="date" name="scheduleStartDate" value="${scheduleStartDate}"
                        class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
               </div>
               <div>
-                <label class="block text-[11px] mb-1">Session length (hours)</label>
-                <input type="number" step="0.25" name="sessionLengthHours" value="${sessionLengthHours}"
-                       class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
-              </div>
-            </div>
-            <div class="grid grid-cols-2 gap-2 mt-2">
-              <div>
                 <label class="block text-[11px] mb-1">Timezone</label>
                 <input name="scheduleTimezone" value="${scheduleTimezone}"
                        class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
               </div>
-              <div>
-                <label class="block text-[11px] mb-1">Schedule notes</label>
-                <input name="scheduleNotes" value="${scheduleNotes}"
-                       class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="Optional">
-              </div>
+            </div>
+            <div class="mt-2">
+              <label class="block text-[11px] mb-1">Schedule notes</label>
+              <input name="scheduleNotes" value="${scheduleNotes}"
+                     class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="Optional">
             </div>
           </div>
           <div class="flex justify-between items-center mt-3">
@@ -7806,9 +8099,81 @@ Best regards,
           };
         }
 
+        const slotsContainer = document.getElementById('scheduleSlotsContainer');
+        const slotsEmpty = document.getElementById('scheduleSlotsEmpty');
+        const addSlotBtn = document.getElementById('addScheduleSlotBtn');
+        const dayOptions = WEEKDAY_LABELS.map((label, idx) => `<option value="${idx}">${label}</option>`).join('');
+
+        function updateSlotsEmpty() {
+          if (!slotsEmpty) return;
+          const hasSlots = slotsContainer && slotsContainer.querySelector('.schedule-slot-row');
+          slotsEmpty.classList.toggle('hidden', !!hasSlots);
+        }
+
+        function addSlotRow(slot = {}) {
+          if (!slotsContainer) return;
+          const row = document.createElement('div');
+          row.className = 'schedule-slot-row grid grid-cols-[1.1fr_1fr_1fr_auto] gap-2 items-end';
+          const dayOfWeek = Number(slot.dayOfWeek ?? slot.day_of_week ?? 1);
+          const startTime = String(slot.startTime || slot.start_time || '16:00').trim();
+          const durationHours = Number(slot.durationHours || slot.duration_hours || defaultSlotDuration || 1);
+          row.innerHTML = `
+            <div>
+              <label class="block text-[10px] mb-1">Day</label>
+              <select class="slot-day w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+                ${dayOptions}
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] mb-1">Start time</label>
+              <input type="time" class="slot-time w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" value="${startTime}">
+            </div>
+            <div>
+              <label class="block text-[10px] mb-1">Duration (hours)</label>
+              <input type="number" step="0.25" class="slot-duration w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" value="${durationHours}">
+            </div>
+            <button type="button" class="remove-slot-btn px-2 py-1 rounded-lg border border-slate-300 text-[11px]">Remove</button>
+          `;
+          const daySelect = row.querySelector('.slot-day');
+          if (daySelect) daySelect.value = String(Number.isFinite(dayOfWeek) ? dayOfWeek : 1);
+          const removeBtn = row.querySelector('.remove-slot-btn');
+          if (removeBtn) {
+            removeBtn.onclick = () => {
+              row.remove();
+              updateSlotsEmpty();
+            };
+          }
+          slotsContainer.appendChild(row);
+          updateSlotsEmpty();
+        }
+
+        (scheduleSlots || []).forEach(slot => addSlotRow(slot));
+        updateSlotsEmpty();
+        if (addSlotBtn) {
+          addSlotBtn.onclick = () => addSlotRow({ dayOfWeek: 1, startTime: '16:00', durationHours: defaultSlotDuration, timezone: scheduleTimezone });
+        }
+
         document.getElementById('studentForm').onsubmit = (e) => {
           e.preventDefault();
           const form = e.target;
+          const slotRows = [...form.querySelectorAll('.schedule-slot-row')];
+          const scheduleTimezoneValue = (form.scheduleTimezone.value || DEFAULT_TIMEZONE).trim() || DEFAULT_TIMEZONE;
+          const collectedSlots = [];
+          for (const row of slotRows) {
+            const day = Number(row.querySelector('.slot-day')?.value);
+            const startTime = String(row.querySelector('.slot-time')?.value || '').trim();
+            const duration = Number(row.querySelector('.slot-duration')?.value || 0);
+            if (!startTime || !Number.isFinite(day) || day < 0 || day > 6 || duration <= 0) {
+              alert('Each schedule slot needs a day, start time, and duration.');
+              return;
+            }
+            collectedSlots.push({
+              dayOfWeek: day,
+              startTime,
+              durationHours: duration,
+              timezone: scheduleTimezoneValue
+            });
+          }
           const newStudent = {
             id: student?.id || generateId('stu'),
             name: form.name.value.trim(),
@@ -7823,11 +8188,12 @@ Best regards,
             contractVersion: student?.contractVersion || 'v1',
             contractSignerName: student?.contractSignerName || '',
             contractSignerEmail: student?.contractSignerEmail || '',
-            scheduleDays: [...form.querySelectorAll('input[name="scheduleDays"]:checked')].map(i => Number(i.value)),
-            preferredTime: form.preferredTime.value.trim(),
+            scheduleSlots: collectedSlots,
+            scheduleDays: getScheduleDaysFromSlots(collectedSlots),
+            preferredTime: collectedSlots[0]?.startTime || '',
             scheduleStartDate: form.scheduleStartDate.value,
-            sessionLengthHours: Number(form.sessionLengthHours.value || state.settings.defaultSessionDuration || 1),
-            scheduleTimezone: form.scheduleTimezone.value.trim() || DEFAULT_TIMEZONE,
+            sessionLengthHours: Number(collectedSlots[0]?.durationHours || state.settings.defaultSessionDuration || 1),
+            scheduleTimezone: scheduleTimezoneValue,
             scheduleNotes: form.scheduleNotes.value.trim()
           };
 
@@ -7835,9 +8201,12 @@ Best regards,
             alert('Name is required.');
             return;
           }
-          if (newStudent.scheduleDays.length && !newStudent.preferredTime) {
-            alert('Select a preferred time for the schedule.');
-            return;
+          if (newStudent.scheduleSlots.length === 0) {
+            // schedule is optional, but warn if start date exists without slots
+            if (newStudent.scheduleStartDate) {
+              const ok = confirm('No weekly slots are set. Continue without scheduling?');
+              if (!ok) return;
+            }
           }
 
           // Validation: If adding, emphasize code?
@@ -8001,7 +8370,6 @@ Best regards,
             alert('Select at least one student.');
             return;
           }
-          if (!guardSessionCreation(selectedIds, form.date.value)) return;
           const newSession = {
             id: session?.id || generateId('sess'),
             studentIds: selectedIds,
@@ -8013,12 +8381,48 @@ Best regards,
             notes: form.notes.value.trim(),
             completed: session?.completed || false
           };
-          const isLateChange = isEdit && session
-            && isWithin24Hours(session)
-            && (session.date !== newSession.date || (session.startTime || '') !== (newSession.startTime || ''));
-          if (isLateChange) {
-            createLateChangeInvoices(session, 'moved');
+          const within24 = isEdit && session && isWithin24Hours(session);
+          const timeChanged = isEdit && session
+            ? session.date !== newSession.date || (session.startTime || '') !== (newSession.startTime || '')
+            : false;
+          const durationChanged = isEdit && session
+            ? Number(session.durationHours || 0) !== Number(newSession.durationHours || 0)
+            : false;
+          const isMoveRequest = within24 && (timeChanged || durationChanged);
+
+          if (!isEdit || !isMoveRequest) {
+            if (!guardSessionCreation(selectedIds, form.date.value)) return;
           }
+
+          if (isMoveRequest) {
+            if (hasPendingMoveInvoice(session.id)) {
+              alert('A move request is already pending for this session. Please wait for payment.');
+              return;
+            }
+            createLateChangeInvoices(session, 'moved', {
+              date: newSession.date,
+              startTime: newSession.startTime || '',
+              durationHours: newSession.durationHours
+            });
+            const idx = state.sessions.findIndex(s => s.id === session.id);
+            if (idx >= 0) {
+              state.sessions[idx] = {
+                ...session,
+                studentIds: newSession.studentIds,
+                subject: newSession.subject,
+                topic: newSession.topic,
+                notes: newSession.notes
+              };
+            }
+            logActivity('Move requested', session.topic || session.subject || 'Session');
+            saveState();
+            closeModal();
+            renderScheduleView();
+            renderStudentsView();
+            alert('Move requested. The session will update after the adjustment invoice is paid.');
+            return;
+          }
+
           if (isEdit) {
             const idx = state.sessions.findIndex(s => s.id === session.id);
             state.sessions[idx] = newSession;
@@ -8665,7 +9069,16 @@ Best regards,
             invoiceType: form.invoiceType.value || invoiceType || 'manual',
             autoGenerated: !!form.autoGenerated.value || autoGenerated,
             paidAt: form.paidAt.value || paidAt || '',
-            paymentProvider: form.paymentProvider.value || paymentProvider || ''
+            paymentProvider: form.paymentProvider.value || paymentProvider || '',
+            invoiceStatus: inv?.invoiceStatus || inv?.invoice_status || (form.paid.checked ? 'paid' : 'issued'),
+            voidedAt: inv?.voidedAt || inv?.voided_at || '',
+            adjustmentReason: inv?.adjustmentReason || inv?.adjustment_reason || '',
+            relatedSessionId: inv?.relatedSessionId || inv?.related_session_id || '',
+            moveToDate: inv?.moveToDate || inv?.move_to_date || '',
+            moveToTime: inv?.moveToTime || inv?.move_to_time || '',
+            moveToDurationHours: inv?.moveToDurationHours || inv?.move_to_duration_hours || 0,
+            moveRequestedAt: inv?.moveRequestedAt || inv?.move_requested_at || '',
+            moveAppliedAt: inv?.moveAppliedAt || inv?.move_applied_at || ''
           };
           if (!newInv.studentId) {
             alert('Select a student.');
@@ -8681,6 +9094,13 @@ Best regards,
           }
           if (!newInv.paid) {
             newInv.paidAt = '';
+          }
+          if (isInvoiceVoid(newInv)) {
+            newInv.invoiceStatus = 'void';
+            newInv.paid = false;
+            newInv.paidAt = '';
+          } else {
+            newInv.invoiceStatus = newInv.paid ? 'paid' : 'issued';
           }
           try {
             if (isSupabaseReady()) {
