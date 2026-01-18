@@ -1621,6 +1621,7 @@
     const TERMS_EFFECTIVE_DATE = BUSINESS.termsEffectiveDate || 'TERMS_EFFECTIVE_DATE';
     const DEFAULT_TIMEZONE = 'Africa/Johannesburg';
     const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const PHONE_CODES = ['+1', '+27', '+44', '+61', '+65', '+91'];
 
     function enableTourMode() {
       sessionStorage.setItem(TOUR_MODE_KEY, '1');
@@ -2251,6 +2252,7 @@
       st.parents.forEach(p => {
         p.id = cleanId(p.id);
         p.email = (p.email || '').trim().toLowerCase();
+        p.phone = normalizePhoneValue(p.phone || '');
         p.loginCode = normalizeCode(p.loginCode || p.login_code || '');
       });
       st.parentLinks.forEach(pl => { pl.id = cleanId(pl.id); pl.parentId = cleanId(pl.parentId); pl.studentId = cleanId(pl.studentId); });
@@ -3532,6 +3534,38 @@
       return String(value || '').replace(/\s+/g, ' ').trim();
     }
 
+    function normalizePhoneValue(value) {
+      const cleaned = normalizePersonValue(value);
+      if (!cleaned) return '';
+      const match = cleaned.match(/^\+\d+/);
+      if (!match) return cleaned;
+      const code = match[0];
+      let rest = cleaned.slice(code.length).trim();
+      while (rest.startsWith(code)) {
+        rest = rest.slice(code.length).trim();
+      }
+      rest = rest.replace(/^\+\d+\s*/, '');
+      return rest ? `${code} ${rest}` : code;
+    }
+
+    function splitPhoneValue(value) {
+      const normalized = normalizePhoneValue(value);
+      const match = normalized.match(/^\+\d+/);
+      const code = match ? match[0] : '';
+      const safeCode = PHONE_CODES.includes(code) ? code : '';
+      const local = safeCode ? normalized.slice(safeCode.length).trim() : normalized;
+      return { code: safeCode, local };
+    }
+
+    function buildPhoneValue(code, local) {
+      const cleanedCode = normalizePersonValue(code);
+      let cleanedLocal = normalizePersonValue(local);
+      cleanedLocal = cleanedLocal.replace(/^\+\d+\s*/, '');
+      if (!cleanedCode && !cleanedLocal) return '';
+      if (cleanedCode && cleanedLocal) return `${cleanedCode} ${cleanedLocal}`;
+      return cleanedCode || cleanedLocal;
+    }
+
     function getParentPromptStorageKey(parent) {
       const id = parent?.id || getSessionParentId() || getSessionLoginCode() || getSessionEmail() || 'parent';
       return `parentProfilePrompted:${id}`;
@@ -3567,9 +3601,9 @@
       }
       const missing = getMissingParentFields(parent);
       const title = missing.length ? 'Complete your profile' : 'Edit your profile';
-      const phoneMatch = String(parent.phone || '').match(/^(\+\\d+)\\s?/);
-      const phoneCode = phoneMatch ? phoneMatch[1] : '';
-      const phoneLocal = parent.phone ? parent.phone.replace(/^\\+\\d+\\s?/, '') : '';
+      const phoneParts = splitPhoneValue(parent.phone || '');
+      const phoneCode = phoneParts.code;
+      const phoneLocal = phoneParts.local;
       const allowSkip = !opts.forcePrompt;
       const html = `
         <h2 class="text-sm font-semibold mb-1">${title}</h2>
@@ -3590,7 +3624,7 @@
             <label class="block text-[11px] mb-1">Phone</label>
             <div class="flex gap-2">
               <select name="phoneCode" class="border border-slate-300 rounded-lg px-2 py-1 text-xs w-28">
-                ${['+1', '+27', '+44', '+61', '+65', '+91'].map(c => `<option value="${c}" ${phoneCode === c ? 'selected' : ''}>${c}</option>`).join('')}
+                ${PHONE_CODES.map(c => `<option value="${c}" ${phoneCode === c ? 'selected' : ''}>${c}</option>`).join('')}
                 <option value="" ${!phoneCode ? 'selected' : ''}>Code</option>
               </select>
               <input name="phoneLocal" value="${phoneLocal}" class="flex-1 border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="Number">
@@ -3626,9 +3660,7 @@
           if (status) status.textContent = '';
           const name = normalizePersonValue(form.name.value);
           const email = normalizePersonValue(form.email.value).toLowerCase();
-          const phone = normalizePersonValue(
-            (form.phoneCode.value || '') + (form.phoneLocal.value.trim() ? (' ' + form.phoneLocal.value.trim()) : '')
-          );
+          const phone = buildPhoneValue(form.phoneCode.value, form.phoneLocal.value);
           const notes = normalizePersonValue(form.notes.value);
           if (!name) {
             if (status) status.textContent = 'Please enter your name.';
@@ -5793,6 +5825,9 @@
         </label>
       `).join('');
       const existingCode = normalizeCode(parent?.loginCode);
+      const phoneParts = splitPhoneValue(parent?.phone || '');
+      const phoneCode = phoneParts.code;
+      const phoneLocal = phoneParts.local;
       const html = `
         <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit parent' : 'Add parent'}</h2>
         <form id="parentForm" class="space-y-2 text-xs">
@@ -5812,10 +5847,10 @@
             <label class="block text-[11px] mb-1">Phone</label>
             <div class="flex gap-2">
               <select name="phoneCode" class="border border-slate-300 rounded-lg px-2 py-1 text-xs w-28">
-                ${['+1', '+27', '+44', '+61', '+65', '+91'].map(c => `<option value="${c}" ${parent?.phone?.startsWith(c) ? 'selected' : ''}>${c}</option>`).join('')}
-                <option value="" ${!(parent?.phone) ? 'selected' : ''}>Code</option>
+                ${PHONE_CODES.map(c => `<option value="${c}" ${phoneCode === c ? 'selected' : ''}>${c}</option>`).join('')}
+                <option value="" ${!phoneCode ? 'selected' : ''}>Code</option>
               </select>
-              <input name="phoneLocal" value="${parent?.phone ? parent.phone.replace(/^\\+\\d+\\s?/, '') : ''}" class="flex-1 border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="Number">
+              <input name="phoneLocal" value="${phoneLocal}" class="flex-1 border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="Number">
             </div>
           </div>
           <div>
@@ -5905,7 +5940,7 @@
             id: parent?.id || generateId('par'),
             name: form.name.value.trim(),
             email: emailVal,
-            phone: (form.phoneCode.value || '') + (form.phoneLocal.value.trim() ? (' ' + form.phoneLocal.value.trim()) : ''),
+            phone: buildPhoneValue(form.phoneCode.value, form.phoneLocal.value),
             notes: form.notes.value.trim(),
             loginCode
           };
