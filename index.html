@@ -1401,6 +1401,22 @@
                 <h2 class="text-lg font-semibold">Parent portal</h2>
                 <p class="text-xs text-slate-500">Linked students, schedules, homework, invoices, and messages.</p>
               </div>
+              <button id="parentEditProfileBtn"
+                class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-[11px]">
+                Edit profile
+              </button>
+            </div>
+            <div id="parentProfilePrompt" class="card p-4 hidden">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <div class="text-sm font-semibold">Complete your profile</div>
+                  <div id="parentProfilePromptText" class="text-[11px] text-slate-500"></div>
+                </div>
+                <button id="parentCompleteProfileBtn"
+                  class="px-3 py-1.5 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-[11px]">
+                  Complete profile
+                </button>
+              </div>
             </div>
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
               <div class="card p-4 space-y-2">
@@ -1414,7 +1430,7 @@
             </div>
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
               <div class="card p-4 space-y-2">
-                <h3 class="text-sm font-semibold">Upcoming sessions</h3>
+                <h3 class="text-sm font-semibold">All sessions</h3>
                 <ul id="parentSessions" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
               </div>
               <div class="card p-4 space-y-2">
@@ -3512,9 +3528,204 @@
       return links.map(pl => state.students.find(s => s.id === pl.studentId)).filter(Boolean);
     }
 
+    function normalizePersonValue(value) {
+      return String(value || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function getParentPromptStorageKey(parent) {
+      const id = parent?.id || getSessionParentId() || getSessionLoginCode() || getSessionEmail() || 'parent';
+      return `parentProfilePrompted:${id}`;
+    }
+
+    function getMissingParentFields(parent) {
+      if (!parent) return ['name', 'phone number', 'email'];
+      const missing = [];
+      if (!normalizePersonValue(parent.name)) missing.push('name');
+      if (!normalizePersonValue(parent.phone)) missing.push('phone number');
+      if (!normalizePersonValue(parent.email)) missing.push('email');
+      return missing;
+    }
+
+    function hasPromptedParentProfile(parent) {
+      try {
+        return localStorage.getItem(getParentPromptStorageKey(parent)) === '1';
+      } catch {
+        return false;
+      }
+    }
+
+    function markParentProfilePrompted(parent) {
+      try {
+        localStorage.setItem(getParentPromptStorageKey(parent), '1');
+      } catch { }
+    }
+
+    function openParentSelfProfileModal(parent, opts = {}) {
+      if (!parent) {
+        alert('Parent profile not found. Please contact your tutor.');
+        return;
+      }
+      const missing = getMissingParentFields(parent);
+      const title = missing.length ? 'Complete your profile' : 'Edit your profile';
+      const phoneMatch = String(parent.phone || '').match(/^(\+\\d+)\\s?/);
+      const phoneCode = phoneMatch ? phoneMatch[1] : '';
+      const phoneLocal = parent.phone ? parent.phone.replace(/^\\+\\d+\\s?/, '') : '';
+      const allowSkip = !opts.forcePrompt;
+      const html = `
+        <h2 class="text-sm font-semibold mb-1">${title}</h2>
+        <p class="text-[11px] text-slate-500 mb-3">
+          Please confirm your details so we can share updates and invoices.
+        </p>
+        <form id="parentSelfProfileForm" class="space-y-2 text-xs">
+          <div>
+            <label class="block text-[11px] mb-1">Name</label>
+            <input name="name" value="${parent.name || ''}" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" required>
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Email (optional)</label>
+            <input name="email" value="${parent.email || ''}" placeholder="name@email.com"
+              class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Phone</label>
+            <div class="flex gap-2">
+              <select name="phoneCode" class="border border-slate-300 rounded-lg px-2 py-1 text-xs w-28">
+                ${['+1', '+27', '+44', '+61', '+65', '+91'].map(c => `<option value="${c}" ${phoneCode === c ? 'selected' : ''}>${c}</option>`).join('')}
+                <option value="" ${!phoneCode ? 'selected' : ''}>Code</option>
+              </select>
+              <input name="phoneLocal" value="${phoneLocal}" class="flex-1 border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="Number">
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">Notes (optional)</label>
+            <textarea name="notes" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${parent.notes || ''}</textarea>
+          </div>
+          <div id="parentSelfProfileStatus" class="text-[10px] text-rose-600"></div>
+          <div class="flex justify-between items-center mt-3">
+            <button id="parentSelfProfileSaveBtn" type="submit"
+              class="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium">
+              Save
+            </button>
+            ${allowSkip ? '<button type="button" id="parentSelfProfileSkipBtn" class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs">Not now</button>' : ''}
+          </div>
+        </form>
+      `;
+      openModal(html, () => {
+        const form = document.getElementById('parentSelfProfileForm');
+        const status = document.getElementById('parentSelfProfileStatus');
+        const saveBtn = document.getElementById('parentSelfProfileSaveBtn');
+        const skipBtn = document.getElementById('parentSelfProfileSkipBtn');
+        if (skipBtn) {
+          skipBtn.onclick = () => {
+            closeModal();
+            markParentProfilePrompted(parent);
+          };
+        }
+        form.onsubmit = async (e) => {
+          e.preventDefault();
+          if (status) status.textContent = '';
+          const name = normalizePersonValue(form.name.value);
+          const email = normalizePersonValue(form.email.value).toLowerCase();
+          const phone = normalizePersonValue(
+            (form.phoneCode.value || '') + (form.phoneLocal.value.trim() ? (' ' + form.phoneLocal.value.trim()) : '')
+          );
+          const notes = normalizePersonValue(form.notes.value);
+          if (!name) {
+            if (status) status.textContent = 'Please enter your name.';
+            return;
+          }
+          if (email && !/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email)) {
+            if (status) status.textContent = 'Please enter a valid email or leave it blank.';
+            return;
+          }
+          const taken = email && state.parents.some(p => p.email === email && p.id !== parent.id);
+          if (taken) {
+            if (status) status.textContent = 'That email is already used by another parent.';
+            return;
+          }
+          if (saveBtn) saveBtn.disabled = true;
+          try {
+            const updates = {
+              name,
+              email: email || '',
+              phone: phone || '',
+              notes: notes || ''
+            };
+            let updatedRow = null;
+            if (isSupabaseReady()) {
+              let query = supabaseClient
+                .from('parents')
+                .update({
+                  name,
+                  email: email || null,
+                  phone: phone || null,
+                  notes: notes || null
+                })
+                .select('*');
+              if (parent.id) query = query.eq('id', parent.id);
+              else if (getSessionParentId()) query = query.eq('id', getSessionParentId());
+              else if (getSessionLoginCode()) query = query.eq('login_code', getSessionLoginCode());
+              else if (getSessionEmail()) query = query.eq('email', getSessionEmail());
+              const { data, error } = await query;
+              if (error) throw error;
+              updatedRow = data?.[0] || null;
+            }
+            if (updatedRow) {
+              parent.name = updatedRow.name;
+              parent.email = (updatedRow.email || '').toLowerCase();
+              parent.phone = updatedRow.phone || '';
+              parent.notes = updatedRow.notes || '';
+            } else {
+              parent.name = updates.name;
+              parent.email = updates.email;
+              parent.phone = updates.phone;
+              parent.notes = updates.notes;
+            }
+            saveState();
+            markParentProfilePrompted(parent);
+            closeModal();
+            renderParentPortal();
+          } catch (err) {
+            console.warn('Parent profile update failed', err);
+            if (status) status.textContent = err?.message || 'Unable to update profile.';
+          } finally {
+            if (saveBtn) saveBtn.disabled = false;
+          }
+        };
+      });
+    }
+
+    function updateParentProfilePrompt(parent) {
+      const promptCard = document.getElementById('parentProfilePrompt');
+      const promptText = document.getElementById('parentProfilePromptText');
+      const completeBtn = document.getElementById('parentCompleteProfileBtn');
+      if (completeBtn) completeBtn.onclick = () => openParentSelfProfileModal(parent);
+      if (!promptCard) return;
+      if (!parent) {
+        promptCard.classList.add('hidden');
+        return;
+      }
+      const missing = getMissingParentFields(parent);
+      if (!missing.length) {
+        promptCard.classList.add('hidden');
+        return;
+      }
+      promptCard.classList.remove('hidden');
+      if (promptText) {
+        promptText.textContent = `Please add ${missing.join(', ')} so we can share updates and invoices.`;
+      }
+      if (!tourMode && !hasPromptedParentProfile(parent)) {
+        markParentProfilePrompted(parent);
+        openParentSelfProfileModal(parent, { forcePrompt: true });
+      }
+    }
+
     function renderParentPortal() {
       const parent = tourMode ? getTourParent() : getParentProfileBySession();
       const students = tourMode && parent ? getParentLinkedStudents(parent.id) : getChildrenForParent();
+      const editProfileBtn = document.getElementById('parentEditProfileBtn');
+      if (editProfileBtn) editProfileBtn.onclick = () => openParentSelfProfileModal(parent);
+      updateParentProfilePrompt(parent);
       const sList = document.getElementById('parentStudentsList');
       if (sList) {
         sList.innerHTML = students.length ? students.map(s => {
@@ -3561,21 +3772,34 @@
       const childIds = new Set(students.map(s => s.id));
 
       const now = new Date();
-      const soon = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-      const mySessions = state.sessions.filter(s => s.studentIds.some(id => childIds.has(id)))
-        .filter(s => {
-          const d = new Date(s.date + 'T' + (s.startTime || '00:00'));
-          return d >= now && d <= soon;
-        })
-        .sort((a, b) => new Date(a.date) - new Date(b.date));
+      const sessionsWithDates = state.sessions
+        .filter(s => s.studentIds.some(id => childIds.has(id)))
+        .map(s => ({
+          session: s,
+          when: new Date(s.date + 'T' + (s.startTime || '00:00'))
+        }));
+      const upcomingSessions = sessionsWithDates
+        .filter(s => s.when >= now)
+        .sort((a, b) => a.when - b.when);
+      const pastSessions = sessionsWithDates
+        .filter(s => s.when < now)
+        .sort((a, b) => b.when - a.when);
+      const mySessions = [...upcomingSessions, ...pastSessions].map(s => s.session);
       if (sessionsUl) {
         sessionsUl.innerHTML = mySessions.length ? mySessions.map(s => {
           const names = s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+          const when = new Date(s.date + 'T' + (s.startTime || '00:00'));
+          const isPast = when < now;
+          const status = s.completed ? 'Completed' : (isPast ? 'Past' : 'Upcoming');
+          const statusClass = s.completed ? 'bg-emerald-100 text-emerald-700' : (isPast ? 'bg-slate-100 text-slate-600' : 'bg-indigo-100 text-indigo-700');
           return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
-            <div class="font-medium">${s.subject} • ${s.topic || 'Lesson'}</div>
+            <div class="flex items-center justify-between gap-2">
+              <div class="font-medium">${s.subject} • ${s.topic || 'Lesson'}</div>
+              <span class="text-[10px] px-2 py-0.5 rounded-full ${statusClass}">${status}</span>
+            </div>
             <div class="text-[10px] text-slate-500">${s.date} ${s.startTime || ''} • ${s.durationHours || 1}h • ${names}</div>
           </li>`;
-        }).join('') : '<li class="text-slate-500 text-xs">No sessions in the next 14 days.</li>';
+        }).join('') : '<li class="text-slate-500 text-xs">No sessions yet.</li>';
       }
 
       const myHw = state.homework.filter(hw => childIds.has(hw.studentId));
