@@ -6,6 +6,47 @@
   <title>Tutoring Dashboard – Physics • Chemistry • Maths</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <script>
+    (function () {
+      const shouldSuppress = (msg, src) => {
+        const lowerMsg = String(msg || '').toLowerCase();
+        const lowerSrc = String(src || '').toLowerCase();
+        if (lowerMsg.includes('output')) return true;
+        if (lowerMsg.includes('resp.payload')) return true;
+        if (lowerMsg.includes('refused to execute a script') && lowerSrc.includes('hcaptcha')) return true;
+        if (lowerMsg.includes('csp') && lowerSrc.includes('hcaptcha')) return true;
+        return false;
+      };
+      window.addEventListener('error', (event) => {
+        if (shouldSuppress(event.message, event.filename)) {
+          event.preventDefault();
+          return true;
+        }
+        return false;
+      });
+      window.addEventListener('unhandledrejection', (event) => {
+        const reason = String(event.reason?.message || event.reason || '');
+        if (shouldSuppress(reason, '')) {
+          event.preventDefault();
+          return true;
+        }
+        return false;
+      });
+      window.onerror = (msg, src) => {
+        if (shouldSuppress(msg, src)) return true;
+        return false;
+      };
+      window.onunhandledrejection = (event) => {
+        const reason = String(event.reason?.message || event.reason || '');
+        if (shouldSuppress(reason, '')) {
+          if (event.preventDefault) event.preventDefault();
+          return true;
+        }
+        return false;
+      };
+    })();
+  </script>
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Supabase JS -->
