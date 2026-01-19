@@ -3694,8 +3694,7 @@
     }
 
     function renderStudentPortal() {
-      const email = getSessionEmail();
-      const student = tourMode ? getTourStudent() : state.students.find(s => s.studentEmail === email);
+      const student = tourMode ? getTourStudent() : getStudentProfileBySession();
       const sessionsUl = document.getElementById('portalSessions');
       const hwUl = document.getElementById('portalHomework');
       const invUl = document.getElementById('portalInvoices');
@@ -4606,6 +4605,25 @@
       }
       const email = getSessionEmail();
       return state.parents.find(p => p.email === email);
+    }
+
+    function getStudentProfileBySession() {
+      const studentId = getSessionStudentId();
+      if (studentId) {
+        const byId = state.students.find(s => s.id === studentId);
+        if (byId) return byId;
+      }
+      const loginCode = getSessionLoginCode();
+      if (loginCode) {
+        const byCode = state.students.find(s => normalizeCode(s.loginCode || s.login_code || '') === loginCode);
+        if (byCode) return byCode;
+      }
+      const email = getSessionEmail();
+      if (email) {
+        const byEmail = state.students.find(s => (s.studentEmail || '').toLowerCase() === email);
+        if (byEmail) return byEmail;
+      }
+      return null;
     }
 
     function getTourStudent() {
