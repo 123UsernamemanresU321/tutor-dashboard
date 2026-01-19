@@ -2679,16 +2679,20 @@
       const uid = supabaseSession?.user?.id;
       if (!uid) return;
 
-      const parents = state.parents.map(p => ({
-        id: cleanId(p.id),
-        user_id: uid,
-        email: (p.email || '').trim().toLowerCase(),
-        name: p.name,
-        phone: p.phone,
-        notes: p.notes,
-        verified: p.verified || false,
-        login_code: normalizeCode(p.loginCode)
-      }));
+      const parents = state.parents.map(p => {
+        const email = (p.email || '').trim().toLowerCase();
+        const loginCode = normalizeCode(p.loginCode);
+        return {
+          id: cleanId(p.id),
+          user_id: uid,
+          email: email || null,
+          name: p.name,
+          phone: p.phone,
+          notes: p.notes,
+          verified: p.verified || false,
+          login_code: loginCode || null
+        };
+      });
       await upsertAndPrune('parents', parents, 'id');
 
       const parentLinks = state.parentLinks.map(pl => ({
@@ -2715,7 +2719,7 @@
           rate: s.rate,
           subjects: s.subjects,
           notes: s.notes,
-          student_email: (s.studentEmail || '').trim(),
+          student_email: (s.studentEmail || '').trim() || null,
           created_at: s.createdAt,
           contract_signed: !!s.contractSigned,
           contract_signed_at: s.contractSignedAt || null,
@@ -2723,7 +2727,7 @@
           contract_signer_name: s.contractSignerName || null,
           contract_signer_email: s.contractSignerEmail || null,
           last_contract_id: s.lastContractId || null,
-          login_code: normalizeCode(s.loginCode),
+          login_code: normalizeCode(s.loginCode) || null,
           schedule_slots: serializeScheduleSlots(slots, scheduleTimezone),
           schedule_days: legacyDays,
           preferred_time: legacyPreferredTime,
@@ -2734,6 +2738,7 @@
         };
       });
       await upsertAndPrune('students', students, 'id');
+      const studentIdSet = new Set(students.map(s => cleanId(s.id)));
 
       const sessionsClean = state.sessions
         .map(sess => ({
@@ -2941,7 +2946,7 @@
         text: m.text,
         sender: m.sender,
         created_at: m.created_at
-      }));
+      })).filter(m => m.student_id && studentIdSet.has(m.student_id));
       try {
         await upsertAndPrune('messages', messages, 'id');
       } catch (err) {
