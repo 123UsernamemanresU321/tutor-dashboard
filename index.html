@@ -8322,13 +8322,21 @@
 
     function assignResourceToStudents(resourceId, studentIds, dueDate) {
       if (!resourceId || !studentIds?.length) return;
+      const res = getResourceById(resourceId);
+      if (!res) return;
+      const students = studentIds.map(id => getStudentById(id)).filter(Boolean);
+      if (!students.length) return;
+      // Normalize ids before creating assignments so resource/student ids match DB rows.
+      normalizeIdsToUuid();
+      enforceUuidFields();
+      const resolvedResourceId = cleanId(res.id);
       const today = new Date().toISOString().slice(0, 10);
-      const newAssignments = studentIds.map(stuId => {
+      const newAssignments = students.map(stu => {
         const id = crypto?.randomUUID ? crypto.randomUUID() : generateId('hw');
         const hw = {
           id,
-          studentId: stuId,
-          resourceId,
+          studentId: cleanId(stu.id),
+          resourceId: resolvedResourceId,
           status: 'To do',
           dueDate,
           assignedDate: today
