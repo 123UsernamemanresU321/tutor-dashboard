@@ -4616,7 +4616,14 @@
     }
 
     function getSessionLoginCode() {
-      return normalizeCode(getSessionMetadata().login_code || '');
+      const meta = getSessionMetadata();
+      const metaCode = normalizeCode(meta.login_code || meta.loginCode || '');
+      if (metaCode) return metaCode;
+      const email = getSessionEmail();
+      if (email && email.endsWith(CODE_EMAIL_SUFFIX)) {
+        return normalizeCode(email.slice(0, -CODE_EMAIL_SUFFIX.length));
+      }
+      return '';
     }
 
     function getParentProfileBySession() {
