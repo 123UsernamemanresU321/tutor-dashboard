@@ -9456,12 +9456,22 @@ Best regards,
         };
 
         if (isEdit) {
-          document.getElementById('deleteResourceBtn').onclick = () => {
+          document.getElementById('deleteResourceBtn').onclick = async () => {
             if (!confirm('Delete this resource?')) return;
             // attempt to delete from storage if present
             if (resource?.storage_path && isSupabaseReady()) {
               supabaseClient.storage.from('resources').remove([resource.storage_path])
                 .catch(err => console.warn('Storage delete failed', err));
+            }
+            if (isSupabaseReady()) {
+              const resId = cleanId(resource?.id);
+              try {
+                // Remove dependent homework rows first to satisfy FK constraints.
+                await supabaseClient.from('homework').delete().eq('resource_id', resId);
+                await supabaseClient.from('resources').delete().eq('id', resId);
+              } catch (err) {
+                console.warn('Resource delete failed', err);
+              }
             }
             state.resources = state.resources.filter(r => r.id !== resource.id);
             state.homework = state.homework.filter(hw => hw.resourceId !== resource.id);
