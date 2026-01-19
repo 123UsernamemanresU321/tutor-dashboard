@@ -326,6 +326,18 @@
       border-bottom: 1px solid #7dd3fc;
     }
 
+    .session-alert-banner {
+      background: linear-gradient(135deg, #fee2e2, #fff7ed);
+      color: #9a3412;
+      border-bottom: 1px solid #fb7185;
+    }
+
+    body.dark .session-alert-banner {
+      background: linear-gradient(135deg, rgba(153, 27, 27, 0.7), rgba(124, 45, 18, 0.7));
+      color: #ffe4e6;
+      border-bottom-color: rgba(251, 113, 133, 0.6);
+    }
+
     .tour-pill {
       border: 1px solid #7dd3fc;
       background: #e0f2fe;
@@ -607,6 +619,7 @@
       <div id="readOnlyBanner" class="read-only-banner hidden px-6 py-2 text-xs">
         Read-only mode: sign in as the owner to edit.
       </div>
+      <div id="sessionAlertBanner" class="session-alert-banner hidden px-6 py-2 text-xs"></div>
 
       <!-- Views container -->
       <main id="viewsContainer"
@@ -1089,8 +1102,8 @@
               </div>
 
               <!-- Homework board -->
-              <div class="card p-4 col-span-1 max-h-[75vh] overflow-y-auto scrollbar-thin text-xs">
-                <h3 class="text-sm font-semibold mb-2">Homework board</h3>
+              <div id="resourcesHomeworkBoard" class="card p-4 col-span-1 max-h-[75vh] overflow-y-auto scrollbar-thin text-xs">
+                <h3 id="homeworkBoardTitle" class="text-sm font-semibold mb-2">Homework board</h3>
                 <div class="grid grid-cols-3 gap-2 text-[11px]">
                   <div>
                     <div class="font-semibold mb-1">To Do</div>
@@ -1105,7 +1118,7 @@
                     <ul id="hwDone" class="space-y-1"></ul>
                   </div>
                 </div>
-                <p class="mt-2 text-[10px] text-slate-500">Change status using the dropdown on each card.</p>
+                <p id="homeworkBoardHint" class="mt-2 text-[10px] text-slate-500">Change status using the dropdown on each card.</p>
               </div>
             </div>
           </div>
@@ -2473,6 +2486,9 @@
         r.id = cleanId(r.id);
         r.storage_path = stripBucketPrefix(r.storage_path, 'resources');
         r.fileName = r.fileName || r.file_name || '';
+        r.linkUrl = r.linkUrl || r.link_url || '';
+        r.resourceType = r.resourceType || r.resource_type || '';
+        r.estimatedMinutes = Number(r.estimatedMinutes || r.estimated_minutes || 0) || 0;
       });
       st.homework.forEach(h => { h.id = cleanId(h.id); h.studentId = cleanId(h.studentId); h.resourceId = cleanId(h.resourceId); });
       st.documents.forEach(d => { d.id = cleanId(d.id); d.studentId = cleanId(d.studentId); });
@@ -2820,6 +2836,9 @@
         level: r.level,
         tags: r.tags,
         description: r.description,
+        resource_type: r.resourceType || null,
+        estimated_minutes: r.estimatedMinutes ?? null,
+        link_url: r.linkUrl || null,
         created_at: r.createdAt,
         favorite: r.favorite,
         storage_path: r.storage_path,
@@ -3354,6 +3373,8 @@
       window.getResourceById = getResourceById;
       window.openAssignResourceModal = openAssignResourceModal;
       window.updateHomeworkStatus = updateHomeworkStatus;
+      window.openResourceLink = openResourceLink;
+      window.copyResourceLink = copyResourceLink;
       window.openDocumentModal = openDocumentModal;
       window.getDocumentById = getDocumentById;
       window.openInvoiceModal = openInvoiceModal;
@@ -3443,6 +3464,7 @@
       if (targetView === 'portal') renderStudentPortal();
       if (targetView === 'parent-portal') renderParentPortal();
       if (targetView === 'reports') renderReportsView();
+      renderSessionAlerts();
     }
 
     function setupTopbar() {
@@ -3780,7 +3802,7 @@
           <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
             <div class="font-medium">${r.title}</div>
             <div class="text-[10px] text-slate-500">${r.subject} • ${r.level || ''}</div>
-            ${r.signedUrl ? `<a class="text-[10px] text-indigo-600" href="${r.signedUrl}" target="_blank">Download</a>` : ''}
+            ${getResourceOpenUrl(r) ? `<a class="text-[10px] text-indigo-600" href="${getResourceOpenUrl(r)}" target="_blank">Open resource</a>` : ''}
           </li>
         `).join('') : '<li class="text-slate-500 text-xs">No resources assigned.</li>';
       }
@@ -4162,7 +4184,7 @@
           <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
             <div class="font-medium">${r.title}</div>
             <div class="text-[10px] text-slate-500">${r.subject} • ${r.level || ''}</div>
-            ${r.signedUrl ? `<a class="text-[10px] text-indigo-600" href="${r.signedUrl}" target="_blank">Download</a>` : ''}
+            ${getResourceOpenUrl(r) ? `<a class="text-[10px] text-indigo-600" href="${getResourceOpenUrl(r)}" target="_blank">Open resource</a>` : ''}
           </li>
         `).join('') : '<li class="text-slate-500 text-xs">No resources yet.</li>';
       }
@@ -4636,6 +4658,81 @@
       return state.parents[0] || null;
     }
 
+    function getViewerStudentIds() {
+      if (studentMode) {
+        const student = getStudentProfileBySession();
+        return student ? [student.id] : [];
+      }
+      if (parentMode) {
+        const parent = getParentProfileBySession();
+        const students = parent ? getParentLinkedStudents(parent.id) : getChildrenForParent();
+        return students.map(s => s.id);
+      }
+      return state.students.map(s => s.id);
+    }
+
+    function getTodayUpcomingSessionsForViewer() {
+      const todayStr = toDateOnly(new Date());
+      const now = new Date();
+      return getScheduleVisibleSessions()
+        .filter(s => s.date === todayStr)
+        .filter(s => new Date(s.date + 'T' + (s.startTime || '00:00')) >= now)
+        .sort((a, b) => (a.date + 'T' + (a.startTime || '00:00')).localeCompare(b.date + 'T' + (b.startTime || '00:00')));
+    }
+
+    function formatSessionAlertLine(sess) {
+      const start = new Date(sess.date + 'T' + (sess.startTime || '00:00'));
+      const mins = Math.max(0, Math.round((start - new Date()) / 60000));
+      const hours = Math.floor(mins / 60);
+      const minutes = mins % 60;
+      const countdown = mins ? (hours ? `${hours}h ${minutes}m` : `${minutes}m`) : 'now';
+      const timeLabel = sess.startTime || 'TBD';
+      const subject = sess.subject || 'Lesson';
+      const names = studentMode ? '' : sess.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+      const who = names ? ` • ${names}` : '';
+      return `<li><strong>${timeLabel}</strong> (${countdown}) • ${subject}${who}</li>`;
+    }
+
+    function renderSessionAlerts() {
+      const banner = document.getElementById('sessionAlertBanner');
+      if (!banner) return;
+      const sessions = getTodayUpcomingSessionsForViewer();
+      if (!sessions.length) {
+        banner.classList.add('hidden');
+        return;
+      }
+      const role = studentMode ? 'student' : parentMode ? 'parent' : 'owner';
+      const key = `session_alert_dismissed_${role}_${toDateOnly(new Date())}`;
+      if (sessionStorage.getItem(key) === '1') {
+        banner.classList.add('hidden');
+        return;
+      }
+      const title = studentMode
+        ? 'Today: your upcoming lesson'
+        : parentMode
+          ? 'Today: your child has upcoming lessons'
+          : 'Today: upcoming lessons';
+      banner.innerHTML = `
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <div class="font-semibold">${title}</div>
+            <ul class="text-[11px] mt-1 space-y-0.5">
+              ${sessions.map(formatSessionAlertLine).join('')}
+            </ul>
+          </div>
+          <button class="text-[11px] px-2 py-1 rounded-lg border border-rose-300 bg-white/80">Dismiss</button>
+        </div>
+      `;
+      banner.classList.remove('hidden');
+      const btn = banner.querySelector('button');
+      if (btn) {
+        btn.onclick = () => {
+          sessionStorage.setItem(key, '1');
+          banner.classList.add('hidden');
+        };
+      }
+    }
+
     function isOwner() {
       if (!supabaseAvailable) return true;
       if (getSessionRole() === 'owner') return true;
@@ -4699,7 +4796,7 @@
       if (navDashboard) navDashboard.classList.toggle('hidden', studentMode || parentMode);
       if (navStudents) navStudents.classList.toggle('hidden', studentMode); // show for owner & parent
       if (navSchedule) navSchedule.classList.toggle('hidden', studentMode); // show for owner & parent
-      if (navResources) navResources.classList.toggle('hidden', studentMode); // show for owner & parent
+      if (navResources) navResources.classList.remove('hidden');
       if (studentMode) switchView('portal');
       if (parentMode) switchView('parent-portal');
     }
@@ -4915,6 +5012,9 @@
               level: r.level,
               tags: r.tags,
               description: r.description,
+              resourceType: r.resource_type || '',
+              estimatedMinutes: r.estimated_minutes || null,
+              linkUrl: r.link_url || '',
               createdAt: r.created_at,
               favorite: r.favorite,
               storage_path: r.storage_path,
@@ -5022,6 +5122,9 @@
                 level: r.level,
                 tags: r.tags,
                 description: r.description,
+                resourceType: r.resourceType || '',
+                estimatedMinutes: r.estimatedMinutes || null,
+                linkUrl: r.linkUrl || '',
                 createdAt: r.createdAt,
                 favorite: r.favorite,
                 storage_path: r.storage_path,
@@ -5151,6 +5254,9 @@
           level: r.level,
           tags: r.tags,
           description: r.description,
+          resourceType: r.resource_type || '',
+          estimatedMinutes: r.estimated_minutes || null,
+          linkUrl: r.link_url || '',
           createdAt: r.created_at,
           favorite: r.favorite,
           storage_path: r.storage_path,
@@ -5423,18 +5529,21 @@
               console.warn('Student/parent resource signed URL fetch failed', err);
             }
           }
-          return {
-            id: r.id,
-            title: r.title,
-            subject: r.subject,
-            level: r.level,
-            tags: r.tags,
-            description: r.description,
-            createdAt: r.created_at,
-            favorite: r.favorite,
-            storage_path: r.storage_path,
-            fileName: r.file_name,
-            signedUrl
+            return {
+              id: r.id,
+              title: r.title,
+              subject: r.subject,
+              level: r.level,
+              tags: r.tags,
+              description: r.description,
+              resourceType: r.resource_type || '',
+              estimatedMinutes: r.estimated_minutes || null,
+              linkUrl: r.link_url || '',
+              createdAt: r.created_at,
+              favorite: r.favorite,
+              storage_path: r.storage_path,
+              fileName: r.file_name,
+              signedUrl
           };
         })
       );
@@ -5755,6 +5864,7 @@
       renderReportsView();
       if (studentMode) renderStudentPortal();
       if (parentMode) renderParentPortal();
+      renderSessionAlerts();
     }
 
     /******************
@@ -7121,8 +7231,8 @@
         return state.sessions.filter(s => s.studentIds.some(id => ids.has(id)));
       }
       if (studentMode) {
-        const studentId = getSessionStudentId();
-        if (studentId) return state.sessions.filter(s => s.studentIds.includes(studentId));
+        const student = getStudentProfileBySession();
+        if (student) return state.sessions.filter(s => s.studentIds.includes(student.id));
       }
       return state.sessions;
     }
@@ -7951,13 +8061,48 @@
      *************/
     function renderResourcesView() {
       const list = document.getElementById('resourcesList');
-      const subjectFilter = document.getElementById('resourceSubjectFilter').value;
-      const searchTerm = document.getElementById('resourceSearchInput').value.trim().toLowerCase();
+      const subjectFilterEl = document.getElementById('resourceSubjectFilter');
+      const searchInput = document.getElementById('resourceSearchInput');
+      const subjectFilter = subjectFilterEl?.value || '';
+      const searchTerm = searchInput?.value?.trim().toLowerCase() || '';
       const tagFiltersEl = document.getElementById('resourceTagFilters');
       const activeTag = tagFiltersEl?.dataset.active || '';
+      const ownerView = !studentMode && !parentMode;
+      const addBtn = document.getElementById('addResourceBtn');
+      const homeworkBoard = document.getElementById('resourcesHomeworkBoard');
+      const homeworkTitle = document.getElementById('homeworkBoardTitle');
+      const homeworkHint = document.getElementById('homeworkBoardHint');
+
+      if (addBtn) addBtn.classList.toggle('hidden', !ownerView);
+
+      const viewerStudentIds = ownerView ? [] : getViewerStudentIds();
+      if (!ownerView && (!viewerStudentIds || !viewerStudentIds.length)) {
+        const msg = studentMode
+          ? 'No student profile linked to this account.'
+          : 'No linked students found yet.';
+        list.innerHTML = `<li class="text-slate-500 text-xs">${msg}</li>`;
+        if (homeworkBoard) homeworkBoard.classList.add('hidden');
+        return;
+      }
+      if (homeworkBoard) homeworkBoard.classList.remove('hidden');
+      if (!ownerView) {
+        if (homeworkTitle) homeworkTitle.textContent = parentMode ? 'Homework for your child' : 'My homework';
+        if (homeworkHint) homeworkHint.textContent = 'Homework status is read-only here.';
+      } else {
+        if (homeworkTitle) homeworkTitle.textContent = 'Homework board';
+        if (homeworkHint) homeworkHint.textContent = 'Change status using the dropdown on each card.';
+      }
+
+      const scopedHomework = ownerView
+        ? state.homework
+        : state.homework.filter(hw => viewerStudentIds.includes(hw.studentId));
+      const scopedResourceIds = new Set(scopedHomework.map(hw => hw.resourceId));
+      const baseResources = ownerView
+        ? state.resources
+        : state.resources.filter(r => scopedResourceIds.has(r.id));
 
       const tagCounts = {};
-      state.resources.forEach(r => {
+      baseResources.forEach(r => {
         (r.tags || []).forEach(tag => {
           const key = tag.trim();
           if (!key) return;
@@ -7980,57 +8125,116 @@
         });
       }
 
-      const filtered = state.resources.filter(r => {
+      const filtered = baseResources.filter(r => {
         if (subjectFilter && r.subject !== subjectFilter) return false;
-        if (searchTerm && !r.title.toLowerCase().includes(searchTerm) && !(r.tags || []).some(t => t.toLowerCase().includes(searchTerm))) {
+        const haystack = [
+          r.title,
+          r.description,
+          r.resourceType,
+          r.linkUrl,
+          r.level
+        ].filter(Boolean).join(' ').toLowerCase();
+        if (searchTerm && !haystack.includes(searchTerm) && !(r.tags || []).some(t => t.toLowerCase().includes(searchTerm))) {
           return false;
         }
         if (activeTag && !(r.tags || []).some(t => t.toLowerCase() === activeTag)) return false;
         return true;
       }).sort((a, b) => (b.favorite === true) - (a.favorite === true));
       if (!filtered.length) {
-        list.innerHTML = '<li class="text-slate-500 text-xs">No resources yet. Add worksheets, lectures, or notes.</li>';
+        const emptyMsg = ownerView
+          ? 'No resources yet. Add worksheets, lectures, or notes.'
+          : 'No resources assigned yet.';
+        list.innerHTML = `<li class="text-slate-500 text-xs">${emptyMsg}</li>`;
       } else {
-        list.innerHTML = filtered.map(r => `
-          <li class="border border-slate-200 rounded-xl px-3 py-2 bg-white/85">
+        const dueDefault = toDateOnly(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+        list.innerHTML = filtered.map(r => {
+          const stats = getResourceAssignmentStats(r.id, ownerView ? null : viewerStudentIds);
+          const progress = stats.total ? Math.round((stats.completed / stats.total) * 100) : 0;
+          const openUrl = getResourceOpenUrl(r);
+          const assignmentLines = !ownerView ? getResourceAssignments(r.id, viewerStudentIds).map(a => `
+            <div class="text-[10px] text-slate-500">${studentMode ? '' : `${a.studentName} • `}${a.status} • Due ${a.dueDate || 'n/a'}</div>
+          `).join('') : '';
+          const metaBits = [
+            r.subject || 'Resource',
+            r.level || '',
+            r.resourceType || '',
+            r.estimatedMinutes ? `${r.estimatedMinutes} min` : ''
+          ].filter(Boolean).join(' • ');
+          return `
+          <li class="border border-slate-200 rounded-xl px-3 py-2 bg-white/85" data-resource-card="${r.id}">
             <div class="flex justify-between items-start gap-2">
               <div>
                 <div class="font-semibold">${r.title}</div>
-                <div class="text-[10px] text-slate-500">${r.subject} • ${r.level || ''}</div>
+                <div class="text-[10px] text-slate-500">${metaBits || 'Resource'}</div>
               </div>
-              <div class="flex items-center gap-1">
-                <button class="text-[12px]" title="Favorite"
-                        onclick="toggleResourceFavorite('${r.id}')">${r.favorite ? '⭐' : '☆'}</button>
-                <button class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
-                        onclick="openResourceModal(getResourceById('${r.id}'))">
-                  Edit
-                </button>
-              </div>
+              ${ownerView ? `
+                <div class="flex items-center gap-1">
+                  <button class="text-[12px]" title="Favorite"
+                          onclick="toggleResourceFavorite('${r.id}')">${r.favorite ? '⭐' : '☆'}</button>
+                  <button class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
+                          onclick="openResourceModal(getResourceById('${r.id}'))">
+                    Edit
+                  </button>
+                </div>
+              ` : ''}
             </div>
-            <div class="mt-1 text-[10px]">${r.description || ''}</div>
-          <div class="mt-1 flex flex-wrap">
+            ${r.description ? `<div class="mt-1 text-[10px]">${r.description}</div>` : ''}
+            <div class="mt-1 flex flex-wrap">
               ${(r.tags || []).map(tag => `<span class="tag-pill">#${tag}</span>`).join('')}
             </div>
-            <div class="mt-1 text-[10px] text-slate-500">
-              ${getResourceUsageText(r.id)}
+            <div class="mt-2">
+              <div class="text-[10px] text-slate-500">${stats.total ? `Assigned ${stats.total}× • Completed ${stats.completed}` : 'Not assigned yet.'}</div>
+              ${stats.total ? `<div class="progress-track mt-1"><div class="progress-thumb" style="width:${progress}%"></div></div>` : ''}
             </div>
+            ${assignmentLines ? `<div class="mt-2 border border-slate-200 rounded-lg p-2 bg-slate-50/60">${assignmentLines}</div>` : ''}
             <div class="mt-2 flex gap-2 text-[11px] flex-wrap items-center">
-              <button data-owner-only class="px-2 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
-                      onclick="if(guardEdit()) openAssignResourceModal('${r.id}')">
-                Assign to student(s)
-              </button>
+              ${ownerView ? `
+                <button data-owner-only class="px-2 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
+                        onclick="if(guardEdit()) openAssignResourceModal('${r.id}')">
+                  Assign to student(s)
+                </button>
+              ` : ''}
+              ${openUrl ? `<button class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
+                        onclick="openResourceLink('${r.id}')">Open</button>` : ''}
+              ${ownerView && openUrl ? `<button class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
+                        onclick="copyResourceLink('${r.id}')">Copy link</button>` : ''}
               ${r.signedUrl ? `<a class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50" href="${r.signedUrl}" target="_blank">Download file</a>` : ''}
               ${!r.signedUrl && r.dataUrl ? `<a class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50" href="${r.dataUrl}" download="${r.fileName || 'resource'}" target="_blank">Download local copy</a>` : ''}
               ${r.signedUrl && r.fileName && (r.fileName.endsWith('.png') || r.fileName.endsWith('.jpg') || r.fileName.endsWith('.jpeg')) ? `<img src="${r.signedUrl}" alt="${r.title}" class="h-12 rounded border border-slate-200">` : ''}
             </div>
+            ${ownerView && state.students.length ? `
+              <div class="mt-2 flex flex-wrap gap-2 items-center text-[10px]" data-quick-assign="${r.id}">
+                <select class="border border-slate-300 rounded-lg px-2 py-1 text-[10px]" data-quick-student>
+                  ${state.students.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+                </select>
+                <input type="date" class="border border-slate-300 rounded-lg px-2 py-1 text-[10px]" data-quick-due value="${dueDefault}">
+                <button class="px-2 py-1 rounded-lg bg-indigo-600 text-white" data-quick-assign-btn>Quick assign</button>
+              </div>
+            ` : ''}
           </li>
-        `).join('');
+        `;
+        }).join('');
       }
 
-      document.getElementById('resourceSubjectFilter').onchange = renderResourcesView;
-      document.getElementById('resourceSearchInput').oninput = renderResourcesView;
+      if (ownerView) {
+        list.querySelectorAll('[data-quick-assign]').forEach(row => {
+          const resourceId = row.dataset.quickAssign;
+          const studentSelect = row.querySelector('[data-quick-student]');
+          const dueInput = row.querySelector('[data-quick-due]');
+          const btn = row.querySelector('[data-quick-assign-btn]');
+          if (!btn) return;
+          btn.onclick = () => {
+            const studentId = studentSelect?.value;
+            if (!studentId) return alert('Select a student.');
+            assignResourceToStudents(resourceId, [studentId], dueInput?.value || '');
+          };
+        });
+      }
 
-      renderHomeworkBoard();
+      if (subjectFilterEl) subjectFilterEl.onchange = renderResourcesView;
+      if (searchInput) searchInput.oninput = renderResourcesView;
+
+      renderHomeworkBoard(ownerView ? null : viewerStudentIds, !ownerView);
     }
 
     function getResourceById(id) {
@@ -8038,13 +8242,88 @@
     }
 
     function getResourceUsageText(resourceId) {
-      const assignments = state.homework.filter(hw => hw.resourceId === resourceId);
-      if (!assignments.length) return 'Not assigned yet.';
-      const last = assignments
-        .map(a => a.dueDate || a.assignedDate)
-        .filter(Boolean)
-        .sort((a, b) => new Date(b) - new Date(a))[0];
-      return `Assigned ${assignments.length}× • Last due ${last || 'n/a'}`;
+      const stats = getResourceAssignmentStats(resourceId);
+      if (!stats.total) return 'Not assigned yet.';
+      return `Assigned ${stats.total}× • Completed ${stats.completed}`;
+    }
+
+    function ensureHttpUrl(url) {
+      const raw = String(url || '').trim();
+      if (!raw) return '';
+      if (/^(https?:|data:|blob:|mailto:)/i.test(raw)) return raw;
+      return `https://${raw}`;
+    }
+
+    function getResourceOpenUrl(resource) {
+      if (!resource) return '';
+      return ensureHttpUrl(resource.signedUrl || resource.dataUrl || resource.linkUrl || '');
+    }
+
+    function getResourceAssignments(resourceId, studentFilterIds = null) {
+      return state.homework
+        .filter(hw => hw.resourceId === resourceId)
+        .filter(hw => !studentFilterIds || studentFilterIds.includes(hw.studentId))
+        .map(hw => ({
+          id: hw.id,
+          studentId: hw.studentId,
+          studentName: getStudentById(hw.studentId)?.name || 'Unknown',
+          status: hw.status || 'To do',
+          dueDate: hw.dueDate || '',
+          assignedDate: hw.assignedDate || ''
+        }));
+    }
+
+    function getResourceAssignmentStats(resourceId, studentFilterIds = null) {
+      const assignments = getResourceAssignments(resourceId, studentFilterIds);
+      const total = assignments.length;
+      const completed = assignments.filter(a => a.status === 'Completed').length;
+      const inProgress = assignments.filter(a => a.status === 'In progress').length;
+      const todo = assignments.filter(a => a.status === 'To do').length;
+      return { total, completed, inProgress, todo };
+    }
+
+    function openResourceLink(resourceId) {
+      const res = getResourceById(resourceId);
+      const url = getResourceOpenUrl(res);
+      if (!url) {
+        alert('No link available for this resource.');
+        return;
+      }
+      window.open(url, '_blank');
+    }
+
+    function copyResourceLink(resourceId) {
+      const res = getResourceById(resourceId);
+      const url = getResourceOpenUrl(res);
+      if (!url) {
+        alert('No link available for this resource.');
+        return;
+      }
+      navigator.clipboard?.writeText(url).then(() => {
+        alert('Resource link copied.');
+      }).catch(() => {
+        prompt('Copy this link:', url);
+      });
+    }
+
+    function assignResourceToStudents(resourceId, studentIds, dueDate) {
+      if (!resourceId || !studentIds?.length) return;
+      const today = new Date().toISOString().slice(0, 10);
+      studentIds.forEach(stuId => {
+        state.homework.push({
+          id: generateId('hw'),
+          studentId: stuId,
+          resourceId,
+          status: 'To do',
+          dueDate,
+          assignedDate: today
+        });
+      });
+      saveState();
+      renderResourcesView();
+      if (selectedStudentId) {
+        renderStudentTimeline(selectedStudentId);
+      }
     }
 
     function toggleResourceFavorite(resourceId) {
@@ -8055,7 +8334,7 @@
       renderResourcesView();
     }
 
-    function renderHomeworkBoard() {
+    function renderHomeworkBoard(studentFilterIds = null, readOnly = false) {
       const todo = document.getElementById('hwTodo');
       const doing = document.getElementById('hwInProgress');
       const done = document.getElementById('hwDone');
@@ -8067,7 +8346,10 @@
         'Completed': []
       };
 
-      state.homework.forEach(hw => {
+      const filteredHomework = studentFilterIds && studentFilterIds.length
+        ? state.homework.filter(hw => studentFilterIds.includes(hw.studentId))
+        : state.homework;
+      filteredHomework.forEach(hw => {
         const res = state.resources.find(r => r.id === hw.resourceId);
         const student = getStudentById(hw.studentId);
         if (!res || !student) return;
@@ -8083,6 +8365,7 @@
           <div class="font-medium">${hw.res.title}</div>
           <div class="text-[10px] text-slate-500">${hw.student.name} • Due ${hw.dueDate || 'n/a'}</div>
           <select class="mt-1 w-full border border-slate-300 rounded-lg px-1 py-0.5 text-[10px]"
+                  ${readOnly ? 'disabled' : ''}
                   onchange="updateHomeworkStatus('${hw.id}', this.value)">
             <option value="To do" ${hw.status === 'To do' ? 'selected' : ''}>To do</option>
             <option value="In progress" ${hw.status === 'In progress' ? 'selected' : ''}>In progress</option>
@@ -8097,6 +8380,7 @@
     }
 
     function updateHomeworkStatus(hwId, status) {
+      if (readOnlyMode || studentMode || parentMode) return;
       const hw = state.homework.find(h => h.id === hwId);
       if (!hw) return;
       hw.status = status;
@@ -9017,6 +9301,29 @@ Best regards,
             <input name="tags" value="${(resource?.tags || []).join(', ')}"
                    class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
           </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] mb-1">Resource type</label>
+              <select name="resourceType" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+                <option value="" ${!resource?.resourceType ? 'selected' : ''}>General</option>
+                <option value="Worksheet" ${resource?.resourceType === 'Worksheet' ? 'selected' : ''}>Worksheet</option>
+                <option value="Video" ${resource?.resourceType === 'Video' ? 'selected' : ''}>Video</option>
+                <option value="Notes" ${resource?.resourceType === 'Notes' ? 'selected' : ''}>Notes</option>
+                <option value="Past paper" ${resource?.resourceType === 'Past paper' ? 'selected' : ''}>Past paper</option>
+                <option value="Link" ${resource?.resourceType === 'Link' ? 'selected' : ''}>Link</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] mb-1">Estimated minutes</label>
+              <input type="number" min="0" name="estimatedMinutes" value="${resource?.estimatedMinutes || ''}"
+                     class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="e.g. 30">
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">External link (optional)</label>
+            <input name="linkUrl" value="${resource?.linkUrl || ''}"
+                   class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="https://">
+          </div>
           <div>
             <label class="block text-[11px] mb-1">Description / location</label>
             <textarea name="description" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${resource?.description || ''}</textarea>
@@ -9054,6 +9361,9 @@ Best regards,
             subject: form.subject.value,
             level: form.level.value.trim(),
             tags: form.tags.value.split(',').map(t => t.trim()).filter(Boolean),
+            resourceType: form.resourceType.value,
+            estimatedMinutes: Number(form.estimatedMinutes.value || 0) || null,
+            linkUrl: form.linkUrl.value.trim(),
             description: form.description.value.trim(),
             createdAt: resource?.createdAt || new Date().toISOString().slice(0, 10),
             storage_path: resource?.storage_path || '',
@@ -9220,18 +9530,7 @@ Best regards,
             return;
           }
           const dueDate = form.dueDate.value;
-          const today = new Date().toISOString().slice(0, 10);
-          ids.forEach(stuId => {
-            state.homework.push({
-              id: generateId('hw'),
-              studentId: stuId,
-              resourceId,
-              status: 'To do',
-              dueDate,
-              assignedDate: today
-            });
-          });
-          saveState();
+          assignResourceToStudents(resourceId, ids, dueDate);
           closeModal();
           renderResourcesView();
           if (selectedStudentId) {
