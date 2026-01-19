@@ -8338,21 +8338,15 @@
       });
       saveState();
       if (isSupabaseReady()) {
-        const uid = supabaseSession?.user?.id;
-        if (uid) {
-          const rows = newAssignments.map(hw => ({
-            id: cleanId(hw.id),
-            user_id: uid,
-            student_id: cleanId(hw.studentId),
-            resource_id: cleanId(hw.resourceId),
-            status: hw.status,
-            due_date: hw.dueDate,
-            assigned_date: hw.assignedDate
-          }));
-          supabaseClient.from('homework').upsert(rows).then(({ error }) => {
-            if (error) console.error('Homework assignment failed', error);
-          }).catch(err => console.error('Homework assignment failed', err));
-        }
+        const token = supabaseSession?.access_token || SUPABASE_ANON_KEY;
+        supabaseClient.functions.invoke('assign-homework', {
+          body: { assignments: newAssignments },
+          headers: { Authorization: `Bearer ${token}` }
+        }).then(({ error, data }) => {
+          if (error || data?.error) {
+            console.error('Homework assignment failed', error || data?.error);
+          }
+        }).catch(err => console.error('Homework assignment failed', err));
       }
       renderResourcesView();
       if (selectedStudentId) {
