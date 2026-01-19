@@ -3373,6 +3373,7 @@
       window.getResourceById = getResourceById;
       window.openAssignResourceModal = openAssignResourceModal;
       window.updateHomeworkStatus = updateHomeworkStatus;
+      window.unassignHomework = unassignHomework;
       window.openResourceLink = openResourceLink;
       window.copyResourceLink = copyResourceLink;
       window.openDocumentModal = openDocumentModal;
@@ -3761,7 +3762,8 @@
         `).join('') : '<li class="text-slate-500 text-xs">No sessions in the next 14 days.</li>';
       }
 
-      const myHw = state.homework.filter(hw => hw.studentId === student.id && hw.status !== 'Completed');
+      const allHw = state.homework.filter(hw => hw.studentId === student.id);
+      const myHw = allHw.filter(hw => hw.status !== 'Completed');
       if (hwUl) {
         hwUl.innerHTML = myHw.length ? myHw.map(hw => {
           const res = getResourceById(hw.resourceId);
@@ -3795,7 +3797,7 @@
       }
 
       // Resources assigned via homework
-      const resourceIds = new Set(myHw.map(hw => hw.resourceId));
+      const resourceIds = new Set(allHw.map(hw => hw.resourceId));
       const myRes = state.resources.filter(r => resourceIds.has(r.id));
       if (resUl) {
         resUl.innerHTML = myRes.length ? myRes.map(r => `
@@ -5349,10 +5351,16 @@
         return out;
       }
 
-      if (sessionLoginCode) {
+      const shouldUseSnapshot = !!sessionLoginCode || sessionRole === 'student' || sessionRole === 'parent';
+      if (shouldUseSnapshot) {
         try {
+          const body = {};
+          if (sessionLoginCode) body.code = sessionLoginCode;
+          if (sessionRole) body.role = sessionRole;
+          if (sessionStudentId) body.studentId = sessionStudentId;
+          if (sessionParentId) body.parentId = sessionParentId;
           const { data: snapshot, error: snapErr } = await supabaseClient.functions.invoke('portal-snapshot', {
-            body: { code: sessionLoginCode, role: sessionRole },
+            body,
             headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
           });
           if (snapErr) throw snapErr;
@@ -5360,8 +5368,7 @@
             return await mapSnapshotToState(snapshot);
           }
         } catch (err) {
-          console.warn('Portal snapshot fetch failed; using local cache to avoid CORS issues', err);
-          return loadState();
+          console.warn('Portal snapshot fetch failed; falling back to direct queries', err);
         }
       }
 
@@ -8371,13 +8378,17 @@
         return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/85">
           <div class="font-medium">${hw.res.title}</div>
           <div class="text-[10px] text-slate-500">${hw.student.name} • Due ${hw.dueDate || 'n/a'}</div>
-          <select class="mt-1 w-full border border-slate-300 rounded-lg px-1 py-0.5 text-[10px]"
-                  ${readOnly ? 'disabled' : ''}
-                  onchange="updateHomeworkStatus('${hw.id}', this.value)">
-            <option value="To do" ${hw.status === 'To do' ? 'selected' : ''}>To do</option>
-            <option value="In progress" ${hw.status === 'In progress' ? 'selected' : ''}>In progress</option>
-            <option value="Completed" ${hw.status === 'Completed' ? 'selected' : ''}>Completed</option>
-          </select>
+          <div class="mt-1 flex items-center gap-2">
+            <select class="w-full border border-slate-300 rounded-lg px-1 py-0.5 text-[10px]"
+                    ${readOnly ? 'disabled' : ''}
+                    onchange="updateHomeworkStatus('${hw.id}', this.value)">
+              <option value="To do" ${hw.status === 'To do' ? 'selected' : ''}>To do</option>
+              <option value="In progress" ${hw.status === 'In progress' ? 'selected' : ''}>In progress</option>
+              <option value="Completed" ${hw.status === 'Completed' ? 'selected' : ''}>Completed</option>
+            </select>
+            ${readOnly ? '' : `<button class="px-2 py-0.5 text-[10px] rounded-lg border border-slate-300 hover:bg-slate-50"
+                    onclick="unassignHomework('${hw.id}')">Unassign</button>`}
+          </div>
         </li>`;
       }
 
@@ -8395,6 +8406,33 @@
       renderResourcesView();
       if (selectedStudentId) {
         renderStudentTimeline(selectedStudentId);
+      }
+    }
+
+    function unassignHomework(hwId) {
+      if (readOnlyMode || studentMode || parentMode) return;
+      const idx = state.homework.findIndex(h => h.id === hwId);
+      if (idx === -1) return;
+      const hw = state.homework[idx];
+      const res = getResourceById(hw.resourceId);
+      const student = getStudentById(hw.studentId);
+      const label = `${res?.title || 'resource'} for ${student?.name || 'student'}`;
+      if (!confirm(`Unassign ${label}?`)) return;
+      state.homework.splice(idx, 1);
+      saveState();
+      renderResourcesView();
+      if (selectedStudentId) {
+        renderStudentTimeline(selectedStudentId);
+      }
+      if (isSupabaseReady()) {
+        supabaseClient
+          .from('homework')
+          .delete()
+          .eq('id', hwId)
+          .then(({ error }) => {
+            if (error) console.warn('Homework delete failed', error);
+          })
+          .catch(err => console.warn('Homework delete failed', err));
       }
     }
 
