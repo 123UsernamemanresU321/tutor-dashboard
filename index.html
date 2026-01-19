@@ -8323,17 +8323,37 @@
     function assignResourceToStudents(resourceId, studentIds, dueDate) {
       if (!resourceId || !studentIds?.length) return;
       const today = new Date().toISOString().slice(0, 10);
-      studentIds.forEach(stuId => {
-        state.homework.push({
-          id: generateId('hw'),
+      const newAssignments = studentIds.map(stuId => {
+        const id = crypto?.randomUUID ? crypto.randomUUID() : generateId('hw');
+        const hw = {
+          id,
           studentId: stuId,
           resourceId,
           status: 'To do',
           dueDate,
           assignedDate: today
-        });
+        };
+        state.homework.push(hw);
+        return hw;
       });
       saveState();
+      if (isSupabaseReady()) {
+        const uid = supabaseSession?.user?.id;
+        if (uid) {
+          const rows = newAssignments.map(hw => ({
+            id: cleanId(hw.id),
+            user_id: uid,
+            student_id: cleanId(hw.studentId),
+            resource_id: cleanId(hw.resourceId),
+            status: hw.status,
+            due_date: hw.dueDate,
+            assigned_date: hw.assignedDate
+          }));
+          supabaseClient.from('homework').upsert(rows).then(({ error }) => {
+            if (error) console.error('Homework assignment failed', error);
+          }).catch(err => console.error('Homework assignment failed', err));
+        }
+      }
       renderResourcesView();
       if (selectedStudentId) {
         renderStudentTimeline(selectedStudentId);
