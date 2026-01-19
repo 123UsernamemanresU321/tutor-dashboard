@@ -1342,7 +1342,7 @@
               <div class="card p-4 space-y-2">
                 <div class="flex items-center justify-between">
                   <h3 class="text-sm font-semibold">Upcoming sessions</h3>
-                  <span class="hint">Next 14 days</span>
+                  <span class="hint">All upcoming</span>
                 </div>
                 <ul id="portalSessions" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
               </div>
@@ -3725,13 +3725,12 @@
         return;
       }
       const now = new Date();
-      const soon = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
       const mySessions = state.sessions.filter(s => s.studentIds.includes(student.id))
         .filter(s => {
           const d = new Date(s.date + 'T' + (s.startTime || '00:00'));
-          return d >= now && d <= soon;
+          return d >= now;
         })
-        .sort((a, b) => new Date(a.date) - new Date(b.date));
+        .sort((a, b) => new Date(a.date + 'T' + (a.startTime || '00:00')) - new Date(b.date + 'T' + (b.startTime || '00:00')));
       if (sessionsUl) {
         sessionsUl.innerHTML = mySessions.length ? mySessions.map(s => `
           <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
