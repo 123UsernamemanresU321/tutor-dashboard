@@ -1852,13 +1852,20 @@
     }
 
     function toDateOnly(d) {
-      return d.toISOString().slice(0, 10);
+      const dt = new Date(d);
+      const year = dt.getFullYear();
+      const month = String(dt.getMonth() + 1).padStart(2, '0');
+      const day = String(dt.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
 
     function parseDateOnly(value) {
       if (!value) return null;
-      const parsed = new Date(value);
-      if (Number.isNaN(parsed.getTime())) return null;
+      const parts = String(value).split('-').map(Number);
+      if (parts.length !== 3) return null;
+      const [year, month, day] = parts;
+      if (!year || !month || !day) return null;
+      const parsed = new Date(year, month - 1, day);
       parsed.setHours(0, 0, 0, 0);
       return parsed;
     }
@@ -7368,7 +7375,7 @@
       const label = document.getElementById('scheduleWeekLabel');
       const end = new Date(currentWeekStart);
       end.setDate(end.getDate() + 6);
-      label.textContent = `${currentWeekStart.toISOString().slice(0, 10)} – ${end.toISOString().slice(0, 10)}`;
+      label.textContent = `${toDateOnly(currentWeekStart)} – ${toDateOnly(end)}`;
 
       const grid = document.getElementById('scheduleCalendarGrid');
       const dayLoadRow = document.getElementById('dayLoadRow');
@@ -7377,7 +7384,7 @@
       for (let i = 0; i < 7; i++) {
         const day = new Date(currentWeekStart);
         day.setDate(day.getDate() + i);
-        const isoDate = day.toISOString().slice(0, 10);
+        const isoDate = toDateOnly(day);
         const sessions = scheduleSessions.filter(s => s.date === isoDate);
         const totalHours = sessions.reduce((acc, s) => acc + Number(s.durationHours || 0), 0);
         dayLoads.push({ totalHours, dayName: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i] });
@@ -7439,7 +7446,7 @@
       const exportBtn = document.getElementById('exportIcsBtn');
       if (exportBtn) exportBtn.onclick = downloadIcsFile;
 
-      const todayIso = new Date().toISOString().slice(0, 10);
+      const todayIso = toDateOnly(new Date());
       const todayList = document.getElementById('todaySessionsList');
       const todaySessions = scheduleSessions.filter(s => s.date === todayIso)
         .sort((a, b) => (a.startTime || '00:00').localeCompare(b.startTime || '00:00'));
