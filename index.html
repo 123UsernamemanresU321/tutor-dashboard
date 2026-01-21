@@ -9422,10 +9422,11 @@ Best regards,
       });
     }
 
-    async function deleteSessionAndLinks(sessionId) {
+    async function deleteSessionAndLinks(sessionId, opts = {}) {
+      const skipCancellation = !!opts.skipCancellation;
       // remove locally
       const sess = getSessionById(sessionId);
-      if (sess) {
+      if (sess && !skipCancellation) {
         const start = new Date(sess.date + 'T' + (sess.startTime || '00:00'));
         recordSessionCancellation(sess, 'cancelled');
       }
@@ -9968,6 +9969,23 @@ Best regards,
           <p class="text-[10px] text-slate-500">
             Tip: set a base amount, tick “Apply” on late/short notice fees, and we’ll recalc the total automatically.
           </p>
+          ${isEdit ? `
+            <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50/70 p-2">
+              <div class="text-[11px] font-medium text-amber-900">Fix scheduling error</div>
+              <div class="text-[10px] text-amber-800">
+                If auto-scheduling ran on the wrong invoice, you can rebuild the correct sessions from the student schedule.
+                This will reassign matching sessions to this invoice and remove any linked sessions that are outside the schedule.
+              </div>
+              <button type="button" id="rebuildInvoiceSessionsBtn"
+                class="mt-2 px-2 py-1 rounded-lg border border-amber-300 text-amber-900 text-[11px] hover:bg-amber-100">
+                Rebuild sessions from schedule
+              </button>
+              <button type="button" id="fixInvoiceScheduleBtn"
+                class="mt-2 ml-2 px-2 py-1 rounded-lg border border-amber-300 text-amber-900 text-[11px] hover:bg-amber-100">
+                Void invoice and remove linked sessions
+              </button>
+            </div>
+          ` : ''}
           <div class="flex justify-between items-center mt-3">
             <button type="submit" class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-medium">
               ${isEdit ? 'Save invoice' : 'Create invoice'}
@@ -10154,6 +10172,160 @@ Best regards,
             saveState();
           }
         };
+
+        const rebuildBtn = document.getElementById('rebuildInvoiceSessionsBtn');
+        if (rebuildBtn && inv) {
+          rebuildBtn.onclick = async () => {
+            const student = getStudentById(inv.studentId);
+            if (!student) {
+              alert('Student not found for this invoice.');
+              return;
+            }
+            const prefs = getSchedulePrefs(student);
+            if (!prefs.scheduleSlots.length) {
+              alert('This student does not have a schedule set.');
+              return;
+            }
+            const serviceStart = parseDateOnly(inv.servicePeriodStart || inv.service_period_start);
+            const serviceEnd = parseDateOnly(inv.servicePeriodEnd || inv.service_period_end);
+            if (!serviceStart || !serviceEnd) {
+              alert('This invoice is missing a service period.');
+              return;
+            }
+            const paidAtDate = inv.paid ? (parseDateOnly(inv.paidAt || inv.paid_at) || new Date()) : null;
+            const scheduleStart = inv.paid ? maxDate(serviceStart, paidAtDate) : serviceStart;
+            const occurrences = listScheduleOccurrences(prefs.scheduleSlots, scheduleStart, serviceEnd);
+            const expectedKeys = new Set();
+            occurrences.forEach(occ => {
+              const slotTime = normalizeTimeValue(occ.slot.startTime || '');
+              const key = `${student.id}|${occ.date}|${slotTime}`;
+              expectedKeys.add(key);
+            });
+            const linked = state.sessions.filter(s => s.invoiceId === inv.id && s.studentIds.includes(student.id));
+            const removeCount = linked.filter(s => {
+              const key = `${student.id}|${s.date}|${normalizeTimeValue(s.startTime || '')}`;
+              return !expectedKeys.has(key);
+            }).length;
+            const confirmMsg = `Rebuild sessions for invoice ${inv.id}? This will reassign matching sessions and remove ${removeCount} linked session${removeCount === 1 ? '' : 's'} outside the schedule.`;
+            if (!confirm(confirmMsg)) return;
+
+            let changed = false;
+            const existingByKey = new Map();
+            state.sessions.forEach(s => {
+              if (!s.studentIds.includes(student.id)) return;
+              const key = `${student.id}|${s.date}|${normalizeTimeValue(s.startTime || '')}`;
+              if (!existingByKey.has(key)) existingByKey.set(key, s);
+            });
+
+            occurrences.forEach(occ => {
+              const slot = occ.slot;
+              const slotTime = normalizeTimeValue(slot.startTime || '');
+              if (!slotTime) return;
+              const key = `${student.id}|${occ.date}|${slotTime}`;
+              const durationHours = Number(slot.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1);
+              const existing = existingByKey.get(key);
+              if (existing) {
+                if (existing.invoiceId !== inv.id) {
+                  existing.invoiceId = inv.id;
+                  changed = true;
+                }
+                if (Number(existing.durationHours || 0) !== durationHours) {
+                  existing.durationHours = durationHours;
+                  changed = true;
+                }
+                return;
+              }
+              state.sessions.push({
+                id: generateId('sess'),
+                studentIds: [student.id],
+                date: occ.date,
+                startTime: slotTime,
+                durationHours,
+                subject: student.subjects?.[0] || 'Tutoring',
+                topic: 'Auto-scheduled session',
+                notes: '',
+                completed: false,
+                invoiceId: inv.id
+              });
+              changed = true;
+            });
+
+            const toRemove = state.sessions.filter(s => {
+              if (s.invoiceId !== inv.id) return false;
+              if (!s.studentIds.includes(student.id)) return false;
+              const key = `${student.id}|${s.date}|${normalizeTimeValue(s.startTime || '')}`;
+              return !expectedKeys.has(key);
+            });
+
+            try {
+              for (const sess of toRemove) {
+                await deleteSessionAndLinks(sess.id, { skipCancellation: true });
+                changed = true;
+              }
+              if (changed) {
+                const idx = state.invoices.findIndex(i => i.id === inv.id);
+                if (idx >= 0) {
+                  state.invoices[idx] = { ...state.invoices[idx], numSessions: occurrences.length };
+                  if (isSupabaseReady()) {
+                    await upsertInvoiceRemote(state.invoices[idx]);
+                  }
+                }
+                saveState();
+                renderFinanceView();
+                renderScheduleView();
+                renderStudentsView();
+                if (selectedStudentId) renderStudentFinance(selectedStudentId);
+                alert('Sessions rebuilt for this invoice.');
+              } else {
+                alert('No changes needed for this invoice.');
+              }
+            } catch (err) {
+              console.error('Rebuild sessions failed', err);
+              alert('Rebuild failed: ' + (err?.message || err));
+            }
+          };
+        }
+
+        const fixBtn = document.getElementById('fixInvoiceScheduleBtn');
+        if (fixBtn && inv) {
+          fixBtn.onclick = async () => {
+            const linked = state.sessions.filter(s => s.invoiceId === inv.id);
+            const count = linked.length;
+            const confirmMsg = `This will void invoice ${inv.id} and permanently delete ${count} linked session${count === 1 ? '' : 's'}. Continue?`;
+            if (!confirm(confirmMsg)) return;
+            const nowIso = new Date().toISOString();
+            const note = `Voided due to scheduling error on ${nowIso.slice(0, 10)}.`;
+            const updated = {
+              ...inv,
+              invoiceStatus: 'void',
+              voidedAt: nowIso,
+              paid: false,
+              paidAt: '',
+              paymentMethod: '',
+              notes: [inv.notes, note].filter(Boolean).join(' | ')
+            };
+            try {
+              if (isSupabaseReady()) {
+                await upsertInvoiceRemote(updated);
+              }
+              for (const sess of linked) {
+                await deleteSessionAndLinks(sess.id, { skipCancellation: true });
+              }
+              const idx = state.invoices.findIndex(i => i.id === inv.id);
+              if (idx >= 0) state.invoices[idx] = updated;
+              saveState();
+              closeModal();
+              renderFinanceView();
+              renderScheduleView();
+              renderStudentsView();
+              if (selectedStudentId) renderStudentFinance(selectedStudentId);
+              alert('Invoice voided and linked sessions removed.');
+            } catch (err) {
+              console.error('Fix scheduling error failed', err);
+              alert('Fix failed: ' + (err?.message || err));
+            }
+          };
+        }
 
         if (isEdit) {
           document.getElementById('deleteInvoiceBtn').onclick = async () => {
