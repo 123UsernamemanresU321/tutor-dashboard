@@ -9427,17 +9427,7 @@ Best regards,
       const sess = getSessionById(sessionId);
       if (sess) {
         const start = new Date(sess.date + 'T' + (sess.startTime || '00:00'));
-        const diffMs = start - new Date();
-        if (diffMs >= 24 * 60 * 60 * 1000) {
-          try {
-            await requestRefundForSession(sess);
-          } catch (err) {
-            console.error('Refund failed', err);
-            alert(err?.message || 'Refund failed. Session was not cancelled.');
-            return;
-          }
-        }
-        recordSessionCancellation(sess, diffMs >= 24 * 60 * 60 * 1000 ? 'refund' : 'cancelled');
+        recordSessionCancellation(sess, 'cancelled');
       }
       state.sessions = state.sessions.filter(s => s.id !== sessionId);
       saveState();
