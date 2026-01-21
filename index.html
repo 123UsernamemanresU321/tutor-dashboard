@@ -1506,8 +1506,12 @@
               </div>
             </div>
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
-              <div class="card p-4 space-y-2">
+              <div class="card p-4 space-y-2" id="parentInvoicesCard">
                 <h3 class="text-sm font-semibold">Invoices</h3>
+                <div id="parentInvoiceAlert" class="hidden rounded-lg border border-amber-200 bg-amber-50/70 p-2">
+                  <div class="text-[11px] font-medium text-amber-900">Payment needed to schedule lessons</div>
+                  <div class="text-[10px] text-amber-800">Tap a “Pay now” button below to confirm payment.</div>
+                </div>
                 <ul id="parentInvoices" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
                 <p id="parentInvoiceDisclosure" class="text-[10px] text-slate-500" data-merchant-receipt></p>
               </div>
@@ -4126,7 +4130,7 @@
           const contractClass = signed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700';
           const contractAction = signed
             ? '<button class="px-2 py-1 rounded-lg border border-slate-300 opacity-60 cursor-not-allowed" disabled>Contract signed</button>'
-            : `<button class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50" onclick="copyContractLink('${s.id}')">Copy contract link</button>`;
+            : `<button class="px-2 py-1 rounded-lg bg-amber-500 text-white border border-amber-500 hover:bg-amber-600 shadow-sm" onclick="openContractLink('${s.id}')">Sign contract</button>`;
           return `
             <li class="border border-slate-200 rounded-lg px-3 py-2 bg-white/80 space-y-1" data-student-id="${s.id}">
               <div class="flex items-center justify-between">
@@ -4169,6 +4173,10 @@
         !isInvoiceVoid(inv) &&
         (inv.invoiceType || inv.invoice_type) !== 'refund'
       );
+      const invoiceAlert = document.getElementById('parentInvoiceAlert');
+      if (invoiceAlert) {
+        invoiceAlert.classList.toggle('hidden', pendingInvoices.length === 0);
+      }
       const guideKey = `parent_guide_dismissed_${parent?.id || getSessionEmail() || 'session'}`;
       const guideDismissed = localStorage.getItem(guideKey) === '1';
       const showGuide = (unsignedStudents.length || pendingInvoices.length) && !guideDismissed;
@@ -4185,11 +4193,12 @@
                 ${unsignedStudents.map(s => `
                   <li class="flex items-center justify-between gap-2">
                     <span>${s.name}</span>
-                    <button class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50 text-[10px]"
-                      onclick="copyContractLink('${s.id}')">Copy contract link</button>
+                    <button class="px-2 py-1 rounded-lg bg-amber-500 text-white border border-amber-500 hover:bg-amber-600 text-[10px] shadow-sm"
+                      onclick="openContractLink('${s.id}')">Open & sign</button>
                   </li>
                 `).join('')}
               </ul>
+              <div class="mt-1 text-[10px] text-slate-500">Signing opens in a new tab so you can return here easily.</div>
             </div>
           ` : `
             <div class="border border-slate-200 rounded-lg p-2 bg-white/80">
@@ -4206,12 +4215,14 @@
                   return `
                     <li class="flex items-center justify-between gap-2">
                       <span>${stu?.name || 'Student'} • ${inv.dueDate || 'n/a'} • R ${Number(inv.total || 0).toFixed(2)}</span>
-                      <button class="px-2 py-1 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-[10px]"
+                      <button class="px-2 py-1 rounded-lg bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700 text-[10px] shadow-sm"
                         onclick="startPayfastPayment('${inv.id}')">Pay now</button>
                     </li>
                   `;
                 }).join('')}
               </ul>
+              <button class="mt-2 px-2 py-1 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-[10px]"
+                onclick="scrollToParentInvoices()">Go to invoices</button>
             </div>
           ` : `
             <div class="border border-slate-200 rounded-lg p-2 bg-white/80">
@@ -4310,7 +4321,7 @@
             </div>
             <div class="flex flex-wrap gap-2 mt-1 text-[10px]">
               <button id="btn-inv-${inv.id}" class="px-2 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50" onclick="explainInvoiceAI('${inv.id}')">Explain with AI</button>
-              ${!inv.paid && !isInvoiceVoid(inv) && (inv.invoiceType || inv.invoice_type) !== 'refund' ? `<button class="px-2 py-1 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50" onclick="startPayfastPayment('${inv.id}')">Pay Now</button>` : ''}
+              ${!inv.paid && !isInvoiceVoid(inv) && (inv.invoiceType || inv.invoice_type) !== 'refund' ? `<button class="px-2 py-1 rounded-lg bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700 shadow-sm" onclick="startPayfastPayment('${inv.id}')">Pay Now</button>` : ''}
             </div>
             <div id="ai-invoice-${inv.id}" class="text-[10px] text-slate-600 whitespace-pre-wrap"></div>
           </li>`;
@@ -5947,42 +5958,58 @@
       presenceMap = new Map();
     }
 
-    async function copyContractLink(studentId) {
+    async function buildContractSigningLink(studentId) {
       const basePath = window.location.pathname.replace(/[^/]*$/, '');
       const student = getStudentById(studentId);
       if (student?.contractSigned) {
-        alert('Contract already signed. No link is needed.');
-        return;
+        throw new Error('Contract already signed. No link is needed.');
+      }
+      if (!isSupabaseReady()) {
+        throw new Error('Unable to generate signing link while offline. Please try again when connected.');
       }
       const studentName = student?.name ? `&student_name=${encodeURIComponent(student.name)}` : '';
-      if (!isSupabaseReady()) {
-        alert('Unable to generate signing link while offline. Please try again when connected.');
-        return;
-      }
-
-      let token = '';
       const parentProfile = parentMode ? getParentProfileBySession() : null;
+      const { data, error } = await supabaseClient.functions.invoke('issue-contract-sign-token', {
+        body: { student_id: studentId, parent_email: parentProfile?.email || student?.parentEmail || null },
+        headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
+      });
+      if (error || !data?.token) {
+        throw new Error(data?.error || error?.message || 'Failed to issue signing link');
+      }
+      return `${window.location.origin}${basePath}contract-sign.html?student_id=${encodeURIComponent(studentId)}&v=v1&token=${encodeURIComponent(data.token)}${studentName}`;
+    }
+
+    async function copyContractLink(studentId) {
       try {
-        const { data, error } = await supabaseClient.functions.invoke('issue-contract-sign-token', {
-          body: { student_id: studentId, parent_email: parentProfile?.email || student?.parentEmail || null },
-          headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
+        const link = await buildContractSigningLink(studentId);
+        navigator.clipboard?.writeText(link).then(() => {
+          alert('Parent signing link copied to clipboard.');
+        }).catch(() => {
+          prompt('Copy this link:', link);
         });
-        if (error || !data?.token) {
-          throw new Error(data?.error || error?.message || 'Failed to issue signing link');
-        }
-        token = data.token;
       } catch (err) {
         console.warn('issue-contract-sign-token failed', err);
-        alert('Unable to generate signing link. Please try again.');
-        return;
+        alert(err?.message || 'Unable to generate signing link. Please try again.');
       }
+    }
 
-      const link = `${window.location.origin}${basePath}contract-sign.html?student_id=${encodeURIComponent(studentId)}&v=v1&token=${encodeURIComponent(token)}${studentName}`;
-      navigator.clipboard?.writeText(link).then(() => {
-        alert('Parent signing link copied to clipboard.');
-      }).catch(() => {
-        prompt('Copy this link:', link);
-      });
+    async function openContractLink(studentId) {
+      try {
+        const link = await buildContractSigningLink(studentId);
+        const win = window.open(link, '_blank', 'noopener');
+        navigator.clipboard?.writeText(link).catch(() => {});
+        if (!win) {
+          prompt('Pop-up blocked. Copy this link:', link);
+        }
+      } catch (err) {
+        console.warn('issue-contract-sign-token failed', err);
+        alert(err?.message || 'Unable to generate signing link. Please try again.');
+      }
+    }
+
+    function scrollToParentInvoices() {
+      const target = document.getElementById('parentInvoicesCard');
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     function renderAllViews() {
