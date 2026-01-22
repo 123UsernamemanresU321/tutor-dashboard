@@ -1348,7 +1348,11 @@
             </div>
             <div id="portalBlocker"
               class="hidden border border-rose-300 bg-rose-50 text-rose-800 rounded-lg px-3 py-2 text-xs">
-              INVALID – CONTRACT NOT SIGNED. Ask your parent/guardian to sign the contract to unlock this portal.
+              <div>INVALID – CONTRACT NOT SIGNED. Ask your parent/guardian to sign the contract to unlock this portal.</div>
+              <button id="portalCheckContractBtn"
+                class="mt-2 px-2 py-1 rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-100 text-[10px]">
+                Refresh contract status
+              </button>
             </div>
 
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
@@ -3763,6 +3767,11 @@
         portalBlocker.classList.toggle('hidden', signed);
       }
       if (!signed) {
+        const checkBtn = document.getElementById('portalCheckContractBtn');
+        if (checkBtn) {
+          checkBtn.onclick = () => startContractStatusWatch([student.id], { maxMs: 120000 });
+        }
+        startContractStatusWatch([student.id], { maxMs: 120000 });
         const msg = '<li class="text-slate-500 text-xs">Contract not signed yet.</li>';
         if (sessionsUl) sessionsUl.innerHTML = msg;
         if (hwUl) hwUl.innerHTML = msg;
@@ -4114,6 +4123,11 @@
     function renderParentPortal() {
       const parent = tourMode ? getTourParent() : getParentProfileBySession();
       const students = tourMode && parent ? getParentLinkedStudents(parent.id) : getChildrenForParent();
+      let contractUpdated = false;
+      students.forEach(s => {
+        if (ensureStudentContractState(s)) contractUpdated = true;
+      });
+      if (contractUpdated) saveState();
       const editProfileBtn = document.getElementById('parentEditProfileBtn');
       if (editProfileBtn) editProfileBtn.onclick = () => openParentSelfProfileModal(parent);
       updateParentProfilePrompt(parent);
@@ -4750,22 +4764,27 @@
     }
 
     function getStudentProfileBySession() {
+      let candidate = null;
       const studentId = getSessionStudentId();
       if (studentId) {
-        const byId = state.students.find(s => s.id === studentId);
-        if (byId) return byId;
+        candidate = state.students.find(s => s.id === studentId) || null;
       }
-      const loginCode = getSessionLoginCode();
-      if (loginCode) {
-        const byCode = state.students.find(s => normalizeCode(s.loginCode || s.login_code || '') === loginCode);
-        if (byCode) return byCode;
+      if (!candidate) {
+        const loginCode = getSessionLoginCode();
+        if (loginCode) {
+          candidate = state.students.find(s => normalizeCode(s.loginCode || s.login_code || '') === loginCode) || null;
+        }
       }
-      const email = getSessionEmail();
-      if (email) {
-        const byEmail = state.students.find(s => (s.studentEmail || '').toLowerCase() === email);
-        if (byEmail) return byEmail;
+      if (!candidate) {
+        const email = getSessionEmail();
+        if (email) {
+          candidate = state.students.find(s => (s.studentEmail || '').toLowerCase() === email) || null;
+        }
       }
-      return null;
+      if (candidate && ensureStudentContractState(candidate)) {
+        saveState();
+      }
+      return candidate;
     }
 
     function getTourStudent() {
@@ -4972,6 +4991,45 @@
       }
       state = loadState();
       updateReadOnlyUI();
+    }
+
+    const contractWatchTimers = new Map();
+    function startContractStatusWatch(studentIds = [], opts = {}) {
+      if (!supabaseAvailable) return;
+      const ids = [...new Set((studentIds || []).map(cleanId).filter(Boolean))];
+      if (!ids.length) return;
+      const key = ids.join('|');
+      if (contractWatchTimers.has(key)) return;
+      const maxMs = Number(opts.maxMs || 120000);
+      const intervalMs = Number(opts.intervalMs || 10000);
+      const startedAt = Date.now();
+
+      const stop = () => {
+        const timer = contractWatchTimers.get(key);
+        if (timer) clearInterval(timer);
+        contractWatchTimers.delete(key);
+      };
+
+      const tick = async () => {
+        try {
+          await tryLoadRemoteThenLocal();
+          renderAllViews();
+          const allSigned = ids.every(id => {
+            const stu = getStudentById(id);
+            return stu && (stu.contractSigned || getLatestSignature(id) || state.contracts.some(c => c.studentId === id && c.status === 'Signed'));
+          });
+          if (allSigned || Date.now() - startedAt > maxMs) {
+            stop();
+          }
+        } catch (err) {
+          console.warn('Contract status refresh failed', err);
+          if (Date.now() - startedAt > maxMs) stop();
+        }
+      };
+
+      tick();
+      const timer = setInterval(tick, intervalMs);
+      contractWatchTimers.set(key, timer);
     }
 
     async function loadStateFromSupabase() {
@@ -5998,6 +6056,7 @@
         const link = await buildContractSigningLink(studentId);
         const win = window.open(link, '_blank', 'noopener');
         navigator.clipboard?.writeText(link).catch(() => {});
+        startContractStatusWatch([studentId], { maxMs: 180000 });
         if (!win) {
           prompt('Pop-up blocked. Copy this link:', link);
         }
@@ -6400,6 +6459,22 @@
         .filter(cs => cs.studentId === studentId)
         .sort((a, b) => new Date(b.signedAt || 0) - new Date(a.signedAt || 0));
       return sigs[0] || null;
+    }
+
+    function ensureStudentContractState(student) {
+      if (!student) return false;
+      if (student.contractSigned) return false;
+      const latestSig = getLatestSignature(student.id);
+      const contractEntry = state.contracts.find(c => c.studentId === student.id && c.status === 'Signed') || null;
+      if (!latestSig && !contractEntry) return false;
+      student.contractSigned = true;
+      if (!student.contractSignedAt) {
+        student.contractSignedAt = latestSig?.signedAt || contractEntry?.uploadedAt || new Date().toISOString();
+      }
+      if (!student.lastContractId) {
+        student.lastContractId = latestSig?.id || contractEntry?.id || '';
+      }
+      return true;
     }
 
     async function deleteParentAndLinks(parentId) {
@@ -7613,6 +7688,49 @@
         && (inv.servicePeriodEnd || inv.service_period_end) === serviceEnd);
       if (existing) {
         if (isInvoiceVoid(existing)) return false;
+        const serviceStartDate = parseDateOnly(existing.servicePeriodStart || existing.service_period_start);
+        const serviceEndDate = parseDateOnly(existing.servicePeriodEnd || existing.service_period_end);
+        if (serviceStartDate && serviceEndDate && !existing.paid && existing.autoGenerated) {
+          const billableStart = maxDate(serviceStartDate, today);
+          const occurrences = listScheduleOccurrences(prefs.scheduleSlots, billableStart, serviceEndDate);
+          const numSessions = occurrences.length;
+          const baseAmount = Number(occurrences.reduce((sum, occ) => {
+            const rate = Number(student.rate || 0);
+            const hours = Number(occ.slot.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1);
+            return sum + rate * hours;
+          }, 0).toFixed(2));
+          const total = computeInvoiceTotal(baseAmount, existing);
+          const billableMoved = billableStart && serviceStartDate && billableStart.getTime() > serviceStartDate.getTime();
+          const changedAmount = numSessions !== existing.numSessions || baseAmount !== existing.baseAmount || total !== existing.total;
+          if (billableMoved && changedAmount) {
+            // Replace unpaid invoice with a refreshed one for remaining sessions
+            const nextStartStr = toDateOnly(billableStart);
+            const nowStr = toDateOnly(today);
+            removeSessionsByInvoiceId(existing.id, { skipCancellation: true });
+            state.invoices = state.invoices.filter(i => i.id !== existing.id);
+            if (numSessions > 0) {
+              const newInv = {
+                ...existing,
+                id: generateInvoiceIdForPeriod(student.id, nextStartStr || existing.servicePeriodStart || ''),
+                issueDate: nowStr,
+                dueDate: nextStartStr || existing.dueDate,
+                baseAmount,
+                total,
+                numSessions,
+                paid: false,
+                paidAt: '',
+                paymentMethod: '',
+                invoiceStatus: 'issued',
+                notes: [existing.notes, `Adjusted on ${nowStr} for remaining sessions from ${nextStartStr}.`].filter(Boolean).join(' | ')
+              };
+              state.invoices.push(newInv);
+              logActivity('Reissued invoice', newInv.id);
+            } else {
+              logActivity('Removed invoice', existing.id);
+            }
+            return true;
+          }
+        }
         let changed = false;
         if (!existing.invoiceType) { existing.invoiceType = 'monthly'; changed = true; }
         if (!existing.autoGenerated) { existing.autoGenerated = true; changed = true; }
@@ -9447,6 +9565,17 @@ Best regards,
           };
         }
       });
+    }
+
+    function removeSessionsByInvoiceId(invoiceId, opts = {}) {
+      if (!invoiceId) return 0;
+      const skipCancellation = !!opts.skipCancellation;
+      const toRemove = state.sessions.filter(s => s.invoiceId === invoiceId);
+      if (!skipCancellation) {
+        toRemove.forEach(sess => recordSessionCancellation(sess, 'cancelled'));
+      }
+      state.sessions = state.sessions.filter(s => s.invoiceId !== invoiceId);
+      return toRemove.length;
     }
 
     async function deleteSessionAndLinks(sessionId, opts = {}) {
