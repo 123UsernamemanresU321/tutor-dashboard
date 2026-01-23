@@ -9490,7 +9490,11 @@ Best regards,
             invoiceId: session?.invoiceId || ''
           };
           const bypassInvoice = !!form.rescheduleNoInvoice?.checked;
-          if (bypassInvoice) newSession.invoiceId = '';
+          if (bypassInvoice) {
+            const existingInvoice = session?.invoiceId ? state.invoices.find(i => i.id === session.invoiceId) : null;
+            const paidExisting = existingInvoice && existingInvoice.paid && !isInvoiceVoid(existingInvoice);
+            if (!paidExisting) newSession.invoiceId = '';
+          }
           const within24 = isEdit && session && isWithin24Hours(session);
           const timeChanged = isEdit && session
             ? session.date !== newSession.date || (session.startTime || '') !== (newSession.startTime || '')
