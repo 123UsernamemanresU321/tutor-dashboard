@@ -8197,6 +8197,13 @@
         if (!inv.moveToDate || !inv.moveToTime) return;
         const moveTime = normalizeTimeValue(inv.moveToTime || '');
         const durationHours = Number(inv.moveToDurationHours || 0) || Number(sess.durationHours || 1);
+        const oldSnapshot = {
+          ...sess,
+          studentIds: [...(sess.studentIds || [])],
+          date: sess.date,
+          startTime: sess.startTime,
+          durationHours: sess.durationHours
+        };
         const duplicate = state.sessions.find(s => (
           s.id !== sess.id &&
           s.studentIds.some(id => sess.studentIds.includes(id)) &&
@@ -8207,6 +8214,7 @@
           normalizeTimeValue(sess.startTime || '') === moveTime &&
           Number(sess.durationHours || 1) === Number(durationHours || 1);
         if (!alreadyMoved) {
+          recordSessionCancellation(oldSnapshot, 'moved_paid');
           sess.date = inv.moveToDate;
           sess.startTime = moveTime;
           sess.durationHours = durationHours;
@@ -9490,10 +9498,20 @@ Best regards,
           const durationChanged = isEdit && session
             ? Number(session.durationHours || 0) !== Number(newSession.durationHours || 0)
             : false;
-          const isMoveRequest = within24 && (timeChanged || durationChanged);
+          const isMoveRequest = within24 && (timeChanged || durationChanged) && !bypassInvoice;
 
           if (!bypassInvoice && (!isEdit || !isMoveRequest)) {
             if (!guardSessionCreation(selectedIds, form.date.value)) return;
+          }
+
+          if (isEdit && (timeChanged || durationChanged) && !isMoveRequest) {
+            recordSessionCancellation({
+              ...session,
+              studentIds: [...(session.studentIds || [])],
+              date: session.date,
+              startTime: session.startTime,
+              durationHours: session.durationHours
+            }, bypassInvoice ? 'admin_reschedule' : 'rescheduled');
           }
 
           if (isMoveRequest && !bypassInvoice) {
@@ -10454,7 +10472,7 @@ Best regards,
             }
           };
         }
-
+aw
         const fixBtn = document.getElementById('fixInvoiceScheduleBtn');
         if (fixBtn && inv) {
           fixBtn.onclick = async () => {
