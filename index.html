@@ -9404,6 +9404,17 @@ Best regards,
             <label class="block text-[11px] mb-1">Notes</label>
             <textarea name="notes" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${session?.notes || ''}</textarea>
           </div>
+          ${isEdit ? `
+            <div class="rounded-lg border border-amber-200 bg-amber-50/70 p-2">
+              <label class="flex items-center gap-2 text-[11px]">
+                <input type="checkbox" name="rescheduleNoInvoice">
+                <span>Reschedule without invoice (admin correction)</span>
+              </label>
+              <div class="text-[10px] text-amber-800 mt-1">
+                Use this if the session time was entered incorrectly. This bypasses the 24h move fee and clears the invoice link.
+              </div>
+            </div>
+          ` : ''}
           <div class="flex justify-between items-center mt-3">
             <button type="submit" class="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium">
               ${isEdit ? 'Save changes' : 'Add session'}
@@ -9468,8 +9479,11 @@ Best regards,
             subject: form.subject.value,
             topic: form.topic.value.trim(),
             notes: form.notes.value.trim(),
-            completed: session?.completed || false
+            completed: session?.completed || false,
+            invoiceId: session?.invoiceId || ''
           };
+          const bypassInvoice = !!form.rescheduleNoInvoice?.checked;
+          if (bypassInvoice) newSession.invoiceId = '';
           const within24 = isEdit && session && isWithin24Hours(session);
           const timeChanged = isEdit && session
             ? session.date !== newSession.date || (session.startTime || '') !== (newSession.startTime || '')
@@ -9479,11 +9493,11 @@ Best regards,
             : false;
           const isMoveRequest = within24 && (timeChanged || durationChanged);
 
-          if (!isEdit || !isMoveRequest) {
+          if (!bypassInvoice && (!isEdit || !isMoveRequest)) {
             if (!guardSessionCreation(selectedIds, form.date.value)) return;
           }
 
-          if (isMoveRequest) {
+          if (isMoveRequest && !bypassInvoice) {
             if (hasPendingMoveInvoice(session.id)) {
               alert('A move request is already pending for this session. Please wait for payment.');
               return;
