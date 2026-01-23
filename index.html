@@ -8197,24 +8197,23 @@
         if (!inv.moveToDate || !inv.moveToTime) return;
         const moveTime = normalizeTimeValue(inv.moveToTime || '');
         const durationHours = Number(inv.moveToDurationHours || 0) || Number(sess.durationHours || 1);
-        const duplicate = state.sessions.some(s => (
+        const duplicate = state.sessions.find(s => (
+          s.id !== sess.id &&
           s.studentIds.some(id => sess.studentIds.includes(id)) &&
           s.date === inv.moveToDate &&
           normalizeTimeValue(s.startTime || '') === moveTime
         ));
-        if (!duplicate) {
-          state.sessions.push({
-            id: generateId('sess'),
-            studentIds: [...sess.studentIds],
-            date: inv.moveToDate,
-            startTime: moveTime,
-            durationHours,
-            subject: sess.subject,
-            topic: sess.topic || 'Rescheduled session',
-            notes: sess.notes || '',
-            completed: false,
-            invoiceId: inv.id
-          });
+        const alreadyMoved = sess.date === inv.moveToDate &&
+          normalizeTimeValue(sess.startTime || '') === moveTime &&
+          Number(sess.durationHours || 1) === Number(durationHours || 1);
+        if (!alreadyMoved) {
+          sess.date = inv.moveToDate;
+          sess.startTime = moveTime;
+          sess.durationHours = durationHours;
+          sess.topic = sess.topic || 'Rescheduled session';
+          if (duplicate) {
+            state.sessions = state.sessions.filter(s => s.id !== duplicate.id);
+          }
         }
         inv.moveAppliedAt = now.toISOString();
         if (inv.invoiceStatus !== 'paid') inv.invoiceStatus = 'paid';
