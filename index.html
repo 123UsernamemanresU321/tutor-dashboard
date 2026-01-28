@@ -5003,8 +5003,22 @@
       const banner = document.getElementById('supabaseStatusBanner');
       if (!banner) return;
       if (message) {
-        banner.textContent = message;
+        banner.innerHTML = `
+          <div class="flex items-center justify-between gap-3">
+            <span>${message}</span>
+            <button id="supabaseRetryBtn" class="px-2 py-1 rounded-lg border border-amber-300 text-amber-900 text-[10px] hover:bg-amber-100">
+              Force refresh
+            </button>
+          </div>
+        `;
         banner.classList.remove('hidden');
+        const retryBtn = document.getElementById('supabaseRetryBtn');
+        if (retryBtn) {
+          retryBtn.onclick = async () => {
+            await tryLoadRemoteThenLocal();
+            renderAllViews();
+          };
+        }
       } else {
         banner.textContent = '';
         banner.classList.add('hidden');
@@ -10502,7 +10516,7 @@ Best regards,
             }
           };
         }
-aw
+
         const fixBtn = document.getElementById('fixInvoiceScheduleBtn');
         if (fixBtn && inv) {
           fixBtn.onclick = async () => {
