@@ -10566,8 +10566,12 @@ Best regards,
             }
             if (!confirm('Delete this invoice?')) return;
             try {
-              await supabaseClient.from('lesson_sessions').update({ invoice_id: null }).eq('invoice_id', inv.id);
-              await deleteInvoiceRemote(inv.id);
+              if (isInvoiceVoid(inv)) {
+                await deleteInvoiceRemote(inv.id);
+              } else {
+                await supabaseClient.from('lesson_sessions').update({ invoice_id: null }).eq('invoice_id', inv.id);
+                await deleteInvoiceRemote(inv.id);
+              }
               await tryLoadRemoteThenLocal();
               renderAllViews();
               closeModal();
