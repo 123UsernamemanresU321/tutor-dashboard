@@ -619,6 +619,7 @@
       <div id="readOnlyBanner" class="read-only-banner hidden px-6 py-2 text-xs">
         Read-only mode: sign in as the owner to edit.
       </div>
+      <div id="supabaseStatusBanner" class="hidden px-6 py-2 text-xs bg-amber-50 text-amber-900 border-b border-amber-200"></div>
       <div id="sessionAlertBanner" class="session-alert-banner hidden px-6 py-2 text-xs"></div>
 
       <!-- Views container -->
@@ -4980,17 +4981,34 @@
           if (isSupabaseReady()) {
             await refreshPresence().catch(() => { });
           }
+          setSupabaseStatusBanner('');
           updateReadOnlyUI();
           return;
         } catch (e) {
           console.error('Failed to load from Supabase, falling back to local', e);
+          setSupabaseStatusBanner('Supabase connection issue or maintenance detected. Some actions may be temporarily unavailable.');
           state = loadState(); // keep local data instead of wiping to defaults
           updateReadOnlyUI();
           return;
         }
       }
+      if (supabaseAvailable) {
+        setSupabaseStatusBanner('Supabase connection not ready. Edits that require syncing are temporarily disabled.');
+      }
       state = loadState();
       updateReadOnlyUI();
+    }
+
+    function setSupabaseStatusBanner(message) {
+      const banner = document.getElementById('supabaseStatusBanner');
+      if (!banner) return;
+      if (message) {
+        banner.textContent = message;
+        banner.classList.remove('hidden');
+      } else {
+        banner.textContent = '';
+        banner.classList.add('hidden');
+      }
     }
 
     const contractWatchTimers = new Map();
@@ -9613,6 +9631,14 @@ Best regards,
       return toRemove.length;
     }
 
+    async function deleteSessionRemote(sessionId) {
+      if (!isSupabaseReady()) throw new Error('Supabase not ready');
+      const { error: linkErr } = await supabaseClient.from('session_students').delete().eq('session_id', sessionId);
+      if (linkErr) throw linkErr;
+      const { error: sessErr } = await supabaseClient.from('lesson_sessions').delete().eq('id', sessionId);
+      if (sessErr) throw sessErr;
+    }
+
     async function deleteSessionAndLinks(sessionId, opts = {}) {
       const skipCancellation = !!opts.skipCancellation;
       // remove locally
@@ -10480,6 +10506,11 @@ aw
         const fixBtn = document.getElementById('fixInvoiceScheduleBtn');
         if (fixBtn && inv) {
           fixBtn.onclick = async () => {
+            if (!isSupabaseReady()) {
+              setSupabaseStatusBanner('Supabase connection not ready. Please try again when it is back online.');
+              alert('Supabase is not ready. Please try again in a moment.');
+              return;
+            }
             const linked = state.sessions.filter(s => s.invoiceId === inv.id);
             const count = linked.length;
             const confirmMsg = `This will void invoice ${inv.id} and permanently delete ${count} linked session${count === 1 ? '' : 's'}. Continue?`;
@@ -10496,23 +10527,17 @@ aw
               notes: [inv.notes, note].filter(Boolean).join(' | ')
             };
             try {
-              if (isSupabaseReady()) {
-                await upsertInvoiceRemote(updated);
-              }
+              await upsertInvoiceRemote(updated);
               for (const sess of linked) {
-                await deleteSessionAndLinks(sess.id, { skipCancellation: true });
+                await deleteSessionRemote(sess.id);
               }
-              const idx = state.invoices.findIndex(i => i.id === inv.id);
-              if (idx >= 0) state.invoices[idx] = updated;
-              saveState();
+              await tryLoadRemoteThenLocal();
+              renderAllViews();
               closeModal();
-              renderFinanceView();
-              renderScheduleView();
-              renderStudentsView();
-              if (selectedStudentId) renderStudentFinance(selectedStudentId);
               alert('Invoice voided and linked sessions removed.');
             } catch (err) {
               console.error('Fix scheduling error failed', err);
+              setSupabaseStatusBanner('Supabase action failed. Please retry in a moment.');
               alert('Fix failed: ' + (err?.message || err));
             }
           };
@@ -10520,22 +10545,22 @@ aw
 
         if (isEdit) {
           document.getElementById('deleteInvoiceBtn').onclick = async () => {
+            if (!isSupabaseReady()) {
+              setSupabaseStatusBanner('Supabase connection not ready. Please try again when it is back online.');
+              alert('Supabase is not ready. Please try again in a moment.');
+              return;
+            }
             if (!confirm('Delete this invoice?')) return;
             try {
-              if (isSupabaseReady()) {
-                await deleteInvoiceRemote(inv.id);
-              }
-              state.sessions.forEach(s => { if (s.invoiceId === inv.id) s.invoiceId = ''; });
-              state.invoices = state.invoices.filter(i => i.id !== inv.id);
-              saveState();
+              await supabaseClient.from('lesson_sessions').update({ invoice_id: null }).eq('invoice_id', inv.id);
+              await deleteInvoiceRemote(inv.id);
+              await tryLoadRemoteThenLocal();
+              renderAllViews();
               closeModal();
-              renderFinanceView();
-              if (selectedStudentId) renderStudentFinance(selectedStudentId);
             } catch (err) {
               console.error('Invoice delete sync failed', err);
-              alert('Deleted locally but Supabase delete failed: ' + (err?.message || err));
-              state.invoices = state.invoices.filter(i => i.id !== inv.id);
-              saveState();
+              setSupabaseStatusBanner('Supabase action failed. Please retry in a moment.');
+              alert('Delete failed: ' + (err?.message || err));
             }
           };
         }
