@@ -1864,6 +1864,27 @@
       return `${base}/${encodeURIComponent(room)}`;
     }
 
+    function normalizeJoinUrl(joinUrl, room) {
+      const base = getMeetingBaseUrl();
+      if (!joinUrl) return buildMeetingUrl(room);
+      if (!base) return joinUrl;
+      try {
+        const url = new URL(joinUrl);
+        const baseUrl = new URL(base);
+        if (url.hostname !== baseUrl.hostname) {
+          url.hostname = baseUrl.hostname;
+          url.protocol = baseUrl.protocol;
+          url.port = baseUrl.port;
+        }
+        if (!url.pathname || url.pathname === '/') {
+          if (room) url.pathname = `/${encodeURIComponent(room)}`;
+        }
+        return url.toString();
+      } catch (_err) {
+        return buildMeetingUrl(room) || joinUrl;
+      }
+    }
+
     function canJoinMeetingNow(sess) {
       if (!sess || sess.completed) return false;
       if (!isOnlineSession(sess)) return false;
@@ -1894,7 +1915,8 @@
           headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
         });
         if (error) throw error;
-        const joinUrl = data?.join_url || data?.joinUrl || data?.url || '';
+        let joinUrl = data?.join_url || data?.joinUrl || data?.url || '';
+        joinUrl = normalizeJoinUrl(joinUrl, room);
         if (!joinUrl) throw new Error(data?.error || 'Unable to generate meeting link.');
         window.open(joinUrl, '_blank', 'noopener');
       } catch (err) {
