@@ -4962,8 +4962,17 @@
 
     async function fetchMeetingJoinUrl(sessionId) {
       if (!supabaseAvailable || !supabaseSession) throw new Error('Please sign in to join meetings.');
+      const body = { session_id: sessionId };
+      if (studentMode) {
+        const student = getStudentProfileBySession();
+        const loginCode = normalizeCode(student?.loginCode || student?.login_code || '');
+        if (student?.id && loginCode) {
+          body.student_id = student.id;
+          body.login_code = loginCode;
+        }
+      }
       const { data, error } = await supabaseClient.functions.invoke('jaas-token', {
-        body: { session_id: sessionId }
+        body
       });
       if (error) throw error;
       if (!data?.join_url) throw new Error('Meeting link not available.');
