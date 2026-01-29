@@ -10572,6 +10572,12 @@ Best regards,
                 await supabaseClient.from('lesson_sessions').update({ invoice_id: null }).eq('invoice_id', inv.id);
                 await deleteInvoiceRemote(inv.id);
               }
+              // keep local state in sync so the deleted invoice is not re-merged back in
+              if (!isInvoiceVoid(inv)) {
+                state.sessions.forEach(s => { if (s.invoiceId === inv.id) s.invoiceId = ''; });
+              }
+              state.invoices = state.invoices.filter(i => i.id !== inv.id);
+              saveState();
               await tryLoadRemoteThenLocal();
               renderAllViews();
               closeModal();
