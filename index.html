@@ -3830,8 +3830,10 @@
           const isOnline = isOnlineSession(s);
           const joinBtn = isOnline
             ? (canJoinMeetingNow(s)
-              ? `<button class="ml-auto px-2 py-0.5 rounded-lg bg-indigo-600 text-white text-[10px]" onclick="openMeetingForSession('${s.id}')">Join</button>`
-              : `<span class="ml-auto text-[10px] text-slate-500">Join 10 min before</span>`)
+              ? `<button class="ml-auto px-2 py-0.5 rounded-lg bg-indigo-600 text-white text-[10px]" onclick="openMeetingForSession('${s.id}')">Join online</button>`
+              : `<button class="ml-auto px-2 py-0.5 rounded-lg border border-slate-200 text-[10px] text-slate-500 cursor-not-allowed" disabled>
+                  Join 10 min before
+                </button>`)
             : '';
           return `
           <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
