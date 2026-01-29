@@ -279,6 +279,17 @@
       box-shadow: 0 10px 30px -20px rgba(15, 23, 42, 0.4);
     }
 
+    .session-card.completed {
+      border-color: rgba(16, 185, 129, 0.6);
+      background: rgba(236, 253, 245, 0.95);
+    }
+
+    .session-card.completed .session-time,
+    .session-card.completed .text-slate-800 {
+      text-decoration: line-through;
+      opacity: 0.8;
+    }
+
     .session-chip {
       font-size: 0.65rem;
       text-transform: uppercase;
@@ -290,6 +301,24 @@
       align-items: center;
       gap: 0.25rem;
       background: rgba(248, 250, 252, 0.7);
+    }
+
+    .session-chip-online {
+      background: rgba(14, 165, 233, 0.12);
+      color: #0369a1;
+      border-color: rgba(14, 165, 233, 0.25);
+    }
+
+    .session-chip-inperson {
+      background: rgba(148, 163, 184, 0.12);
+      color: #475569;
+      border-color: rgba(148, 163, 184, 0.3);
+    }
+
+    .session-chip-completed {
+      background: rgba(16, 185, 129, 0.15);
+      color: #047857;
+      border-color: rgba(16, 185, 129, 0.35);
     }
 
     .session-time {
@@ -1738,6 +1767,9 @@
     const PAYFAST_RETURN_URL = `${window.location.origin}${window.location.pathname}?payfast=success`;
     const PAYFAST_CANCEL_URL = `${window.location.origin}${window.location.pathname}?payfast=cancel`;
     const PAYFAST_NOTIFY_URL = `${SUPABASE_URL}/functions/v1/payfast-ipn`;
+    const MEETING_PROVIDER = 'Jitsi';
+    const JITSI_DOMAIN = (BUSINESS.meetingDomain || '').trim();
+    const MEETING_JOIN_LEAD_MINUTES = 10;
     const supabaseAvailable =
       !tourMode &&
       typeof supabase !== 'undefined' &&
@@ -1778,6 +1810,99 @@
       return `${hours}:${minutes}`;
     }
 
+    function normalizeSessionMode(value, fallback = 'in_person') {
+      const raw = String(value || '').trim().toLowerCase();
+      if (!raw) return fallback;
+      if (['online', 'remote', 'virtual', 'video'].includes(raw)) return 'online';
+      if (['in_person', 'in-person', 'in person', 'onsite', 'on-site', 'offline'].includes(raw)) return 'in_person';
+      return fallback;
+    }
+
+    function getSessionModeLabel(mode) {
+      return normalizeSessionMode(mode) === 'online' ? 'Online' : 'In person';
+    }
+
+    function isOnlineSession(sess) {
+      return normalizeSessionMode(sess?.sessionMode || sess?.session_mode || sess?.mode || '') === 'online';
+    }
+
+    function getSessionStartDateTime(sess) {
+      return new Date(`${sess.date}T${sess.startTime || '00:00'}`);
+    }
+
+    function getSessionEndDateTime(sess) {
+      const start = getSessionStartDateTime(sess);
+      const durationMs = Number(sess.durationHours || 1) * 60 * 60 * 1000;
+      return new Date(start.getTime() + durationMs);
+    }
+
+    function isMeetingWindow(sess, leadMinutes = MEETING_JOIN_LEAD_MINUTES) {
+      const now = new Date();
+      const start = getSessionStartDateTime(sess);
+      const end = getSessionEndDateTime(sess);
+      const windowStart = new Date(start.getTime() - leadMinutes * 60 * 1000);
+      const windowEnd = new Date(end.getTime() + 30 * 60 * 1000);
+      return now >= windowStart && now <= windowEnd;
+    }
+
+    function getMeetingRoomName(sess) {
+      const existing = String(sess?.meetingRoom || sess?.meeting_room || '').trim();
+      if (existing) return existing;
+      return `tutor-${sess.id}`;
+    }
+
+    function getMeetingBaseUrl() {
+      const raw = (JITSI_DOMAIN || '').trim();
+      if (!raw) return '';
+      const cleaned = raw.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+      return cleaned ? `https://${cleaned}` : '';
+    }
+
+    function buildMeetingUrl(room) {
+      const base = getMeetingBaseUrl();
+      if (!base || !room) return '';
+      return `${base}/${encodeURIComponent(room)}`;
+    }
+
+    function canJoinMeetingNow(sess) {
+      if (!sess || sess.completed) return false;
+      if (!isOnlineSession(sess)) return false;
+      return isMeetingWindow(sess);
+    }
+
+    async function openMeetingForSession(sessionId) {
+      const sess = getSessionById(sessionId);
+      if (!sess) return;
+      if (!isOnlineSession(sess)) {
+        alert('This session is marked as in person.');
+        return;
+      }
+      if (!isMeetingWindow(sess)) {
+        alert(`Join link appears ${MEETING_JOIN_LEAD_MINUTES} minutes before the session.`);
+        return;
+      }
+      const room = getMeetingRoomName(sess);
+      if (!supabaseAvailable || !supabaseClient) {
+        const fallbackUrl = buildMeetingUrl(room);
+        if (fallbackUrl) window.open(fallbackUrl, '_blank', 'noopener');
+        else alert('Meeting domain is not configured yet.');
+        return;
+      }
+      try {
+        const { data, error } = await supabaseClient.functions.invoke('jaas-token', {
+          body: { session_id: sess.id },
+          headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
+        });
+        if (error) throw error;
+        const joinUrl = data?.join_url || data?.joinUrl || data?.url || '';
+        if (!joinUrl) throw new Error(data?.error || 'Unable to generate meeting link.');
+        window.open(joinUrl, '_blank', 'noopener');
+      } catch (err) {
+        console.error('Meeting launch failed', err);
+        alert(err?.message || 'Unable to open meeting link.');
+      }
+    }
+
     function codeToEmail(code) {
       const normalized = normalizeCode(code);
       return normalized ? `${normalized.toLowerCase()}${CODE_EMAIL_SUFFIX}` : '';
@@ -1808,8 +1933,9 @@
         const durationRaw = raw?.durationHours ?? raw?.duration_hours ?? raw?.duration ?? '';
         const durationHours = Number(durationRaw || 0) || Number(state.settings.defaultSessionDuration || 1);
         const timezone = String(raw?.timezone || raw?.tz || fallbackTimezone || DEFAULT_TIMEZONE).trim() || DEFAULT_TIMEZONE;
+        const mode = normalizeSessionMode(raw?.mode ?? raw?.session_mode ?? raw?.sessionMode ?? raw?.meeting_mode ?? '', 'in_person');
         if (!Number.isFinite(day) || day < 0 || day > 6 || !startTime) return null;
-        return { dayOfWeek: day, startTime, durationHours, timezone };
+        return { dayOfWeek: day, startTime, durationHours, timezone, mode };
       }).filter(Boolean);
       return slots;
     }
@@ -1820,7 +1946,8 @@
         day_of_week: Number(slot.dayOfWeek),
         start_time: normalizeTimeValue(slot.startTime || ''),
         duration_hours: Number(slot.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1),
-        timezone: String(slot.timezone || fallbackTimezone || DEFAULT_TIMEZONE).trim() || DEFAULT_TIMEZONE
+        timezone: String(slot.timezone || fallbackTimezone || DEFAULT_TIMEZONE).trim() || DEFAULT_TIMEZONE,
+        session_mode: normalizeSessionMode(slot.mode || slot.session_mode || slot.sessionMode || '', 'in_person')
       })).filter(s => Number.isFinite(s.day_of_week) && s.day_of_week >= 0 && s.day_of_week <= 6 && s.start_time);
     }
 
@@ -1846,7 +1973,8 @@
             dayOfWeek: day,
             startTime: preferredTime,
             durationHours,
-            timezone: fallbackTimezone
+            timezone: fallbackTimezone,
+            mode: normalizeSessionMode(student?.sessionMode || student?.session_mode || '', 'in_person')
           }));
         }
       }
@@ -1856,7 +1984,8 @@
     function formatScheduleSlotLabel(slot) {
       const dayLabel = WEEKDAY_LABELS[slot.dayOfWeek] || 'Day';
       const duration = Number(slot.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1);
-      return `${dayLabel} ${slot.startTime} (${duration}h)`;
+      const modeLabel = getSessionModeLabel(slot.mode || slot.session_mode || slot.sessionMode || '');
+      return `${dayLabel} ${slot.startTime} (${duration}h, ${modeLabel})`;
     }
 
     function formatScheduleDays(days) {
@@ -2125,9 +2254,9 @@
           contractSignerEmail: 'priya.naidoo@example.com',
           lastContractId: contractA,
           scheduleSlots: [
-            { dayOfWeek: 1, startTime: '16:00', durationHours: 1.5, timezone: DEFAULT_TIMEZONE },
-            { dayOfWeek: 3, startTime: '16:00', durationHours: 1.5, timezone: DEFAULT_TIMEZONE },
-            { dayOfWeek: 5, startTime: '16:00', durationHours: 1.5, timezone: DEFAULT_TIMEZONE }
+            { dayOfWeek: 1, startTime: '16:00', durationHours: 1.5, timezone: DEFAULT_TIMEZONE, mode: 'in_person' },
+            { dayOfWeek: 3, startTime: '16:00', durationHours: 1.5, timezone: DEFAULT_TIMEZONE, mode: 'online' },
+            { dayOfWeek: 5, startTime: '16:00', durationHours: 1.5, timezone: DEFAULT_TIMEZONE, mode: 'in_person' }
           ],
           scheduleDays: [1, 3, 5],
           preferredTime: '16:00',
@@ -2152,8 +2281,8 @@
           contractSignerEmail: '',
           lastContractId: '',
           scheduleSlots: [
-            { dayOfWeek: 2, startTime: '17:00', durationHours: 1.5, timezone: DEFAULT_TIMEZONE },
-            { dayOfWeek: 4, startTime: '17:00', durationHours: 1.5, timezone: DEFAULT_TIMEZONE }
+            { dayOfWeek: 2, startTime: '17:00', durationHours: 1.5, timezone: DEFAULT_TIMEZONE, mode: 'in_person' },
+            { dayOfWeek: 4, startTime: '17:00', durationHours: 1.5, timezone: DEFAULT_TIMEZONE, mode: 'in_person' }
           ],
           scheduleDays: [2, 4],
           preferredTime: '17:00',
@@ -2192,7 +2321,10 @@
           topic: 'Momentum and collisions',
           notes: 'Bring worksheet 4.',
           completed: false,
-          invoiceId: invoiceA
+          invoiceId: invoiceA,
+          sessionMode: 'online',
+          meetingProvider: MEETING_PROVIDER,
+          meetingRoom: ''
         },
         {
           id: 'demo-sess-2',
@@ -2204,7 +2336,10 @@
           topic: 'Trigonometry revision',
           notes: 'Review identities.',
           completed: false,
-          invoiceId: ''
+          invoiceId: '',
+          sessionMode: 'in_person',
+          meetingProvider: '',
+          meetingRoom: ''
         },
         {
           id: 'demo-sess-3',
@@ -2216,7 +2351,11 @@
           topic: 'Stoichiometry recap',
           notes: 'Check limiting reagent.',
           completed: true,
-          invoiceId: invoiceB
+          invoiceId: invoiceB,
+          sessionMode: 'in_person',
+          meetingProvider: '',
+          meetingRoom: '',
+          completedAt: new Date().toISOString()
         }
       ];
 
@@ -2507,6 +2646,10 @@
         s.studentIds = (s.studentIds || []).map(cleanId);
         s.invoiceId = cleanId(s.invoiceId);
         s.startTime = normalizeTimeValue(s.startTime || s.start_time || '');
+        s.sessionMode = normalizeSessionMode(s.sessionMode || s.session_mode || s.mode || '', 'in_person');
+        s.meetingRoom = (s.meetingRoom || s.meeting_room || '').trim();
+        s.meetingProvider = (s.meetingProvider || s.meeting_provider || '').trim();
+        s.completedAt = s.completedAt || s.completed_at || '';
       });
       st.sessionCancellations.forEach(c => {
         c.id = cleanId(c.id);
@@ -2810,7 +2953,11 @@
         topic: sess.topic,
         notes: sess.notes,
         completed: !!sess.completed,
-        invoice_id: sess.invoiceId ? cleanId(sess.invoiceId) : null
+        completed_at: sess.completedAt || null,
+        invoice_id: sess.invoiceId ? cleanId(sess.invoiceId) : null,
+        session_mode: normalizeSessionMode(sess.sessionMode || sess.session_mode || sess.mode || '', 'in_person'),
+        meeting_room: (sess.meetingRoom || sess.meeting_room || '').trim() || null,
+        meeting_provider: (sess.meetingProvider || sess.meeting_provider || '').trim() || null
       }));
       try {
         await upsertAndPrune('lesson_sessions', sessions, 'id');
@@ -3797,12 +3944,19 @@
         })
         .sort((a, b) => new Date(a.date + 'T' + (a.startTime || '00:00')) - new Date(b.date + 'T' + (b.startTime || '00:00')));
       if (sessionsUl) {
-        sessionsUl.innerHTML = mySessions.length ? mySessions.map(s => `
+        sessionsUl.innerHTML = mySessions.length ? mySessions.map(s => {
+          const modeLabel = getSessionModeLabel(s.sessionMode || s.session_mode || '');
+          const joinBtn = canJoinMeetingNow(s)
+            ? `<button class="mt-1 text-[10px] px-2 py-0.5 rounded-lg bg-indigo-600 text-white" onclick="openMeetingForSession('${s.id}')">Join online</button>`
+            : '';
+          return `
           <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
             <div class="font-medium">${s.subject} • ${s.topic || 'Lesson'}</div>
-            <div class="text-[10px] text-slate-500">${s.date} ${s.startTime || ''} • ${s.durationHours || 1}h</div>
+            <div class="text-[10px] text-slate-500">${s.date} ${s.startTime || ''} • ${s.durationHours || 1}h • ${modeLabel}</div>
+            ${joinBtn}
           </li>
-        `).join('') : '<li class="text-slate-500 text-xs">No sessions in the next 14 days.</li>';
+        `;
+        }).join('') : '<li class="text-slate-500 text-xs">No sessions in the next 14 days.</li>';
       }
 
       const allHw = state.homework.filter(hw => hw.studentId === student.id);
@@ -4290,12 +4444,17 @@
           const isPast = when < now;
           const status = s.completed ? 'Completed' : (isPast ? 'Past' : 'Upcoming');
           const statusClass = s.completed ? 'bg-emerald-100 text-emerald-700' : (isPast ? 'bg-slate-100 text-slate-600' : 'bg-indigo-100 text-indigo-700');
+          const modeLabel = getSessionModeLabel(s.sessionMode || s.session_mode || '');
+          const joinBtn = canJoinMeetingNow(s)
+            ? `<button class="mt-1 text-[10px] px-2 py-0.5 rounded-lg bg-indigo-600 text-white" onclick="openMeetingForSession('${s.id}')">Join online</button>`
+            : '';
           return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
             <div class="flex items-center justify-between gap-2">
               <div class="font-medium">${s.subject} • ${s.topic || 'Lesson'}</div>
               <span class="text-[10px] px-2 py-0.5 rounded-full ${statusClass}">${status}</span>
             </div>
-            <div class="text-[10px] text-slate-500">${s.date} ${s.startTime || ''} • ${s.durationHours || 1}h • ${names}</div>
+            <div class="text-[10px] text-slate-500">${s.date} ${s.startTime || ''} • ${s.durationHours || 1}h • ${names} • ${modeLabel}</div>
+            ${joinBtn}
           </li>`;
         }).join('') : '<li class="text-slate-500 text-xs">No sessions yet.</li>';
       }
@@ -4823,6 +4982,7 @@
       const now = new Date();
       return getScheduleVisibleSessions()
         .filter(s => s.date === todayStr)
+        .filter(s => !s.completed)
         .filter(s => new Date(s.date + 'T' + (s.startTime || '00:00')) >= now)
         .sort((a, b) => (a.date + 'T' + (a.startTime || '00:00')).localeCompare(b.date + 'T' + (b.startTime || '00:00')));
     }
@@ -4837,7 +4997,8 @@
       const subject = sess.subject || 'Lesson';
       const names = studentMode ? '' : sess.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
       const who = names ? ` • ${names}` : '';
-      return `<li><strong>${timeLabel}</strong> (${countdown}) • ${subject}${who}</li>`;
+      const modeLabel = isOnlineSession(sess) ? ' • Online' : ' • In person';
+      return `<li><strong>${timeLabel}</strong> (${countdown}) • ${subject}${who}${modeLabel}</li>`;
     }
 
     function renderSessionAlerts() {
@@ -4859,6 +5020,14 @@
         : parentMode
           ? 'Today: your child has upcoming lessons'
           : 'Today: upcoming lessons';
+      const meetingSessions = sessions.filter(canJoinMeetingNow);
+      const meetingBlock = meetingSessions.length ? `
+        <div class="mt-2 flex flex-wrap gap-2">
+          ${meetingSessions.map(s => `
+            <button class="px-2 py-1 rounded-lg bg-indigo-600 text-white text-[11px]" onclick="openMeetingForSession('${s.id}')">
+              Join ${s.startTime || 'lesson'} online
+            </button>`).join('')}
+        </div>` : '';
       banner.innerHTML = `
         <div class="flex items-start justify-between gap-4">
           <div>
@@ -4866,6 +5035,7 @@
             <ul class="text-[11px] mt-1 space-y-0.5">
               ${sessions.map(formatSessionAlertLine).join('')}
             </ul>
+            ${meetingBlock}
           </div>
           <button class="text-[11px] px-2 py-1 rounded-lg border border-rose-300 bg-white/80">Dismiss</button>
         </div>
@@ -5137,7 +5307,11 @@
             topic: sess.topic,
             notes: sess.notes,
             completed: sess.completed,
+            completedAt: sess.completed_at || '',
             invoiceId: sess.invoice_id,
+            sessionMode: normalizeSessionMode(sess.session_mode || '', 'in_person'),
+            meetingRoom: sess.meeting_room || '',
+            meetingProvider: sess.meeting_provider || '',
             studentIds
           };
         });
@@ -5469,7 +5643,11 @@
           topic: sess.topic,
           notes: sess.notes,
           completed: sess.completed,
+          completedAt: sess.completed_at || '',
           invoiceId: sess.invoice_id,
+          sessionMode: normalizeSessionMode(sess.session_mode || '', 'in_person'),
+          meetingRoom: sess.meeting_room || '',
+          meetingProvider: sess.meeting_provider || '',
           studentIds: (snap.sessionStudents || [])
             .filter(ss => ss.session_id === sess.id)
             .map(ss => cleanId(ss.student_id))
@@ -5744,7 +5922,11 @@
           topic: sess.topic,
           notes: sess.notes,
           completed: sess.completed,
+          completedAt: sess.completed_at || '',
           invoiceId: sess.invoice_id,
+          sessionMode: normalizeSessionMode(sess.session_mode || '', 'in_person'),
+          meetingRoom: sess.meeting_room || '',
+          meetingProvider: sess.meeting_provider || '',
           studentIds: studentIdsForSess
         };
       });
@@ -7151,7 +7333,8 @@
         <li class="border border-slate-200 rounded-lg px-2 py-1 flex justify-between items-center bg-white/80">
           <div>
             <div class="font-medium">${sess.subject} – ${sess.topic || 'Lesson'}</div>
-            <div class="text-[10px] text-slate-500">${sess.date} • ${sess.startTime || ''} • ${sess.durationHours || 1}h</div>
+            <div class="text-[10px] text-slate-500">${sess.date} • ${sess.startTime || ''} • ${sess.durationHours || 1}h • ${getSessionModeLabel(sess.sessionMode || sess.session_mode || '')}</div>
+            ${sess.completed ? '<div class="text-[10px] text-emerald-600">Completed</div>' : ''}
           </div>
             <button data-owner-only class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
                     onclick="if(guardEdit()) openSessionModal(getSessionById('${sess.id}'))">
@@ -7545,10 +7728,18 @@
               ? 'text-emerald-700'
               : 'text-rose-700';
           const names = s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
-          return `<div class="session-card cursor-pointer" onclick="openSessionQuickActions('${s.id}')">
+          const completedClass = s.completed ? 'completed' : '';
+          const modeLabel = isOnlineSession(s) ? 'Online' : 'In person';
+          const modeClass = isOnlineSession(s) ? 'session-chip-online' : 'session-chip-inperson';
+          const completedChip = s.completed ? '<span class="session-chip session-chip-completed">Completed</span>' : '';
+          return `<div class="session-card ${completedClass} cursor-pointer" onclick="openSessionQuickActions('${s.id}')">
                             <div class="flex items-center justify-between">
                               <span class="session-time ${subjectClass}">${s.startTime || ''}</span>
-                              <span class="session-chip ${subjectClass}">${s.subject}</span>
+                              <div class="flex items-center gap-1">
+                                ${completedChip}
+                                <span class="session-chip ${modeClass}">${modeLabel}</span>
+                                <span class="session-chip ${subjectClass}">${s.subject}</span>
+                              </div>
                             </div>
                             <div class="text-[11px] font-semibold text-slate-800">${names}</div>
                             <div class="text-[10px] text-slate-600 leading-snug">${s.topic || ''}</div>
@@ -7597,13 +7788,21 @@
       } else {
         todayList.innerHTML = todaySessions.map(s => {
           const names = s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
-          return `<li class="session-card">
+          const completedClass = s.completed ? 'completed' : '';
+          const modeLabel = isOnlineSession(s) ? 'Online' : 'In person';
+          const modeClass = isOnlineSession(s) ? 'session-chip-online' : 'session-chip-inperson';
+          const completedChip = s.completed ? '<span class="session-chip session-chip-completed">Completed</span>' : '';
+          return `<li class="session-card ${completedClass}">
             <div class="flex items-center justify-between">
               <div class="text-[10px] uppercase tracking-wide text-slate-500">${s.subject}</div>
               <div class="session-time">${s.startTime || ''}</div>
             </div>
             <div class="text-[11px] font-semibold text-slate-800">${names}</div>
             <div class="text-[10px] text-slate-600">${s.topic || ''} • ${s.durationHours || 1}h</div>
+            <div class="flex items-center gap-1 mt-1">
+              ${completedChip}
+              <span class="session-chip ${modeClass}">${modeLabel}</span>
+            </div>
             <button class="mt-1 text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50"
                     onclick="openSessionQuickActions('${s.id}')">
               Open
@@ -7907,6 +8106,7 @@
         const slot = occ.slot;
         const slotTime = normalizeTimeValue(slot.startTime || '');
         const durationHours = Number(slot.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1);
+        const slotMode = normalizeSessionMode(slot.mode || slot.session_mode || slot.sessionMode || '', 'in_person');
         const existing = state.sessions.filter(s =>
           s.studentIds.includes(student.id) &&
           s.date === dateStr &&
@@ -7916,6 +8116,11 @@
           existing.forEach(s => {
             if (!s.invoiceId) {
               s.invoiceId = inv.id;
+              changed = true;
+            }
+            if (!s.sessionMode) {
+              s.sessionMode = slotMode;
+              if (slotMode === 'online' && !s.meetingProvider) s.meetingProvider = MEETING_PROVIDER;
               changed = true;
             }
           });
@@ -7934,7 +8139,11 @@
           topic: 'Auto-scheduled session',
           notes: '',
           completed: false,
-          invoiceId: inv.id
+          completedAt: '',
+          invoiceId: inv.id,
+          sessionMode: slotMode,
+          meetingProvider: slotMode === 'online' ? MEETING_PROVIDER : '',
+          meetingRoom: ''
         });
         changed = true;
       });
@@ -8379,12 +8588,22 @@
       const sess = getSessionById(sessionId);
       if (!sess) return;
       const names = sess.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+      const canJoin = canJoinMeetingNow(sess);
+      const showOnlineInfo = isOnlineSession(sess) && !sess.completed;
       openModal(`
         <h2 class="text-sm font-semibold mb-2">Session with ${names}</h2>
         <p class="text-[11px] mb-2">${sess.subject} • ${sess.date} • ${sess.startTime || ''} (${sess.durationHours || 1}h)</p>
         <p class="text-[11px] mb-3">${sess.topic || ''}</p>
 
         <div class="space-y-2">
+          ${canJoin ? `
+            <button class="w-full px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium" onclick="openMeetingForSession('${sess.id}')">
+              Join online meeting
+            </button>` : ''}
+          ${showOnlineInfo && !canJoin ? `
+            <div class="text-[10px] text-slate-500">
+              Online link appears ${MEETING_JOIN_LEAD_MINUTES} minutes before start.
+            </div>` : ''}
           <button id="sessionMarkCompletedBtn" class="w-full px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-medium" data-owner-only>
             Mark attended & complete session
           </button>
@@ -8400,6 +8619,7 @@
             return;
           }
           sess.completed = true;
+          sess.completedAt = new Date().toISOString();
           saveState();
           closeModal();
           renderScheduleView();
@@ -9293,10 +9513,11 @@ Best regards,
         function addSlotRow(slot = {}) {
           if (!slotsContainer) return;
           const row = document.createElement('div');
-          row.className = 'schedule-slot-row grid grid-cols-[1.1fr_1fr_1fr_auto] gap-2 items-end';
+          row.className = 'schedule-slot-row grid grid-cols-[1.1fr_1fr_1fr_1fr_auto] gap-2 items-end';
           const dayOfWeek = Number(slot.dayOfWeek ?? slot.day_of_week ?? 1);
           const startTime = normalizeTimeValue(slot.startTime || slot.start_time || '16:00');
           const durationHours = Number(slot.durationHours || slot.duration_hours || defaultSlotDuration || 1);
+          const slotMode = normalizeSessionMode(slot.mode || slot.session_mode || slot.sessionMode || '', 'in_person');
           row.innerHTML = `
             <div>
               <label class="block text-[10px] mb-1">Day</label>
@@ -9312,10 +9533,19 @@ Best regards,
               <label class="block text-[10px] mb-1">Duration (hours)</label>
               <input type="number" step="0.25" class="slot-duration w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" value="${durationHours}">
             </div>
+            <div>
+              <label class="block text-[10px] mb-1">Session type</label>
+              <select class="slot-mode w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+                <option value="in_person">In person</option>
+                <option value="online">Online (Jitsi)</option>
+              </select>
+            </div>
             <button type="button" class="remove-slot-btn px-2 py-1 rounded-lg border border-slate-300 text-[11px]">Remove</button>
           `;
           const daySelect = row.querySelector('.slot-day');
           if (daySelect) daySelect.value = String(Number.isFinite(dayOfWeek) ? dayOfWeek : 1);
+          const modeSelect = row.querySelector('.slot-mode');
+          if (modeSelect) modeSelect.value = slotMode;
           const removeBtn = row.querySelector('.remove-slot-btn');
           if (removeBtn) {
             removeBtn.onclick = () => {
@@ -9343,6 +9573,7 @@ Best regards,
             const day = Number(row.querySelector('.slot-day')?.value);
             const startTime = normalizeTimeValue(row.querySelector('.slot-time')?.value || '');
             const duration = Number(row.querySelector('.slot-duration')?.value || 0);
+            const mode = normalizeSessionMode(row.querySelector('.slot-mode')?.value || '', 'in_person');
             if (!startTime || !Number.isFinite(day) || day < 0 || day > 6 || duration <= 0) {
               alert('Each schedule slot needs a day, start time, and duration.');
               return;
@@ -9351,7 +9582,8 @@ Best regards,
               dayOfWeek: day,
               startTime,
               durationHours: duration,
-              timezone: scheduleTimezoneValue
+              timezone: scheduleTimezoneValue,
+              mode
             });
           }
           const newStudent = {
@@ -9435,6 +9667,7 @@ Best regards,
     function openSessionModal(session) {
       if (!guardEdit()) return;
       const isEdit = !!session;
+      const sessionModeValue = normalizeSessionMode(session?.sessionMode || session?.session_mode || session?.mode || '', 'in_person');
       const html = `
         <h2 class="text-sm font-semibold mb-3">${isEdit ? 'Edit session' : 'Add session'}</h2>
         <div class="flex items-center gap-2 mb-2">
@@ -9484,6 +9717,18 @@ Best regards,
                 <option value="Chemistry" ${session?.subject === 'Chemistry' ? 'selected' : ''}>Chemistry</option>
                 <option value="Maths" ${session?.subject === 'Maths' ? 'selected' : ''}>Maths</option>
               </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] mb-1">Session type</label>
+              <select name="sessionMode" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+                <option value="in_person" ${sessionModeValue === 'in_person' ? 'selected' : ''}>In person</option>
+                <option value="online" ${sessionModeValue === 'online' ? 'selected' : ''}>Online (Jitsi)</option>
+              </select>
+            </div>
+            <div class="text-[10px] text-slate-500 flex items-end pb-1">
+              Online sessions show a join link 10 minutes before start.
             </div>
           </div>
           <div>
@@ -9571,8 +9816,15 @@ Best regards,
             topic: form.topic.value.trim(),
             notes: form.notes.value.trim(),
             completed: session?.completed || false,
-            invoiceId: session?.invoiceId || ''
+            completedAt: session?.completedAt || session?.completed_at || '',
+            invoiceId: session?.invoiceId || '',
+            sessionMode: normalizeSessionMode(form.sessionMode?.value || sessionModeValue || '', 'in_person'),
+            meetingProvider: session?.meetingProvider || session?.meeting_provider || '',
+            meetingRoom: session?.meetingRoom || session?.meeting_room || ''
           };
+          if (newSession.sessionMode === 'online' && !newSession.meetingProvider) {
+            newSession.meetingProvider = MEETING_PROVIDER;
+          }
           const bypassInvoice = !!form.rescheduleNoInvoice?.checked;
           if (bypassInvoice) {
             const existingInvoice = session?.invoiceId ? state.invoices.find(i => i.id === session.invoiceId) : null;
@@ -9619,7 +9871,10 @@ Best regards,
                 studentIds: newSession.studentIds,
                 subject: newSession.subject,
                 topic: newSession.topic,
-                notes: newSession.notes
+                notes: newSession.notes,
+                sessionMode: newSession.sessionMode,
+                meetingProvider: newSession.meetingProvider,
+                meetingRoom: newSession.meetingRoom
               };
             }
             logActivity('Move requested', session.topic || session.subject || 'Session');
@@ -10506,6 +10761,7 @@ Best regards,
               if (!slotTime) return;
               const key = `${student.id}|${occ.date}|${slotTime}`;
               const durationHours = Number(slot.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1);
+              const slotMode = normalizeSessionMode(slot.mode || slot.session_mode || slot.sessionMode || '', 'in_person');
               const existing = existingByKey.get(key);
               if (existing) {
                 if (existing.invoiceId !== inv.id) {
@@ -10514,6 +10770,13 @@ Best regards,
                 }
                 if (Number(existing.durationHours || 0) !== durationHours) {
                   existing.durationHours = durationHours;
+                  changed = true;
+                }
+                if (!existing.sessionMode) {
+                  existing.sessionMode = slotMode;
+                  if (slotMode === 'online' && !existing.meetingProvider) {
+                    existing.meetingProvider = MEETING_PROVIDER;
+                  }
                   changed = true;
                 }
                 return;
@@ -10528,7 +10791,11 @@ Best regards,
                 topic: 'Auto-scheduled session',
                 notes: '',
                 completed: false,
-                invoiceId: inv.id
+                completedAt: '',
+                invoiceId: inv.id,
+                sessionMode: slotMode,
+                meetingProvider: slotMode === 'online' ? MEETING_PROVIDER : '',
+                meetingRoom: ''
               });
               changed = true;
             });
