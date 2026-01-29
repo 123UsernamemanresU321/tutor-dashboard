@@ -3827,14 +3827,19 @@
       if (sessionsUl) {
         sessionsUl.innerHTML = mySessions.length ? mySessions.map(s => {
           const modeLabel = getSessionModeLabel(s.sessionMode ?? s.session_mode ?? s.mode);
-          const joinBtn = (!parentMode && canJoinMeetingNow(s))
-            ? `<button class="mt-1 px-2 py-1 rounded-lg bg-indigo-600 text-white text-[10px]" onclick="openMeetingForSession('${s.id}')">Join online session</button>`
+          const isOnline = isOnlineSession(s);
+          const joinBtn = isOnline
+            ? (canJoinMeetingNow(s)
+              ? `<button class="ml-auto px-2 py-0.5 rounded-lg bg-indigo-600 text-white text-[10px]" onclick="openMeetingForSession('${s.id}')">Join</button>`
+              : `<span class="ml-auto text-[10px] text-slate-500">Join 10 min before</span>`)
             : '';
           return `
           <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
             <div class="font-medium">${s.subject} • ${s.topic || 'Lesson'}</div>
-            <div class="text-[10px] text-slate-500">${s.date} ${s.startTime || ''} • ${s.durationHours || 1}h • ${modeLabel}</div>
-            ${joinBtn}
+            <div class="text-[10px] text-slate-500 flex items-center gap-2">
+              <span>${s.date} ${s.startTime || ''} • ${s.durationHours || 1}h • ${modeLabel}</span>
+              ${joinBtn}
+            </div>
           </li>
         `;
         }).join('') : '<li class="text-slate-500 text-xs">No sessions in the next 14 days.</li>';
