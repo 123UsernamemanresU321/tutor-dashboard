@@ -325,6 +325,11 @@
       min-width: 0;
     }
 
+    .session-chip-row-center {
+      justify-content: center;
+      width: 100%;
+    }
+
     .session-chip-online {
       background: rgba(14, 165, 233, 0.12);
       color: #0369a1;
@@ -1079,9 +1084,9 @@
               </div>
             </div>
 
-            <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+            <div class="grid grid-cols-1 xl:grid-cols-4 gap-4 items-start">
               <!-- Left column: week grid -->
-              <div class="card p-5 col-span-2 space-y-3 h-full">
+              <div class="card p-5 xl:col-span-3 space-y-3 h-full">
                 <div class="flex items-center justify-between text-xs">
                   <div class="flex items-center gap-2">
                     <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-700"><span
@@ -8230,15 +8235,16 @@
           return `<div class="session-card ${completedClass} cursor-pointer" onclick="openSessionQuickActions('${s.id}')">
                             <div class="flex items-center justify-between">
                               <span class="session-time ${subjectClass}">${s.startTime || ''}</span>
-                            <div class="session-chip-row">
+                              <span class="text-[10px] text-slate-500">${s.durationHours ? `${Number(s.durationHours).toFixed(1)}h` : ''}</span>
+                            </div>
+                            <div class="text-[11px] font-semibold text-slate-800">${names}</div>
+                            <div class="text-[10px] text-slate-600 leading-snug">${s.topic || ''}</div>
+                            <div class="session-chip-row session-chip-row-center mt-1">
                               ${completedChip}
                               ${busyChip}
                               <span class="session-chip ${modeClass}">${modeLabel}</span>
                               <span class="session-chip ${subjectClass}">${s.subject}</span>
-                              </div>
                             </div>
-                            <div class="text-[11px] font-semibold text-slate-800">${names}</div>
-                            <div class="text-[10px] text-slate-600 leading-snug">${s.topic || ''}</div>
                           </div>`;
         }).join('')
           }
