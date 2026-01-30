@@ -5373,11 +5373,23 @@
           return;
         }
         const joinUrl = await fetchMeetingJoinUrl(sessionId);
-        window.open(joinUrl, '_blank', 'noopener,noreferrer');
+        openPopupWithConfirm(joinUrl, 'online session');
       } catch (err) {
         console.error('Meeting launch failed', err);
         alert(err?.message || 'Unable to open meeting.');
       }
+    }
+
+    function openPopupWithConfirm(url, label = 'link', features = 'noopener,noreferrer') {
+      if (!url) return false;
+      const ok = confirm(`Open ${label} in a new tab?`);
+      if (!ok) return false;
+      const win = window.open(url, '_blank', features);
+      if (!win) {
+        prompt('Pop-up blocked. Copy this link:', url);
+        return false;
+      }
+      return true;
     }
 
     function applyTourUI() {
@@ -6661,11 +6673,10 @@
     async function openContractLink(studentId) {
       try {
         const link = await buildContractSigningLink(studentId);
-        const win = window.open(link, '_blank', 'noopener');
-        navigator.clipboard?.writeText(link).catch(() => {});
-        startContractStatusWatch([studentId], { maxMs: 180000 });
-        if (!win) {
-          prompt('Pop-up blocked. Copy this link:', link);
+        const opened = openPopupWithConfirm(link, 'contract signing page', 'noopener');
+        if (opened) {
+          navigator.clipboard?.writeText(link).catch(() => {});
+          startContractStatusWatch([studentId], { maxMs: 180000 });
         }
       } catch (err) {
         console.warn('issue-contract-sign-token failed', err);
@@ -9361,7 +9372,7 @@
         alert('No link available for this resource.');
         return;
       }
-      window.open(url, '_blank');
+      openPopupWithConfirm(url, 'resource');
     }
 
     function copyResourceLink(resourceId) {
