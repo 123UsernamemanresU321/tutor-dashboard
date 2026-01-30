@@ -189,6 +189,40 @@
       border-color: rgba(51, 65, 85, 0.9);
     }
 
+    .calendar-day.busy-day {
+      border-color: rgba(248, 113, 113, 0.65);
+      background: rgba(254, 226, 226, 0.72);
+    }
+
+    body.dark .calendar-day.busy-day {
+      background: rgba(127, 29, 29, 0.18);
+      border-color: rgba(248, 113, 113, 0.55);
+    }
+
+    .busy-badge {
+      font-size: 0.65rem;
+      padding: 0.1rem 0.45rem;
+      border-radius: 999px;
+      background: rgba(248, 113, 113, 0.15);
+      color: #b91c1c;
+      border: 1px solid rgba(248, 113, 113, 0.4);
+    }
+
+    body.dark .busy-badge {
+      color: #fecaca;
+      border-color: rgba(248, 113, 113, 0.4);
+    }
+
+    .session-chip-busy {
+      background: rgba(248, 113, 113, 0.18);
+      color: #b91c1c;
+    }
+
+    body.dark .session-chip-busy {
+      background: rgba(248, 113, 113, 0.16);
+      color: #fecaca;
+    }
+
     .tag-pill {
       font-size: 0.7rem;
       padding: 0.1rem 0.45rem;
@@ -1349,6 +1383,10 @@
                 Refresh contract status
               </button>
             </div>
+            <div id="portalBusyNotice" class="hidden border border-rose-200 bg-rose-50 text-rose-800 rounded-lg px-3 py-2 text-xs">
+              <div class="font-semibold">Tutor unavailable on the dates below</div>
+              <ul id="portalBusyList" class="mt-2 space-y-1 text-[11px]"></ul>
+            </div>
 
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
               <div class="card p-4 space-y-2">
@@ -1483,6 +1521,15 @@
                 </button>
               </div>
               <div id="parentGuideSteps" class="mt-3 space-y-2 text-[11px]"></div>
+            </div>
+            <div id="parentBusyNotice" class="card p-4 hidden border border-rose-200 bg-rose-50 text-rose-800">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <div class="text-sm font-semibold">Tutor unavailable</div>
+                  <div class="text-[11px] text-rose-700">Sessions are not scheduled on these dates.</div>
+                </div>
+              </div>
+              <ul id="parentBusyList" class="mt-2 space-y-1 text-[11px]"></ul>
             </div>
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
               <div class="card p-4 space-y-2">
@@ -1928,10 +1975,15 @@
       const endDate = new Date(end);
       endDate.setHours(0, 0, 0, 0);
       while (cursor <= endDate) {
+        const dateStr = toDateOnly(cursor);
+        if (isBusyDate(dateStr)) {
+          cursor.setDate(cursor.getDate() + 1);
+          continue;
+        }
         const day = cursor.getDay();
         slots.forEach(slot => {
           if (slot.dayOfWeek === day) {
-            results.push({ date: toDateOnly(cursor), slot });
+            results.push({ date: dateStr, slot });
           }
         });
         cursor.setDate(cursor.getDate() + 1);
@@ -2069,6 +2121,7 @@
       parentLinks: [],
       sessions: [],
       sessionCancellations: [],
+      busyDays: [],
       resources: [],
       invoices: [],
       documents: [],
@@ -2192,6 +2245,15 @@
       demo.parentLinks = [
         { id: 'demo-link-1', parentId, studentId: studentAId, relationship: 'Mother' },
         { id: 'demo-link-2', parentId, studentId: studentBId, relationship: 'Mother' }
+      ];
+
+      demo.busyDays = [
+        {
+          id: 'demo-busy-1',
+          date: toIso(addDays(today, 4)),
+          note: 'School event',
+          createdAt: new Date().toISOString()
+        }
       ];
 
       demo.sessions = [
@@ -2475,7 +2537,7 @@
     }
 
     function sanitizeState(st) {
-      ['students', 'parents', 'parentLinks', 'sessions', 'sessionCancellations', 'resources', 'homework', 'documents', 'contracts', 'invoices', 'studentTodos', 'studentCheckins', 'messages'].forEach(key => {
+      ['students', 'parents', 'parentLinks', 'sessions', 'sessionCancellations', 'busyDays', 'resources', 'homework', 'documents', 'contracts', 'invoices', 'studentTodos', 'studentCheckins', 'messages'].forEach(key => {
         if (!Array.isArray(st[key])) st[key] = [];
       });
       if (!Array.isArray(st.activityLog)) st.activityLog = [];
@@ -2540,6 +2602,14 @@
         c.invoiceId = cleanId(c.invoiceId || c.invoice_id || '');
         c.reason = (c.reason || '').trim();
         c.cancelledAt = c.cancelledAt || c.cancelled_at || '';
+      });
+      st.busyDays.forEach(b => {
+        b.id = cleanId(b.id);
+        const rawDate = b.date || b.busy_date || '';
+        const parsed = parseDateOnly(rawDate);
+        b.date = parsed ? toDateOnly(parsed) : String(rawDate || '').slice(0, 10);
+        b.note = (b.note || '').trim();
+        b.createdAt = b.createdAt || b.created_at || '';
       });
       st.resources.forEach(r => {
         r.id = cleanId(r.id);
@@ -2620,6 +2690,7 @@
         c.sessionId = cleanId(c.sessionId);
         c.invoiceId = cleanId(c.invoiceId);
       });
+      state.busyDays.forEach(b => { b.id = forceUuid(b.id); });
       state.resources.forEach(r => { r.id = forceUuid(r.id); });
       state.homework.forEach(hw => { hw.id = forceUuid(hw.id); hw.studentId = forceUuid(hw.studentId); hw.resourceId = forceUuid(hw.resourceId); });
       state.documents.forEach(d => { d.id = forceUuid(d.id); d.studentId = forceUuid(d.studentId); });
@@ -2641,6 +2712,7 @@
         parentLinks: new Map(),
         sessions: new Map(),
         sessionCancellations: new Map(),
+        busyDays: new Map(),
         resources: new Map(),
         homework: new Map(),
         documents: new Map(),
@@ -2667,6 +2739,7 @@
       state.parentLinks.forEach(pl => ensureId(pl, 'parentLinks', maps.parentLinks));
       state.sessions.forEach(sess => ensureId(sess, 'sessions', maps.sessions));
       state.sessionCancellations.forEach(c => ensureId(c, 'sessionCancellations', maps.sessionCancellations));
+      state.busyDays.forEach(b => ensureId(b, 'busyDays', maps.busyDays));
       state.resources.forEach(r => ensureId(r, 'resources', maps.resources));
       state.homework.forEach(hw => ensureId(hw, 'homework', maps.homework));
       state.documents.forEach(d => ensureId(d, 'documents', maps.documents));
@@ -2890,6 +2963,23 @@
           await upsertAndPrune('session_cancellations', cancellations, 'id');
         } catch (err) {
           console.warn('Session cancellations sync skipped', err);
+        }
+      }
+
+      const busyDays = state.busyDays
+        .map(b => ({
+          id: cleanId(b.id),
+          user_id: uid,
+          date: b.date,
+          note: b.note || null,
+          created_at: b.createdAt || null
+        }))
+        .filter(b => b.date);
+      if (busyDays.length) {
+        try {
+          await upsertAndPrune('busy_days', busyDays, 'id');
+        } catch (err) {
+          console.warn('Busy days sync skipped', err);
         }
       }
 
@@ -3817,6 +3907,22 @@
         if (msgsList) msgsList.innerHTML = msg;
         return;
       }
+      const busyNotice = document.getElementById('portalBusyNotice');
+      const busyList = document.getElementById('portalBusyList');
+      const upcomingBusy = getUpcomingBusyDays(45);
+      if (busyNotice && busyList) {
+        if (!upcomingBusy.length) {
+          busyNotice.classList.add('hidden');
+        } else {
+          busyNotice.classList.remove('hidden');
+          busyList.innerHTML = upcomingBusy.map(b => `
+            <li class="flex items-start gap-2">
+              <span class="busy-badge">Busy</span>
+              <span>${b.date}${b.note ? ` • ${b.note}` : ''}</span>
+            </li>
+          `).join('');
+        }
+      }
       const now = new Date();
       const mySessions = state.sessions.filter(s => s.studentIds.includes(student.id))
         .filter(s => {
@@ -3828,8 +3934,14 @@
         sessionsUl.innerHTML = mySessions.length ? mySessions.map(s => {
           const modeLabel = getSessionModeLabel(s.sessionMode ?? s.session_mode ?? s.mode);
           const isOnline = isOnlineSession(s);
+          const isBusyDay = isBusyDate(s.date);
+          const busyLabel = isBusyDay ? '<span class="session-chip session-chip-busy">Tutor busy</span>' : '';
           const joinBtn = isOnline
-            ? (canJoinMeetingNow(s)
+            ? (isBusyDay
+              ? `<button class="ml-auto px-2 py-0.5 rounded-lg border border-rose-200 text-[10px] text-rose-600 cursor-not-allowed" disabled>
+                  Tutor unavailable
+                </button>`
+              : canJoinMeetingNow(s)
               ? `<button class="ml-auto px-2 py-0.5 rounded-lg bg-indigo-600 text-white text-[10px]" onclick="openMeetingForSession('${s.id}')">Join online</button>`
               : `<button class="ml-auto px-2 py-0.5 rounded-lg border border-slate-200 text-[10px] text-slate-500 cursor-not-allowed" disabled>
                   Join 10 min before
@@ -3840,6 +3952,7 @@
             <div class="font-medium">${s.subject} • ${s.topic || 'Lesson'}</div>
             <div class="text-[10px] text-slate-500 flex items-center gap-2">
               <span>${s.date} ${s.startTime || ''} • ${s.durationHours || 1}h • ${modeLabel}</span>
+              ${busyLabel}
               ${joinBtn}
             </div>
           </li>
@@ -4311,6 +4424,23 @@
         }
       }
 
+      const parentBusyNotice = document.getElementById('parentBusyNotice');
+      const parentBusyList = document.getElementById('parentBusyList');
+      const upcomingBusy = getUpcomingBusyDays(45);
+      if (parentBusyNotice && parentBusyList) {
+        if (!upcomingBusy.length) {
+          parentBusyNotice.classList.add('hidden');
+        } else {
+          parentBusyNotice.classList.remove('hidden');
+          parentBusyList.innerHTML = upcomingBusy.map(b => `
+            <li class="flex items-start gap-2">
+              <span class="busy-badge">Busy</span>
+              <span>${b.date}${b.note ? ` • ${b.note}` : ''}</span>
+            </li>
+          `).join('');
+        }
+      }
+
       const now = new Date();
       const sessionsWithDates = state.sessions
         .filter(s => s.studentIds.some(id => childIds.has(id)))
@@ -4334,8 +4464,14 @@
           const statusClass = s.completed ? 'bg-emerald-100 text-emerald-700' : (isPast ? 'bg-slate-100 text-slate-600' : 'bg-indigo-100 text-indigo-700');
           const modeLabel = getSessionModeLabel(s.sessionMode ?? s.session_mode ?? s.mode);
           const isOnline = isOnlineSession(s);
+          const isBusyDay = isBusyDate(s.date);
+          const busyLabel = isBusyDay ? '<span class="session-chip session-chip-busy">Tutor busy</span>' : '';
           const joinBtn = isOnline
-            ? (canJoinMeetingNow(s)
+            ? (isBusyDay
+              ? `<button class="mt-1 px-2 py-1 rounded-lg border border-rose-200 text-[10px] text-rose-600 cursor-not-allowed" disabled>
+                  Tutor unavailable
+                </button>`
+              : canJoinMeetingNow(s)
               ? `<button class="mt-1 px-2 py-1 rounded-lg bg-indigo-600 text-white text-[10px]" onclick="openMeetingForSession('${s.id}')">Join online session</button>`
               : `<button class="mt-1 px-2 py-1 rounded-lg border border-slate-200 text-[10px] text-slate-500 cursor-not-allowed" disabled>
                   Join available 10 min before
@@ -4347,6 +4483,7 @@
               <span class="text-[10px] px-2 py-0.5 rounded-full ${statusClass}">${status}</span>
             </div>
             <div class="text-[10px] text-slate-500">${s.date} ${s.startTime || ''} • ${s.durationHours || 1}h • ${names} • ${modeLabel}</div>
+            ${busyLabel ? `<div class="mt-1">${busyLabel}</div>` : ''}
             ${joinBtn}
           </li>`;
         }).join('') : '<li class="text-slate-500 text-xs">No sessions yet.</li>';
@@ -5194,6 +5331,7 @@
           sessionsRes,
           sessionStudentsRes,
           cancellationsRes,
+          busyDaysRes,
           resourcesRes,
           homeworkRes,
           documentsRes,
@@ -5211,6 +5349,7 @@
           fetchTable('lesson_sessions'),
           fetchTable('session_students'),
           fetchTable('session_cancellations'),
+          fetchTable('busy_days'),
           fetchTable('resources'),
           fetchTable('homework'),
           fetchTable('documents'),
@@ -5223,7 +5362,7 @@
           fetchTable('parent_contract_signatures')
         ]);
 
-        [studentsRes, parentsRes, parentLinksRes, sessionsRes, sessionStudentsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes, activityRes, messagesRes, contractSignaturesRes].forEach(res => {
+        [studentsRes, parentsRes, parentLinksRes, sessionsRes, sessionStudentsRes, busyDaysRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes, activityRes, messagesRes, contractSignaturesRes].forEach(res => {
           if (res.error) throw res.error;
         });
         if (cancellationsRes?.error) {
@@ -5342,6 +5481,12 @@
           invoiceId: c.invoice_id || '',
           reason: c.reason || '',
           cancelledAt: c.cancelled_at || ''
+        }));
+        merged.busyDays = (busyDaysRes?.data || []).map(b => ({
+          id: b.id,
+          date: b.date,
+          note: b.note || '',
+          createdAt: b.created_at || ''
         }));
         const resources = await Promise.all(
           (resourcesRes.data || []).map(async r => {
@@ -5572,6 +5717,12 @@
           parentId: pl.parent_id,
           studentId: pl.student_id,
           relationship: pl.relationship
+        }));
+        out.busyDays = (snap.busyDays || []).map(b => ({
+          id: b.id,
+          date: b.date,
+          note: b.note || '',
+          createdAt: b.created_at || b.createdAt || ''
         }));
         out.sessions = (snap.sessions || []).map(sess => ({
           id: sess.id,
@@ -5808,6 +5959,20 @@
         } catch { }
       }
 
+      let busyDaysRes = { data: [] };
+      const ownerIds = new Set();
+      (studentsRes.data || []).forEach(s => {
+        if (s.user_id) ownerIds.add(s.user_id);
+      });
+      (parentsRes.data || []).forEach(p => {
+        if (p.user_id) ownerIds.add(p.user_id);
+      });
+      if (ownerIds.size) {
+        try {
+          busyDaysRes = await supabaseClient.from('busy_days').select('*').in('user_id', Array.from(ownerIds));
+        } catch { }
+      }
+
       // Map into state
       merged.students = (studentsRes.data || []).map(s => ({
         id: s.id,
@@ -5847,6 +6012,12 @@
         parentId: pl.parent_id,
         studentId: pl.student_id,
         relationship: pl.relationship
+      }));
+      merged.busyDays = (busyDaysRes.data || []).map(b => ({
+        id: b.id,
+        date: b.date,
+        note: b.note || '',
+        createdAt: b.created_at || ''
       }));
 
       const sessions = (sessionsRes.data || []).map(sess => {
@@ -7632,6 +7803,87 @@
       return state.sessions;
     }
 
+    function normalizeBusyNote(note) {
+      return String(note || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function getBusyDay(dateStr) {
+      const target = String(dateStr || '').slice(0, 10);
+      return state.busyDays.find(b => b.date === target);
+    }
+
+    function isBusyDate(dateStr) {
+      return !!getBusyDay(dateStr);
+    }
+
+    function addBusyDay(dateStr, note = '') {
+      const target = String(dateStr || '').slice(0, 10);
+      if (!target || isBusyDate(target)) return false;
+      state.busyDays.push({
+        id: generateId('busy'),
+        date: target,
+        note: normalizeBusyNote(note),
+        createdAt: new Date().toISOString()
+      });
+      return true;
+    }
+
+    function removeBusyDay(dateStr) {
+      const target = String(dateStr || '').slice(0, 10);
+      const before = state.busyDays.length;
+      state.busyDays = state.busyDays.filter(b => b.date !== target);
+      return state.busyDays.length !== before;
+    }
+
+    function recalcInvoicesForBusyDays() {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      let changed = false;
+      state.invoices.forEach(inv => {
+        if ((inv.invoiceType || inv.invoice_type) !== 'monthly') return;
+        if (inv.paid || isInvoiceVoid(inv)) return;
+        const student = getStudentById(inv.studentId);
+        if (!student) return;
+        if (recalculateMonthlyInvoice(inv, student, today)) changed = true;
+      });
+      return changed;
+    }
+
+    function toggleBusyDay(dateStr) {
+      const target = String(dateStr || '').slice(0, 10);
+      if (!target) return;
+      const existing = getBusyDay(target);
+      if (existing) {
+        if (!confirm(`Clear busy day for ${target}?`)) return;
+        removeBusyDay(target);
+        if (isSupabaseReady()) {
+          supabaseClient.from('busy_days').delete().eq('date', target).catch(err => {
+            console.warn('Busy day delete failed', err);
+          });
+        }
+      } else {
+        const note = prompt('Optional note for this busy day (e.g., school event):', '') || '';
+        addBusyDay(target, note);
+      }
+      recalcInvoicesForBusyDays();
+      saveState();
+      renderScheduleView();
+      renderStudentPortal();
+      renderParentPortal();
+    }
+
+    function getUpcomingBusyDays(limitDays = 30) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const cutoff = new Date(today);
+      cutoff.setDate(cutoff.getDate() + Number(limitDays || 30));
+      const startStr = toDateOnly(today);
+      const endStr = toDateOnly(cutoff);
+      return state.busyDays
+        .filter(b => b.date >= startStr && b.date <= endStr)
+        .sort((a, b) => a.date.localeCompare(b.date));
+    }
+
     function renderScheduleView() {
       const scheduleSessions = getScheduleVisibleSessions();
       const label = document.getElementById('scheduleWeekLabel');
@@ -7651,12 +7903,27 @@
         const totalHours = sessions.reduce((acc, s) => acc + Number(s.durationHours || 0), 0);
         dayLoads.push({ totalHours, dayName: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i] });
         const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i];
+        const busyEntry = getBusyDay(isoDate);
+        const isBusy = !!busyEntry;
+        const canEditBusy = !parentMode && !studentMode;
+        const busyAction = canEditBusy
+          ? `<button class="text-[9px] px-2 py-0.5 rounded-full border ${isBusy ? 'border-rose-300 text-rose-700 bg-rose-50' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}" onclick="toggleBusyDay('${isoDate}')">
+              ${isBusy ? 'Clear busy' : 'Mark busy'}
+            </button>`
+          : (isBusy ? '<span class="busy-badge">Busy</span>' : '');
+        const busyNote = isBusy
+          ? `<div class="mt-1 text-[10px] text-rose-600">${busyEntry?.note ? `Busy: ${busyEntry.note}` : 'Tutor unavailable'}</div>`
+          : '';
         grid.innerHTML += `
-          <div class="calendar-day" data-date="${isoDate}">
-            <div class="flex flex-col mb-1">
-              <span class="font-semibold">${dayName}</span>
-              <span class="text-[10px] text-slate-500 whitespace-nowrap">${isoDate}</span>
+          <div class="calendar-day ${isBusy ? 'busy-day' : ''}" data-date="${isoDate}">
+            <div class="flex items-start justify-between gap-2 mb-1">
+              <div class="flex flex-col">
+                <span class="font-semibold">${dayName}</span>
+                <span class="text-[10px] text-slate-500 whitespace-nowrap">${isoDate}</span>
+              </div>
+              ${busyAction}
             </div>
+            ${busyNote}
             <div class="space-y-1 text-[11px]">
               ${sessions.map(s => {
           const subjectClass = s.subject === 'Physics'
@@ -7669,11 +7936,13 @@
           const modeLabel = isOnlineSession(s) ? 'Online' : 'In person';
           const modeClass = isOnlineSession(s) ? 'session-chip-online' : 'session-chip-inperson';
           const completedChip = s.completed ? '<span class="session-chip session-chip-completed">Completed</span>' : '';
+          const busyChip = isBusy ? '<span class="session-chip session-chip-busy">Busy day</span>' : '';
           return `<div class="session-card ${completedClass} cursor-pointer" onclick="openSessionQuickActions('${s.id}')">
                             <div class="flex items-center justify-between">
                               <span class="session-time ${subjectClass}">${s.startTime || ''}</span>
                               <div class="flex items-center gap-1">
                                 ${completedChip}
+                                ${busyChip}
                                 <span class="session-chip ${modeClass}">${modeLabel}</span>
                                 <span class="session-chip ${subjectClass}">${s.subject}</span>
                               </div>
@@ -7729,6 +7998,7 @@
           const modeLabel = isOnlineSession(s) ? 'Online' : 'In person';
           const modeClass = isOnlineSession(s) ? 'session-chip-online' : 'session-chip-inperson';
           const completedChip = s.completed ? '<span class="session-chip session-chip-completed">Completed</span>' : '';
+          const busyChip = isBusyDate(s.date) ? '<span class="session-chip session-chip-busy">Busy day</span>' : '';
           return `<li class="session-card ${completedClass}">
             <div class="flex items-center justify-between">
               <div class="text-[10px] uppercase tracking-wide text-slate-500">${s.subject}</div>
@@ -7738,6 +8008,7 @@
             <div class="text-[10px] text-slate-600">${s.topic || ''} • ${s.durationHours || 1}h</div>
             <div class="flex items-center gap-1 mt-1">
               ${completedChip}
+              ${busyChip}
               <span class="session-chip ${modeClass}">${modeLabel}</span>
             </div>
             <button class="mt-1 text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50"
