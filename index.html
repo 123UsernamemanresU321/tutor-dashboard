@@ -174,6 +174,8 @@
 
     .calendar-day {
       min-height: 6rem;
+      min-width: 0;
+      overflow: visible;
       border-radius: 0.8rem;
       border: 1px solid rgba(148, 163, 184, 0.35);
       padding: 0.4rem 0.45rem;
@@ -182,6 +184,24 @@
       font-size: 0.75rem;
       background: rgba(255, 255, 255, 0.88);
       backdrop-filter: blur(12px);
+    }
+
+    .calendar-day-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 0.35rem;
+    }
+
+    .calendar-day-title {
+      display: flex;
+      flex-direction: column;
+      min-width: 80px;
+      flex: 1 1 120px;
+    }
+
+    .calendar-day-action {
+      margin-left: auto;
     }
 
     body.dark .calendar-day {
@@ -264,6 +284,7 @@
       display: flex;
       flex-direction: column;
       gap: 0.15rem;
+      min-width: 0;
       transition: transform 0.1s ease, box-shadow 0.2s ease;
     }
 
@@ -296,6 +317,14 @@
       background: rgba(248, 250, 252, 0.7);
     }
 
+    .session-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.25rem;
+      min-width: 0;
+    }
+
     .session-chip-online {
       background: rgba(14, 165, 233, 0.12);
       color: #0369a1;
@@ -317,6 +346,29 @@
     .session-time {
       font-weight: 700;
       font-size: 0.8rem;
+      flex-shrink: 0;
+    }
+
+    .maintenance-banner {
+      background: #fff7ed;
+      color: #9a3412;
+      border-bottom: 1px solid #fed7aa;
+    }
+
+    .maintenance-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 95;
+      padding: 1.5rem;
+    }
+
+    .maintenance-overlay.show {
+      display: flex;
     }
 
     /* AUTH OVERLAY */
@@ -641,6 +693,7 @@
       <div id="readOnlyBanner" class="read-only-banner hidden px-6 py-2 text-xs">
         Read-only mode: sign in as the owner to edit.
       </div>
+      <div id="maintenanceBanner" class="maintenance-banner hidden px-6 py-2 text-xs"></div>
       <div id="supabaseStatusBanner" class="hidden px-6 py-2 text-xs bg-amber-50 text-amber-900 border-b border-amber-200"></div>
       <div id="sessionAlertBanner" class="session-alert-banner hidden px-6 py-2 text-xs"></div>
 
@@ -1258,6 +1311,40 @@
                 </div>
               </div>
 
+              <div class="card p-5 text-xs space-y-3" data-owner-only>
+                <h3 class="text-sm font-semibold mb-1">Scheduled maintenance</h3>
+                <p class="text-[11px] text-slate-500">Notify users ahead of time and lock the site during maintenance.</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label class="text-[11px]">
+                    Start date
+                    <input id="maintenanceStartInput" type="date"
+                      class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
+                  </label>
+                  <label class="text-[11px]">
+                    End date (optional)
+                    <input id="maintenanceEndInput" type="date"
+                      class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
+                  </label>
+                </div>
+                <label class="text-[11px] block">
+                  Message to users (optional)
+                  <input id="maintenanceMessageInput" type="text"
+                    placeholder="Example: Database upgrade in progress."
+                    class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
+                </label>
+                <div class="flex items-center gap-2">
+                  <button id="maintenanceSaveBtn"
+                    class="px-3 py-1.5 rounded-2xl bg-amber-600 text-white text-xs font-medium hover:bg-amber-700">
+                    Schedule maintenance
+                  </button>
+                  <button id="maintenanceClearBtn"
+                    class="px-3 py-1.5 rounded-2xl border border-slate-300 text-xs">
+                    Clear maintenance
+                  </button>
+                </div>
+                <div id="maintenanceStatusText" class="text-[11px] text-slate-500"></div>
+              </div>
+
               <div class="card p-5 text-xs space-y-3">
                 <h3 class="text-sm font-semibold mb-1">Data backup</h3>
                 <p>Export your dashboard data as JSON and paste it somewhere safe. You can import it later.</p>
@@ -1717,6 +1804,14 @@
   <script src="./business-config.js"></script>
   <script src="./business-ui.js"></script>
 
+  <div id="maintenanceOverlay" class="maintenance-overlay">
+    <div class="max-w-md w-full bg-white rounded-2xl shadow-2xl p-5 text-slate-900 text-xs">
+      <div class="text-sm font-semibold text-amber-700">Scheduled maintenance in progress</div>
+      <p id="maintenanceOverlayMessage" class="mt-2 text-slate-600">
+        The dashboard is temporarily locked while maintenance is underway. Please check back soon.
+      </p>
+    </div>
+  </div>
   <script>
     /***********************
      * STATE & PERSISTENCE *
@@ -1770,6 +1865,7 @@
     const HCAPTCHA_ENABLED = true;
     const HCAPTCHA_SITEKEY = '3ff631fc-4c9c-43ee-a486-3232939eedb2';
     const MEETING_JOIN_LEAD_MINUTES = 10;
+    const MAINTENANCE_MIN_DAYS = 1;
     const PAYFAST_PROVIDER = 'PayFast';
     const PAYFAST_RETURN_URL = `${window.location.origin}${window.location.pathname}?payfast=success`;
     const PAYFAST_CANCEL_URL = `${window.location.origin}${window.location.pathname}?payfast=cancel`;
@@ -2139,7 +2235,11 @@
         monthlyIncomeGoal: 0,
         reflection: '',
         defaultSessionDuration: 1.5,
-        showVoidedInvoices: false
+        showVoidedInvoices: false,
+        maintenanceEnabled: false,
+        maintenanceStart: '',
+        maintenanceEnd: '',
+        maintenanceMessage: ''
       }
     };
 
@@ -2540,6 +2640,8 @@
       ['students', 'parents', 'parentLinks', 'sessions', 'sessionCancellations', 'busyDays', 'resources', 'homework', 'documents', 'contracts', 'invoices', 'studentTodos', 'studentCheckins', 'messages'].forEach(key => {
         if (!Array.isArray(st[key])) st[key] = [];
       });
+      if (!st.settings || typeof st.settings !== 'object') st.settings = {};
+      st.settings = Object.assign({}, defaultState.settings, st.settings);
       if (!Array.isArray(st.activityLog)) st.activityLog = [];
       st.students.forEach(s => {
         s.id = cleanId(s.id);
@@ -2980,6 +3082,22 @@
           await upsertAndPrune('busy_days', busyDays, 'id');
         } catch (err) {
           console.warn('Busy days sync skipped', err);
+        }
+      }
+
+      if (isOwner()) {
+        const settingsRow = {
+          user_id: uid,
+          maintenance_enabled: !!state.settings.maintenanceEnabled,
+          maintenance_start: state.settings.maintenanceStart || null,
+          maintenance_end: state.settings.maintenanceEnd || null,
+          maintenance_message: (state.settings.maintenanceMessage || '').trim() || null,
+          updated_at: new Date().toISOString()
+        };
+        try {
+          await supabaseClient.from('owner_settings').upsert(settingsRow, { onConflict: 'user_id' });
+        } catch (err) {
+          console.warn('Owner settings sync skipped', err);
         }
       }
 
@@ -3677,6 +3795,51 @@
       if (ns) ns.addEventListener('input', e => { state.settings.notifySessionsDays = Number(e.target.value || 0); saveState(); });
       if (nh) nh.addEventListener('input', e => { state.settings.notifyHomeworkDays = Number(e.target.value || 0); saveState(); });
       if (ni) ni.addEventListener('input', e => { state.settings.notifyInvoicesDays = Number(e.target.value || 0); saveState(); });
+      const maintenanceSaveBtn = document.getElementById('maintenanceSaveBtn');
+      const maintenanceClearBtn = document.getElementById('maintenanceClearBtn');
+      if (maintenanceSaveBtn) {
+        maintenanceSaveBtn.addEventListener('click', () => {
+          if (!isOwner()) return;
+          const startInput = document.getElementById('maintenanceStartInput');
+          const endInput = document.getElementById('maintenanceEndInput');
+          const msgInput = document.getElementById('maintenanceMessageInput');
+          const startVal = (startInput?.value || '').trim();
+          const endVal = (endInput?.value || '').trim();
+          if (!startVal) {
+            alert('Select a maintenance start date.');
+            return;
+          }
+          const minDate = getMaintenanceMinDate();
+          if (startVal < minDate) {
+            alert(`Please choose a date at least ${MAINTENANCE_MIN_DAYS} day(s) in the future.`);
+            return;
+          }
+          if (endVal && endVal < startVal) {
+            alert('End date must be on or after the start date.');
+            return;
+          }
+          state.settings.maintenanceEnabled = true;
+          state.settings.maintenanceStart = startVal;
+          state.settings.maintenanceEnd = endVal || '';
+          state.settings.maintenanceMessage = (msgInput?.value || '').trim();
+          saveState();
+          applySettingsToUI();
+          renderMaintenanceUI();
+        });
+      }
+      if (maintenanceClearBtn) {
+        maintenanceClearBtn.addEventListener('click', () => {
+          if (!isOwner()) return;
+          if (!confirm('Clear scheduled maintenance?')) return;
+          state.settings.maintenanceEnabled = false;
+          state.settings.maintenanceStart = '';
+          state.settings.maintenanceEnd = '';
+          state.settings.maintenanceMessage = '';
+          saveState();
+          applySettingsToUI();
+          renderMaintenanceUI();
+        });
+      }
       document.getElementById('exportDataBtn').addEventListener('click', () => {
         document.getElementById('backupTextarea').value = JSON.stringify(state, null, 2);
       });
@@ -3754,6 +3917,11 @@
       setVal('notifySessionsDays', state.settings.notifySessionsDays ?? 3);
       setVal('notifyHomeworkDays', state.settings.notifyHomeworkDays ?? 3);
       setVal('notifyInvoicesDays', state.settings.notifyInvoicesDays ?? 3);
+      setVal('maintenanceStartInput', state.settings.maintenanceStart || '');
+      setVal('maintenanceEndInput', state.settings.maintenanceEnd || '');
+      setVal('maintenanceMessageInput', state.settings.maintenanceMessage || '');
+      const startInput = document.getElementById('maintenanceStartInput');
+      if (startInput) startInput.min = getMaintenanceMinDate();
       // lock settings for students
       const lockIds = [
         'settingsWeeklyGoal', 'settingsMonthlyGoal', 'settingsDefaultDuration',
@@ -3763,8 +3931,85 @@
         const el = document.getElementById(id);
         if (el) el.disabled = studentMode;
       });
+      const statusText = document.getElementById('maintenanceStatusText');
+      if (statusText) {
+        const status = getMaintenanceStatus();
+        if (!status.enabled) {
+          statusText.textContent = 'No maintenance scheduled.';
+        } else if (status.active) {
+          statusText.textContent = `Maintenance active (${formatMaintenanceRange(status)}).`;
+        } else {
+          statusText.textContent = `Scheduled for ${formatMaintenanceRange(status)}.`;
+        }
+      }
       applyTheme();
       applyDensity();
+    }
+
+    function getMaintenanceMinDate() {
+      const d = new Date();
+      d.setDate(d.getDate() + MAINTENANCE_MIN_DAYS);
+      return toDateOnly(d);
+    }
+
+    function formatMaintenanceRange(status) {
+      if (!status?.start) return '';
+      if (status.end && status.end !== status.start) return `${status.start} – ${status.end}`;
+      return status.start;
+    }
+
+    function getMaintenanceStatus() {
+      const enabled = !!state.settings.maintenanceEnabled;
+      const startDate = parseDateOnly(state.settings.maintenanceStart || '');
+      const endDateRaw = parseDateOnly(state.settings.maintenanceEnd || '');
+      const endDate = endDateRaw || startDate;
+      if (!enabled || !startDate) {
+        return { enabled: false, active: false, scheduled: false, start: '', end: '', message: '' };
+      }
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const active = !!(endDate && today >= startDate && today <= endDate);
+      const scheduled = today < startDate;
+      return {
+        enabled: true,
+        active,
+        scheduled,
+        start: toDateOnly(startDate),
+        end: endDate ? toDateOnly(endDate) : '',
+        message: (state.settings.maintenanceMessage || '').trim()
+      };
+    }
+
+    function renderMaintenanceUI() {
+      const status = getMaintenanceStatus();
+      const banner = document.getElementById('maintenanceBanner');
+      const overlay = document.getElementById('maintenanceOverlay');
+      const overlayMsg = document.getElementById('maintenanceOverlayMessage');
+      if (banner) {
+        if (!status.enabled) {
+          banner.classList.add('hidden');
+          banner.textContent = '';
+        } else {
+          banner.classList.remove('hidden');
+          if (status.active) {
+            banner.textContent = `Maintenance in progress (${formatMaintenanceRange(status)}). ${status.message || 'Some actions are temporarily unavailable.'}`;
+          } else {
+            banner.textContent = `Scheduled maintenance on ${formatMaintenanceRange(status)}. ${status.message || 'Some actions may be unavailable during this time.'}`;
+          }
+        }
+      }
+      if (overlay) {
+        if (status.active && !isOwner()) {
+          overlay.classList.add('show');
+        } else {
+          overlay.classList.remove('show');
+        }
+      }
+      if (overlayMsg && status.active) {
+        overlayMsg.textContent = status.message
+          ? `${status.message} (Maintenance window: ${formatMaintenanceRange(status)}.)`
+          : `The dashboard is temporarily locked while maintenance is underway (${formatMaintenanceRange(status)}). Please check back soon.`;
+      }
     }
 
     function renderActivityLog() {
@@ -5209,6 +5454,7 @@
           switchView('parent-portal');
         }
       }
+      renderMaintenanceUI();
     }
 
     function guardEdit() {
@@ -5332,6 +5578,7 @@
           sessionStudentsRes,
           cancellationsRes,
           busyDaysRes,
+          ownerSettingsRes,
           resourcesRes,
           homeworkRes,
           documentsRes,
@@ -5350,6 +5597,7 @@
           fetchTable('session_students'),
           fetchTable('session_cancellations'),
           fetchTable('busy_days'),
+          fetchTable('owner_settings'),
           fetchTable('resources'),
           fetchTable('homework'),
           fetchTable('documents'),
@@ -5362,7 +5610,7 @@
           fetchTable('parent_contract_signatures')
         ]);
 
-        [studentsRes, parentsRes, parentLinksRes, sessionsRes, sessionStudentsRes, busyDaysRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes, activityRes, messagesRes, contractSignaturesRes].forEach(res => {
+        [studentsRes, parentsRes, parentLinksRes, sessionsRes, sessionStudentsRes, busyDaysRes, ownerSettingsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes, activityRes, messagesRes, contractSignaturesRes].forEach(res => {
           if (res.error) throw res.error;
         });
         if (cancellationsRes?.error) {
@@ -5601,6 +5849,13 @@
           created_at: a.created_at
         }));
         merged.settings = loadState().settings; // keep local settings
+        const ownerSettings = (ownerSettingsRes?.data || [])[0];
+        if (ownerSettings) {
+          merged.settings.maintenanceEnabled = !!ownerSettings.maintenance_enabled;
+          merged.settings.maintenanceStart = ownerSettings.maintenance_start || '';
+          merged.settings.maintenanceEnd = ownerSettings.maintenance_end || '';
+          merged.settings.maintenanceMessage = ownerSettings.maintenance_message || '';
+        }
 
         // Merge in any local resources not yet in Supabase so they don't disappear on reload/switch
         const localState = loadState();
@@ -5679,6 +5934,13 @@
         const snap = snapshot || {};
         const out = deepClone(defaultState);
         out.settings = localSettings;
+        const ownerSettings = snap.ownerSettings || snap.owner_settings;
+        if (ownerSettings) {
+          out.settings.maintenanceEnabled = !!ownerSettings.maintenance_enabled;
+          out.settings.maintenanceStart = ownerSettings.maintenance_start || '';
+          out.settings.maintenanceEnd = ownerSettings.maintenance_end || '';
+          out.settings.maintenanceMessage = ownerSettings.maintenance_message || '';
+        }
         out.students = (snap.students || []).map(s => ({
           id: s.id,
           name: s.name,
@@ -5960,6 +6222,7 @@
       }
 
       let busyDaysRes = { data: [] };
+      let ownerSettingsRes = { data: [] };
       const ownerIds = new Set();
       (studentsRes.data || []).forEach(s => {
         if (s.user_id) ownerIds.add(s.user_id);
@@ -5970,6 +6233,9 @@
       if (ownerIds.size) {
         try {
           busyDaysRes = await supabaseClient.from('busy_days').select('*').in('user_id', Array.from(ownerIds));
+        } catch { }
+        try {
+          ownerSettingsRes = await supabaseClient.from('owner_settings').select('*').in('user_id', Array.from(ownerIds));
         } catch { }
       }
 
@@ -6019,6 +6285,13 @@
         note: b.note || '',
         createdAt: b.created_at || ''
       }));
+      const ownerSettings = (ownerSettingsRes.data || [])[0];
+      if (ownerSettings) {
+        merged.settings.maintenanceEnabled = !!ownerSettings.maintenance_enabled;
+        merged.settings.maintenanceStart = ownerSettings.maintenance_start || '';
+        merged.settings.maintenanceEnd = ownerSettings.maintenance_end || '';
+        merged.settings.maintenanceMessage = ownerSettings.maintenance_message || '';
+      }
 
       const sessions = (sessionsRes.data || []).map(sess => {
         const studentIdsForSess = (sessionStudentsRes.data || [])
@@ -6413,6 +6686,7 @@
       if (studentMode) renderStudentPortal();
       if (parentMode) renderParentPortal();
       renderSessionAlerts();
+      renderMaintenanceUI();
     }
 
     /******************
@@ -7916,12 +8190,12 @@
           : '';
         grid.innerHTML += `
           <div class="calendar-day ${isBusy ? 'busy-day' : ''}" data-date="${isoDate}">
-            <div class="flex items-start justify-between gap-2 mb-1">
-              <div class="flex flex-col">
+            <div class="calendar-day-header mb-1">
+              <div class="calendar-day-title">
                 <span class="font-semibold">${dayName}</span>
                 <span class="text-[10px] text-slate-500 whitespace-nowrap">${isoDate}</span>
               </div>
-              ${busyAction}
+              <div class="calendar-day-action">${busyAction}</div>
             </div>
             ${busyNote}
             <div class="space-y-1 text-[11px]">
@@ -7940,11 +8214,11 @@
           return `<div class="session-card ${completedClass} cursor-pointer" onclick="openSessionQuickActions('${s.id}')">
                             <div class="flex items-center justify-between">
                               <span class="session-time ${subjectClass}">${s.startTime || ''}</span>
-                              <div class="flex items-center gap-1">
-                                ${completedChip}
-                                ${busyChip}
-                                <span class="session-chip ${modeClass}">${modeLabel}</span>
-                                <span class="session-chip ${subjectClass}">${s.subject}</span>
+                            <div class="session-chip-row">
+                              ${completedChip}
+                              ${busyChip}
+                              <span class="session-chip ${modeClass}">${modeLabel}</span>
+                              <span class="session-chip ${subjectClass}">${s.subject}</span>
                               </div>
                             </div>
                             <div class="text-[11px] font-semibold text-slate-800">${names}</div>
@@ -8006,7 +8280,7 @@
             </div>
             <div class="text-[11px] font-semibold text-slate-800">${names}</div>
             <div class="text-[10px] text-slate-600">${s.topic || ''} • ${s.durationHours || 1}h</div>
-            <div class="flex items-center gap-1 mt-1">
+            <div class="session-chip-row mt-1">
               ${completedChip}
               ${busyChip}
               <span class="session-chip ${modeClass}">${modeLabel}</span>
