@@ -1471,7 +1471,7 @@
               </button>
             </div>
             <div id="portalBusyNotice" class="hidden border border-rose-200 bg-rose-50 text-rose-800 rounded-lg px-3 py-2 text-xs">
-              <div class="font-semibold">Tutor unavailable on the dates below</div>
+              <div class="font-semibold">Tutor unavailable on the dates below (not a live status)</div>
               <ul id="portalBusyList" class="mt-2 space-y-1 text-[11px]"></ul>
             </div>
 
@@ -1612,8 +1612,8 @@
             <div id="parentBusyNotice" class="card p-4 hidden border border-rose-200 bg-rose-50 text-rose-800">
               <div class="flex items-start justify-between gap-3">
                 <div>
-                  <div class="text-sm font-semibold">Tutor unavailable</div>
-                  <div class="text-[11px] text-rose-700">Sessions are not scheduled on these dates.</div>
+                  <div class="text-sm font-semibold">Tutor unavailable on these dates (not a live status)</div>
+                  <div class="text-[11px] text-rose-700">These are specific calendar dates where sessions are not scheduled.</div>
                 </div>
               </div>
               <ul id="parentBusyList" class="mt-2 space-y-1 text-[11px]"></ul>
@@ -4180,11 +4180,11 @@
           const modeLabel = getSessionModeLabel(s.sessionMode ?? s.session_mode ?? s.mode);
           const isOnline = isOnlineSession(s);
           const isBusyDay = isBusyDate(s.date);
-          const busyLabel = isBusyDay ? '<span class="session-chip session-chip-busy">Tutor busy</span>' : '';
+          const busyLabel = isBusyDay ? '<span class="session-chip session-chip-busy">Busy date</span>' : '';
           const joinBtn = isOnline
             ? (isBusyDay
               ? `<button class="ml-auto px-2 py-0.5 rounded-lg border border-rose-200 text-[10px] text-rose-600 cursor-not-allowed" disabled>
-                  Tutor unavailable
+                  Tutor busy on this date
                 </button>`
               : canJoinMeetingNow(s)
               ? `<button class="ml-auto px-2 py-0.5 rounded-lg bg-indigo-600 text-white text-[10px]" onclick="openMeetingForSession('${s.id}')">Join online</button>`
@@ -4710,11 +4710,11 @@
           const modeLabel = getSessionModeLabel(s.sessionMode ?? s.session_mode ?? s.mode);
           const isOnline = isOnlineSession(s);
           const isBusyDay = isBusyDate(s.date);
-          const busyLabel = isBusyDay ? '<span class="session-chip session-chip-busy">Tutor busy</span>' : '';
+          const busyLabel = isBusyDay ? '<span class="session-chip session-chip-busy">Busy date</span>' : '';
           const joinBtn = isOnline
             ? (isBusyDay
               ? `<button class="mt-1 px-2 py-1 rounded-lg border border-rose-200 text-[10px] text-rose-600 cursor-not-allowed" disabled>
-                  Tutor unavailable
+                  Tutor busy on this date
                 </button>`
               : canJoinMeetingNow(s)
               ? `<button class="mt-1 px-2 py-1 rounded-lg bg-indigo-600 text-white text-[10px]" onclick="openMeetingForSession('${s.id}')">Join online session</button>`
@@ -8123,7 +8123,7 @@
       return changed;
     }
 
-    function toggleBusyDay(dateStr) {
+    async function toggleBusyDay(dateStr) {
       const target = String(dateStr || '').slice(0, 10);
       if (!target) return;
       const existing = getBusyDay(target);
@@ -8131,9 +8131,25 @@
         if (!confirm(`Clear busy day for ${target}?`)) return;
         removeBusyDay(target);
         if (isSupabaseReady()) {
-          supabaseClient.from('busy_days').delete().eq('date', target).catch(err => {
+          let deleted = true;
+          try {
+            const uid = supabaseSession?.user?.id;
+            let del = supabaseClient.from('busy_days').delete().eq('date', target);
+            if (uid) del = del.eq('user_id', uid);
+            if (existing.id) del = del.eq('id', existing.id);
+            const { error } = await del;
+            if (error) {
+              deleted = false;
+              console.warn('Busy day delete failed', error);
+            }
+          } catch (err) {
+            deleted = false;
             console.warn('Busy day delete failed', err);
-          });
+          }
+          if (!deleted) {
+            if (!getBusyDay(target)) state.busyDays.push(existing);
+            alert('Could not clear the busy day on the server. Please try again.');
+          }
         }
       } else {
         const note = prompt('Optional note for this busy day (e.g., school event):', '') || '';
@@ -8186,7 +8202,7 @@
             </button>`
           : (isBusy ? '<span class="busy-badge">Busy</span>' : '');
         const busyNote = isBusy
-          ? `<div class="mt-1 text-[10px] text-rose-600">${busyEntry?.note ? `Busy: ${busyEntry.note}` : 'Tutor unavailable'}</div>`
+          ? `<div class="mt-1 text-[10px] text-rose-600">${busyEntry?.note ? `Busy: ${busyEntry.note}` : 'Tutor busy on this date'}</div>`
           : '';
         grid.innerHTML += `
           <div class="calendar-day ${isBusy ? 'busy-day' : ''}" data-date="${isoDate}">
@@ -8210,7 +8226,7 @@
           const modeLabel = isOnlineSession(s) ? 'Online' : 'In person';
           const modeClass = isOnlineSession(s) ? 'session-chip-online' : 'session-chip-inperson';
           const completedChip = s.completed ? '<span class="session-chip session-chip-completed">Completed</span>' : '';
-          const busyChip = isBusy ? '<span class="session-chip session-chip-busy">Busy day</span>' : '';
+          const busyChip = isBusy ? '<span class="session-chip session-chip-busy">Busy date</span>' : '';
           return `<div class="session-card ${completedClass} cursor-pointer" onclick="openSessionQuickActions('${s.id}')">
                             <div class="flex items-center justify-between">
                               <span class="session-time ${subjectClass}">${s.startTime || ''}</span>
@@ -8272,7 +8288,7 @@
           const modeLabel = isOnlineSession(s) ? 'Online' : 'In person';
           const modeClass = isOnlineSession(s) ? 'session-chip-online' : 'session-chip-inperson';
           const completedChip = s.completed ? '<span class="session-chip session-chip-completed">Completed</span>' : '';
-          const busyChip = isBusyDate(s.date) ? '<span class="session-chip session-chip-busy">Busy day</span>' : '';
+          const busyChip = isBusyDate(s.date) ? '<span class="session-chip session-chip-busy">Busy date</span>' : '';
           return `<li class="session-card ${completedClass}">
             <div class="flex items-center justify-between">
               <div class="text-[10px] uppercase tracking-wide text-slate-500">${s.subject}</div>
