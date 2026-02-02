@@ -1321,16 +1321,17 @@
                 <p class="text-[11px] text-slate-500">Notify users ahead of time and lock the site during maintenance.</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label class="text-[11px]">
-                    Start date
-                    <input id="maintenanceStartInput" type="date"
+                    Start date/time
+                    <input id="maintenanceStartInput" type="datetime-local"
                       class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
                   </label>
                   <label class="text-[11px]">
-                    End date (optional)
-                    <input id="maintenanceEndInput" type="date"
+                    End date/time (optional)
+                    <input id="maintenanceEndInput" type="datetime-local"
                       class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
                   </label>
                 </div>
+                <div class="text-[10px] text-slate-500">Leave end blank to keep maintenance active until you clear it.</div>
                 <label class="text-[11px] block">
                   Message to users (optional)
                   <input id="maintenanceMessageInput" type="text"
@@ -1341,6 +1342,10 @@
                   <button id="maintenanceSaveBtn"
                     class="px-3 py-1.5 rounded-2xl bg-amber-600 text-white text-xs font-medium hover:bg-amber-700">
                     Schedule maintenance
+                  </button>
+                  <button id="maintenanceStartNowBtn"
+                    class="px-3 py-1.5 rounded-2xl border border-amber-300 text-amber-700 text-xs">
+                    Start now
                   </button>
                   <button id="maintenanceClearBtn"
                     class="px-3 py-1.5 rounded-2xl border border-slate-300 text-xs">
@@ -1894,6 +1899,7 @@
     let privacyRead = false;
     let tosRead = false;
     let presenceHeartbeat = null;
+    let maintenanceTicker = null;
     let presenceMap = new Map();
 
     // SAFE deep clone helper
@@ -2244,6 +2250,8 @@
         maintenanceEnabled: false,
         maintenanceStart: '',
         maintenanceEnd: '',
+        maintenanceStartAt: '',
+        maintenanceEndAt: '',
         maintenanceMessage: ''
       }
     };
@@ -3096,6 +3104,8 @@
           maintenance_enabled: !!state.settings.maintenanceEnabled,
           maintenance_start: state.settings.maintenanceStart || null,
           maintenance_end: state.settings.maintenanceEnd || null,
+          maintenance_start_at: state.settings.maintenanceStartAt || null,
+          maintenance_end_at: state.settings.maintenanceEndAt || null,
           maintenance_message: (state.settings.maintenanceMessage || '').trim() || null,
           updated_at: new Date().toISOString()
         };
@@ -3801,6 +3811,7 @@
       if (nh) nh.addEventListener('input', e => { state.settings.notifyHomeworkDays = Number(e.target.value || 0); saveState(); });
       if (ni) ni.addEventListener('input', e => { state.settings.notifyInvoicesDays = Number(e.target.value || 0); saveState(); });
       const maintenanceSaveBtn = document.getElementById('maintenanceSaveBtn');
+      const maintenanceStartNowBtn = document.getElementById('maintenanceStartNowBtn');
       const maintenanceClearBtn = document.getElementById('maintenanceClearBtn');
       if (maintenanceSaveBtn) {
         maintenanceSaveBtn.addEventListener('click', () => {
@@ -3814,18 +3825,44 @@
             alert('Select a maintenance start date.');
             return;
           }
-          const minDate = getMaintenanceMinDate();
-          if (startVal < minDate) {
+          const startDate = parseLocalDateTimeInput(startVal);
+          const endDate = endVal ? parseLocalDateTimeInput(endVal) : null;
+          if (!startDate) {
+            alert('Invalid start date/time.');
+            return;
+          }
+          const minDateStr = getMaintenanceMinDate();
+          const minDate = parseLocalDateTimeInput(minDateStr);
+          if (minDate && startDate < minDate) {
             alert(`Please choose a date at least ${MAINTENANCE_MIN_DAYS} day(s) in the future.`);
             return;
           }
-          if (endVal && endVal < startVal) {
+          if (endDate && endDate < startDate) {
             alert('End date must be on or after the start date.');
             return;
           }
           state.settings.maintenanceEnabled = true;
-          state.settings.maintenanceStart = startVal;
-          state.settings.maintenanceEnd = endVal || '';
+          state.settings.maintenanceStartAt = startDate.toISOString();
+          state.settings.maintenanceEndAt = endDate ? endDate.toISOString() : '';
+          state.settings.maintenanceStart = toDateOnly(startDate);
+          state.settings.maintenanceEnd = endDate ? toDateOnly(endDate) : '';
+          state.settings.maintenanceMessage = (msgInput?.value || '').trim();
+          saveState();
+          applySettingsToUI();
+          renderMaintenanceUI();
+        });
+      }
+      if (maintenanceStartNowBtn) {
+        maintenanceStartNowBtn.addEventListener('click', () => {
+          if (!isOwner()) return;
+          if (!confirm('Start maintenance immediately? This will lock out parents/students.')) return;
+          const msgInput = document.getElementById('maintenanceMessageInput');
+          const now = new Date();
+          state.settings.maintenanceEnabled = true;
+          state.settings.maintenanceStartAt = now.toISOString();
+          state.settings.maintenanceEndAt = '';
+          state.settings.maintenanceStart = toDateOnly(now);
+          state.settings.maintenanceEnd = '';
           state.settings.maintenanceMessage = (msgInput?.value || '').trim();
           saveState();
           applySettingsToUI();
@@ -3839,6 +3876,8 @@
           state.settings.maintenanceEnabled = false;
           state.settings.maintenanceStart = '';
           state.settings.maintenanceEnd = '';
+          state.settings.maintenanceStartAt = '';
+          state.settings.maintenanceEndAt = '';
           state.settings.maintenanceMessage = '';
           saveState();
           applySettingsToUI();
@@ -3922,8 +3961,12 @@
       setVal('notifySessionsDays', state.settings.notifySessionsDays ?? 3);
       setVal('notifyHomeworkDays', state.settings.notifyHomeworkDays ?? 3);
       setVal('notifyInvoicesDays', state.settings.notifyInvoicesDays ?? 3);
-      setVal('maintenanceStartInput', state.settings.maintenanceStart || '');
-      setVal('maintenanceEndInput', state.settings.maintenanceEnd || '');
+      const startAtValue = state.settings.maintenanceStartAt || '';
+      const endAtValue = state.settings.maintenanceEndAt || '';
+      const legacyStart = state.settings.maintenanceStart || '';
+      const legacyEnd = state.settings.maintenanceEnd || '';
+      setVal('maintenanceStartInput', toLocalDateTimeInput(startAtValue || (legacyStart ? `${legacyStart}T00:00` : '')));
+      setVal('maintenanceEndInput', toLocalDateTimeInput(endAtValue || (legacyEnd ? `${legacyEnd}T23:59` : '')));
       setVal('maintenanceMessageInput', state.settings.maintenanceMessage || '');
       const startInput = document.getElementById('maintenanceStartInput');
       if (startInput) startInput.min = getMaintenanceMinDate();
@@ -3942,7 +3985,11 @@
         if (!status.enabled) {
           statusText.textContent = 'No maintenance scheduled.';
         } else if (status.active) {
-          statusText.textContent = `Maintenance active (${formatMaintenanceRange(status)}).`;
+          statusText.textContent = status.endAt
+            ? `Maintenance active, ends in ${formatCountdown(status.msToEnd)} (${formatMaintenanceRange(status)}).`
+            : `Maintenance active (until cleared).`;
+        } else if (status.scheduled) {
+          statusText.textContent = `Scheduled for ${formatMaintenanceRange(status)} (starts in ${formatCountdown(status.msToStart)}).`;
         } else {
           statusText.textContent = `Scheduled for ${formatMaintenanceRange(status)}.`;
         }
@@ -3951,36 +3998,88 @@
       applyDensity();
     }
 
+    function pad2(n) {
+      return String(n).padStart(2, '0');
+    }
+
+    function toLocalDateTimeInput(value) {
+      if (!value) return '';
+      const d = value instanceof Date ? value : new Date(value);
+      if (Number.isNaN(d.getTime())) return '';
+      return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    }
+
+    function parseLocalDateTimeInput(value) {
+      const raw = String(value || '').trim();
+      if (!raw) return null;
+      const [datePart, timePart] = raw.split('T');
+      if (!datePart || !timePart) return null;
+      const [y, m, d] = datePart.split('-').map(Number);
+      const [hh, mm] = timePart.split(':').map(Number);
+      if (!y || !m || !d) return null;
+      return new Date(y, (m - 1), d, hh || 0, mm || 0, 0, 0);
+    }
+
+    function formatDateTimeShort(value) {
+      if (!value) return '';
+      const d = value instanceof Date ? value : new Date(value);
+      if (Number.isNaN(d.getTime())) return '';
+      return `${toDateOnly(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    }
+
+    function formatCountdown(ms) {
+      if (!Number.isFinite(ms) || ms <= 0) return '0m';
+      const totalMinutes = Math.ceil(ms / 60000);
+      const days = Math.floor(totalMinutes / 1440);
+      const hours = Math.floor((totalMinutes % 1440) / 60);
+      const minutes = totalMinutes % 60;
+      const parts = [];
+      if (days) parts.push(`${days}d`);
+      if (hours) parts.push(`${hours}h`);
+      if (!days && minutes) parts.push(`${minutes}m`);
+      return parts.join(' ');
+    }
+
     function getMaintenanceMinDate() {
       const d = new Date();
       d.setDate(d.getDate() + MAINTENANCE_MIN_DAYS);
-      return toDateOnly(d);
+      d.setHours(0, 0, 0, 0);
+      return toLocalDateTimeInput(d);
     }
 
     function formatMaintenanceRange(status) {
-      if (!status?.start) return '';
-      if (status.end && status.end !== status.start) return `${status.start} – ${status.end}`;
-      return status.start;
+      if (!status?.startAt) return '';
+      const startLabel = formatDateTimeShort(status.startAt);
+      if (status.endAt) return `${startLabel} – ${formatDateTimeShort(status.endAt)}`;
+      return startLabel;
     }
 
     function getMaintenanceStatus() {
       const enabled = !!state.settings.maintenanceEnabled;
-      const startDate = parseDateOnly(state.settings.maintenanceStart || '');
-      const endDateRaw = parseDateOnly(state.settings.maintenanceEnd || '');
-      const endDate = endDateRaw || startDate;
-      if (!enabled || !startDate) {
-        return { enabled: false, active: false, scheduled: false, start: '', end: '', message: '' };
+      let startAt = state.settings.maintenanceStartAt ? new Date(state.settings.maintenanceStartAt) : null;
+      let endAt = state.settings.maintenanceEndAt ? new Date(state.settings.maintenanceEndAt) : null;
+      if ((!startAt || Number.isNaN(startAt.getTime())) && state.settings.maintenanceStart) {
+        startAt = new Date(state.settings.maintenanceStart + 'T00:00:00');
       }
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const active = !!(endDate && today >= startDate && today <= endDate);
-      const scheduled = today < startDate;
+      if ((!endAt || Number.isNaN(endAt.getTime())) && state.settings.maintenanceEnd) {
+        endAt = new Date(state.settings.maintenanceEnd + 'T23:59:00');
+      }
+      if (!enabled || !startAt || Number.isNaN(startAt.getTime())) {
+        return { enabled: false, active: false, scheduled: false, startAt: null, endAt: null, message: '' };
+      }
+      const now = new Date();
+      const active = now >= startAt && (!endAt || now <= endAt);
+      const scheduled = now < startAt;
+      const msToStart = startAt ? startAt.getTime() - now.getTime() : 0;
+      const msToEnd = endAt ? endAt.getTime() - now.getTime() : 0;
       return {
         enabled: true,
         active,
         scheduled,
-        start: toDateOnly(startDate),
-        end: endDate ? toDateOnly(endDate) : '',
+        startAt,
+        endAt,
+        msToStart,
+        msToEnd,
         message: (state.settings.maintenanceMessage || '').trim()
       };
     }
@@ -3997,7 +4096,12 @@
         } else {
           banner.classList.remove('hidden');
           if (status.active) {
-            banner.textContent = `Maintenance in progress (${formatMaintenanceRange(status)}). ${status.message || 'Some actions are temporarily unavailable.'}`;
+            const suffix = status.endAt
+              ? `Ends in ${formatCountdown(status.msToEnd)}.`
+              : 'Active until cleared.';
+            banner.textContent = `Maintenance in progress (${formatMaintenanceRange(status)}). ${suffix} ${status.message || 'Some actions are temporarily unavailable.'}`;
+          } else if (status.scheduled) {
+            banner.textContent = `Scheduled maintenance starts in ${formatCountdown(status.msToStart)} (${formatMaintenanceRange(status)}). ${status.message || 'Some actions may be unavailable during this time.'}`;
           } else {
             banner.textContent = `Scheduled maintenance on ${formatMaintenanceRange(status)}. ${status.message || 'Some actions may be unavailable during this time.'}`;
           }
@@ -4011,9 +4115,18 @@
         }
       }
       if (overlayMsg && status.active) {
+        const extra = status.endAt
+          ? `Ends in ${formatCountdown(status.msToEnd)}.`
+          : 'Active until cleared.';
         overlayMsg.textContent = status.message
-          ? `${status.message} (Maintenance window: ${formatMaintenanceRange(status)}.)`
-          : `The dashboard is temporarily locked while maintenance is underway (${formatMaintenanceRange(status)}). Please check back soon.`;
+          ? `${status.message} (Maintenance window: ${formatMaintenanceRange(status)}.) ${extra}`
+          : `The dashboard is temporarily locked while maintenance is underway (${formatMaintenanceRange(status)}). ${extra}`;
+      }
+      if (status.enabled && !maintenanceTicker) {
+        maintenanceTicker = setInterval(() => renderMaintenanceUI(), 60000);
+      } else if (!status.enabled && maintenanceTicker) {
+        clearInterval(maintenanceTicker);
+        maintenanceTicker = null;
       }
     }
 
@@ -5871,6 +5984,8 @@
           merged.settings.maintenanceEnabled = !!ownerSettings.maintenance_enabled;
           merged.settings.maintenanceStart = ownerSettings.maintenance_start || '';
           merged.settings.maintenanceEnd = ownerSettings.maintenance_end || '';
+          merged.settings.maintenanceStartAt = ownerSettings.maintenance_start_at || '';
+          merged.settings.maintenanceEndAt = ownerSettings.maintenance_end_at || '';
           merged.settings.maintenanceMessage = ownerSettings.maintenance_message || '';
         }
 
@@ -5956,6 +6071,8 @@
           out.settings.maintenanceEnabled = !!ownerSettings.maintenance_enabled;
           out.settings.maintenanceStart = ownerSettings.maintenance_start || '';
           out.settings.maintenanceEnd = ownerSettings.maintenance_end || '';
+          out.settings.maintenanceStartAt = ownerSettings.maintenance_start_at || '';
+          out.settings.maintenanceEndAt = ownerSettings.maintenance_end_at || '';
           out.settings.maintenanceMessage = ownerSettings.maintenance_message || '';
         }
         out.students = (snap.students || []).map(s => ({
@@ -6307,6 +6424,8 @@
         merged.settings.maintenanceEnabled = !!ownerSettings.maintenance_enabled;
         merged.settings.maintenanceStart = ownerSettings.maintenance_start || '';
         merged.settings.maintenanceEnd = ownerSettings.maintenance_end || '';
+        merged.settings.maintenanceStartAt = ownerSettings.maintenance_start_at || '';
+        merged.settings.maintenanceEndAt = ownerSettings.maintenance_end_at || '';
         merged.settings.maintenanceMessage = ownerSettings.maintenance_message || '';
       }
 
