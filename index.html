@@ -352,6 +352,12 @@
       border-color: rgba(16, 185, 129, 0.35);
     }
 
+    .session-chip-attended {
+      background: rgba(245, 158, 11, 0.16);
+      color: #b45309;
+      border-color: rgba(245, 158, 11, 0.35);
+    }
+
     .session-time {
       font-weight: 700;
       font-size: 0.8rem;
@@ -1402,20 +1408,20 @@
                 <h3 class="text-sm font-semibold mb-1" data-i18n="settings.maintenance_title">Scheduled maintenance</h3>
                 <p class="text-[11px] text-slate-500" data-i18n="settings.maintenance_hint">Notify users ahead of time and lock the site during maintenance.</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <label class="text-[11px]" data-i18n="settings.maintenance_start">
-                    Start date/time
+                  <label class="text-[11px]">
+                    <span data-i18n="settings.maintenance_start">Start date/time</span>
                     <input id="maintenanceStartInput" type="datetime-local"
                       class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
                   </label>
-                  <label class="text-[11px]" data-i18n="settings.maintenance_end">
-                    End date/time (optional)
+                  <label class="text-[11px]">
+                    <span data-i18n="settings.maintenance_end">End date/time (optional)</span>
                     <input id="maintenanceEndInput" type="datetime-local"
                       class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
                   </label>
                 </div>
                 <div class="text-[10px] text-slate-500" data-i18n="settings.maintenance_end_hint">Leave end blank to keep maintenance active until you clear it.</div>
-                <label class="text-[11px] block" data-i18n="settings.maintenance_message">
-                  Message to users (optional)
+                <label class="text-[11px] block">
+                  <span data-i18n="settings.maintenance_message">Message to users (optional)</span>
                   <input id="maintenanceMessageInput" type="text"
                     data-i18n-attr="placeholder:settings.maintenance_message_placeholder"
                     placeholder="Example: Database upgrade in progress."
@@ -1575,6 +1581,7 @@
                   <h3 class="text-sm font-semibold" data-i18n="portal.upcoming_sessions">Upcoming sessions</h3>
                   <span class="hint" data-i18n="portal.all_upcoming">All upcoming</span>
                 </div>
+                <div id="portalSessionReminder" class="hidden rounded-lg border px-2 py-1 text-[11px]"></div>
                 <ul id="portalSessions" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
               </div>
               <div class="card p-4 space-y-2">
@@ -2485,6 +2492,7 @@
           subject: 'Physics',
           topic: 'Momentum and collisions',
           notes: 'Bring worksheet 4.',
+          attended: false,
           completed: false,
           invoiceId: invoiceA,
           sessionMode: 'in_person'
@@ -2498,6 +2506,7 @@
           subject: 'Maths',
           topic: 'Trigonometry revision',
           notes: 'Review identities.',
+          attended: false,
           completed: false,
           invoiceId: '',
           sessionMode: 'online'
@@ -2511,6 +2520,7 @@
           subject: 'Chemistry',
           topic: 'Stoichiometry recap',
           notes: 'Check limiting reagent.',
+          attended: true,
           completed: true,
           invoiceId: invoiceB,
           sessionMode: 'in_person'
@@ -2820,6 +2830,8 @@
         s.studentIds = (s.studentIds || []).map(cleanId);
         s.invoiceId = cleanId(s.invoiceId);
         s.startTime = normalizeTimeValue(s.startTime || s.start_time || '');
+        s.attended = !!s.attended;
+        s.completed = !!s.completed;
         s.sessionMode = normalizeSessionMode(s.sessionMode || s.session_mode || s.mode || 'in_person');
         s.meetingRoom = (s.meetingRoom || s.meeting_room || '').trim();
         s.meetingProvider = (s.meetingProvider || s.meeting_provider || '').trim();
@@ -3139,6 +3151,7 @@
         subject: sess.subject,
         topic: sess.topic,
         notes: sess.notes,
+        attended: !!sess.attended,
         completed: !!sess.completed,
         invoice_id: sess.invoiceId ? cleanId(sess.invoiceId) : null,
         session_mode: normalizeSessionMode(sess.sessionMode ?? sess.session_mode ?? sess.mode),
@@ -4462,11 +4475,47 @@
       }
       const now = new Date();
       const mySessions = state.sessions.filter(s => s.studentIds.includes(student.id))
+        .filter(s => !s.completed)
         .filter(s => {
-          const d = new Date(s.date + 'T' + (s.startTime || '00:00'));
-          return d >= now;
+          const start = new Date(s.date + 'T' + (s.startTime || '00:00'));
+          const durationMs = Number(s.durationHours || 1) * 60 * 60 * 1000;
+          const end = new Date(start.getTime() + durationMs);
+          return end >= now;
         })
         .sort((a, b) => new Date(a.date + 'T' + (a.startTime || '00:00')) - new Date(b.date + 'T' + (b.startTime || '00:00')));
+      const portalReminder = document.getElementById('portalSessionReminder');
+      if (portalReminder) {
+        const activeSessions = mySessions.filter(s => {
+          const start = new Date(s.date + 'T' + (s.startTime || '00:00'));
+          const durationMs = Number(s.durationHours || 1) * 60 * 60 * 1000;
+          const end = new Date(start.getTime() + durationMs);
+          return now >= start && now <= end;
+        });
+        const lateSessions = activeSessions.filter(s => !s.attended);
+        const returnSessions = activeSessions.filter(s => s.attended && !s.completed);
+        if (!lateSessions.length && !returnSessions.length) {
+          portalReminder.classList.add('hidden');
+          portalReminder.innerHTML = '';
+        } else {
+          const isLate = lateSessions.length > 0;
+          portalReminder.className = `rounded-lg border px-2 py-1 text-[11px] ${isLate ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`;
+          const lines = [];
+          if (lateSessions.length) {
+            lines.push(`<div class="font-semibold">${esc(t('portal.reminder_late_title'))}</div>`);
+            lines.push(`<ul class="mt-1 space-y-0.5">${lateSessions.map(s => {
+              return `<li>${esc(t('portal.reminder_late_line', { subject: s.subject || t('common.lesson'), time: s.startTime || '' }))}</li>`;
+            }).join('')}</ul>`);
+          }
+          if (returnSessions.length) {
+            lines.push(`<div class="font-semibold mt-2">${esc(t('portal.reminder_return_title'))}</div>`);
+            lines.push(`<ul class="mt-1 space-y-0.5">${returnSessions.map(s => {
+              return `<li>${esc(t('portal.reminder_return_line', { subject: s.subject || t('common.lesson'), time: s.startTime || '' }))}</li>`;
+            }).join('')}</ul>`);
+          }
+          portalReminder.innerHTML = lines.join('');
+          portalReminder.classList.remove('hidden');
+        }
+      }
       if (sessionsUl) {
         sessionsUl.innerHTML = mySessions.length ? mySessions.map(s => {
           const modeLabel = getSessionModeLabel(s.sessionMode ?? s.session_mode ?? s.mode);
@@ -5649,6 +5698,7 @@
 
     function canJoinMeetingNow(session) {
       if (!isOnlineSession(session)) return false;
+      if (session?.completed) return false;
       if (!session?.date) return false;
       const start = new Date(session.date + 'T' + (session.startTime || '00:00'));
       const durationMs = Number(session.durationHours || 1) * 60 * 60 * 1000;
@@ -5959,6 +6009,7 @@
             subject: sess.subject,
             topic: sess.topic,
             notes: sess.notes,
+            attended: !!sess.attended,
             completed: sess.completed,
             invoiceId: sess.invoice_id,
             studentIds,
@@ -6327,6 +6378,7 @@
           subject: sess.subject,
           topic: sess.topic,
           notes: sess.notes,
+          attended: !!sess.attended,
           completed: sess.completed,
           invoiceId: sess.invoice_id,
           sessionMode: normalizeSessionMode(sess.session_mode),
@@ -6652,6 +6704,7 @@
           subject: sess.subject,
           topic: sess.topic,
           notes: sess.notes,
+          attended: !!sess.attended,
           completed: sess.completed,
           invoiceId: sess.invoice_id,
           studentIds: studentIdsForSess
@@ -8582,6 +8635,7 @@
           const completedClass = s.completed ? 'completed' : '';
           const modeLabel = isOnlineSession(s) ? t('schedule.online') : t('schedule.in_person');
           const modeClass = isOnlineSession(s) ? 'session-chip-online' : 'session-chip-inperson';
+          const attendedChip = (!s.completed && s.attended) ? `<span class="session-chip session-chip-attended">${esc(t('schedule.attended'))}</span>` : '';
           const completedChip = s.completed ? `<span class="session-chip session-chip-completed">${esc(t('schedule.completed'))}</span>` : '';
           const busyChip = isBusy ? `<span class="session-chip session-chip-busy">${esc(t('schedule.busy_date'))}</span>` : '';
           const safeSessionId = cleanId(s.id);
@@ -8593,6 +8647,7 @@
                             <div class="text-[11px] font-semibold text-slate-800">${names}</div>
                             <div class="text-[10px] text-slate-600 leading-snug">${esc(s.topic || '')}</div>
                             <div class="session-chip-row session-chip-row-center mt-1">
+                              ${attendedChip}
                               ${completedChip}
                               ${busyChip}
                               <span class="session-chip ${modeClass}">${esc(modeLabel)}</span>
@@ -8646,6 +8701,7 @@
           const completedClass = s.completed ? 'completed' : '';
           const modeLabel = isOnlineSession(s) ? t('schedule.online') : t('schedule.in_person');
           const modeClass = isOnlineSession(s) ? 'session-chip-online' : 'session-chip-inperson';
+          const attendedChip = (!s.completed && s.attended) ? `<span class="session-chip session-chip-attended">${esc(t('schedule.attended'))}</span>` : '';
           const completedChip = s.completed ? `<span class="session-chip session-chip-completed">${esc(t('schedule.completed'))}</span>` : '';
           const busyChip = isBusyDate(s.date) ? `<span class="session-chip session-chip-busy">${esc(t('schedule.busy_date'))}</span>` : '';
           const safeSessionId = cleanId(s.id);
@@ -8657,6 +8713,7 @@
             <div class="text-[11px] font-semibold text-slate-800">${names}</div>
             <div class="text-[10px] text-slate-600">${esc(s.topic || '')} • ${esc(s.durationHours || 1)}h</div>
             <div class="session-chip-row mt-1">
+              ${attendedChip}
               ${completedChip}
               ${busyChip}
               <span class="session-chip ${modeClass}">${esc(modeLabel)}</span>
@@ -8991,6 +9048,7 @@
           subject: student.subjects?.[0] || 'Tutoring',
           topic: 'Auto-scheduled session',
           notes: '',
+          attended: false,
           completed: false,
           invoiceId: inv.id,
           sessionMode,
@@ -9446,6 +9504,11 @@
       const joinBtn = (!parentMode && canJoinMeetingNow(sess))
         ? `<button id="sessionJoinBtn" class="w-full px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium">${esc(t('meeting.join_online_session'))}</button>`
         : '';
+      const attended = !!sess.attended;
+      const completed = !!sess.completed;
+      const attendedLabel = attended || completed ? t('sessions.attended') : t('sessions.mark_attended');
+      const completedLabel = completed ? t('sessions.completed') : t('sessions.mark_complete');
+      const attendedDisabled = attended || completed;
       openModal(`
         <h2 class="text-sm font-semibold mb-2">${esc(t('sessions.quick_title', { names }))}</h2>
         <p class="text-[11px] mb-2">${esc(sess.subject)} • ${esc(sess.date)} • ${esc(sess.startTime || '')} (${esc(sess.durationHours || 1)}h) • ${modeLabel}</p>
@@ -9453,8 +9516,11 @@
 
         <div class="space-y-2">
           ${joinBtn}
-          <button id="sessionMarkCompletedBtn" class="w-full px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-medium" data-owner-only>
-            ${esc(t('sessions.mark_attended_complete'))}
+          <button id="sessionMarkAttendedBtn" class="w-full px-3 py-1.5 rounded-xl border border-amber-300 text-amber-800 text-xs font-medium ${attendedDisabled ? 'opacity-60 cursor-not-allowed' : ''}" data-owner-only ${attendedDisabled ? 'disabled' : ''}>
+            ${esc(attendedLabel)}
+          </button>
+          <button id="sessionMarkCompletedBtn" class="w-full px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-medium ${completed ? 'opacity-60 cursor-not-allowed' : ''}" data-owner-only ${completed ? 'disabled' : ''}>
+            ${esc(completedLabel)}
           </button>
           <button id="sessionEditBtn" class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs" data-owner-only>
             ${esc(t('common.edit'))}
@@ -9463,17 +9529,27 @@
       `, () => {
         const joinButton = document.getElementById('sessionJoinBtn');
         if (joinButton) joinButton.onclick = () => openMeetingForSession(safeSessionId);
+        const markAttendedBtn = document.getElementById('sessionMarkAttendedBtn');
+        if (markAttendedBtn) {
+          markAttendedBtn.onclick = () => {
+            if (!guardEdit()) return;
+            sess.attended = true;
+            saveState();
+            closeModal();
+            renderAllViews();
+          };
+        }
         document.getElementById('sessionMarkCompletedBtn').onclick = () => {
           if (!guardEdit()) return;
           if (!guardSessionCompletion(sess)) {
             alert(t('alert.cannot_complete_unpaid_invoice'));
             return;
           }
+          sess.attended = true;
           sess.completed = true;
           saveState();
           closeModal();
-          renderScheduleView();
-          renderStudentsView();
+          renderAllViews();
         };
         document.getElementById('sessionEditBtn').onclick = () => {
           if (!guardEdit()) return;
@@ -10704,6 +10780,7 @@
             subject: form.subject.value,
             topic: form.topic.value.trim(),
             notes: form.notes.value.trim(),
+            attended: session?.attended || false,
             completed: session?.completed || false,
             invoiceId: session?.invoiceId || '',
             sessionMode: normalizeSessionMode(form.sessionMode?.value || session?.sessionMode || 'in_person'),
@@ -11694,6 +11771,7 @@
                 subject: student.subjects?.[0] || 'Tutoring',
                 topic: 'Auto-scheduled session',
                 notes: '',
+                attended: false,
                 completed: false,
                 invoiceId: inv.id,
                 sessionMode,
