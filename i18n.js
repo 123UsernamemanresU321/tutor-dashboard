@@ -56,6 +56,7 @@
       'schedule.online': 'Online',
       'schedule.in_person': 'In person',
       'schedule.completed': 'Completed',
+      'schedule.attended': 'Attended',
       'schedule.past': 'Past',
       'schedule.upcoming': 'Upcoming',
       'schedule.join': 'Join',
@@ -228,6 +229,7 @@
       'schedule.online': 'En línea',
       'schedule.in_person': 'Presencial',
       'schedule.completed': 'Completada',
+      'schedule.attended': 'Asistida',
       'schedule.past': 'Pasada',
       'schedule.upcoming': 'Próxima',
       'schedule.join': 'Unirse',
@@ -400,6 +402,7 @@
       'schedule.online': 'En ligne',
       'schedule.in_person': 'En présentiel',
       'schedule.completed': 'Terminée',
+      'schedule.attended': 'Présent',
       'schedule.past': 'Passée',
       'schedule.upcoming': 'À venir',
       'schedule.join': 'Rejoindre',
@@ -572,6 +575,7 @@
       'schedule.online': '线上',
       'schedule.in_person': '线下',
       'schedule.completed': '已完成',
+      'schedule.attended': '已到',
       'schedule.past': '已过去',
       'schedule.upcoming': '即将开始',
       'schedule.join': '进入',
@@ -862,6 +866,10 @@
       'portal.contract_invalid': 'INVALID – CONTRACT NOT SIGNED. Ask your parent/guardian to sign the contract to unlock this portal.',
       'portal.refresh_contract_status': 'Refresh contract status',
       'portal.busy_notice_title': 'Tutor unavailable on the dates below (not a live status)',
+      'portal.reminder_late_title': 'You are late',
+      'portal.reminder_late_line': 'Late for: {{subject}} at {{time}}',
+      'portal.reminder_return_title': 'Lesson in progress',
+      'portal.reminder_return_line': 'Return to lesson: {{subject}} at {{time}}',
       'portal.upcoming_sessions': 'Upcoming sessions',
       'portal.all_upcoming': 'All upcoming',
       'portal.homework': 'Homework',
@@ -1124,6 +1132,10 @@
       'portal.contract_invalid': 'INVÁLIDO – CONTRATO NO FIRMADO. Pide a tu padre/madre que firme para desbloquear.',
       'portal.refresh_contract_status': 'Actualizar estado del contrato',
       'portal.busy_notice_title': 'Tutor no disponible en las fechas abajo (no es estado en vivo)',
+      'portal.reminder_late_title': 'Llegas tarde',
+      'portal.reminder_late_line': 'Tarde para: {{subject}} a las {{time}}',
+      'portal.reminder_return_title': 'Lección en curso',
+      'portal.reminder_return_line': 'Vuelve a la lección: {{subject}} a las {{time}}',
       'portal.upcoming_sessions': 'Próximas sesiones',
       'portal.all_upcoming': 'Todas próximas',
       'portal.homework': 'Tareas',
@@ -1386,6 +1398,10 @@
       'portal.contract_invalid': 'INVALIDE – CONTRAT NON SIGNÉ. Demandez au parent de signer pour débloquer.',
       'portal.refresh_contract_status': 'Actualiser l’état du contrat',
       'portal.busy_notice_title': 'Tuteur indisponible aux dates ci‑dessous (pas en direct)',
+      'portal.reminder_late_title': 'Vous êtes en retard',
+      'portal.reminder_late_line': 'En retard pour : {{subject}} à {{time}}',
+      'portal.reminder_return_title': 'Leçon en cours',
+      'portal.reminder_return_line': 'Revenez à la leçon : {{subject}} à {{time}}',
       'portal.upcoming_sessions': 'Séances à venir',
       'portal.all_upcoming': 'Toutes à venir',
       'portal.homework': 'Devoirs',
@@ -1648,6 +1664,10 @@
       'portal.contract_invalid': '无效 – 合同未签署。请家长签署后解锁。',
       'portal.refresh_contract_status': '刷新合同状态',
       'portal.busy_notice_title': '导师在以下日期不可用（非实时状态）',
+      'portal.reminder_late_title': '你迟到了',
+      'portal.reminder_late_line': '迟到：{{subject}} {{time}}',
+      'portal.reminder_return_title': '课程进行中',
+      'portal.reminder_return_line': '返回课程：{{subject}} {{time}}',
       'portal.upcoming_sessions': '即将课程',
       'portal.all_upcoming': '全部即将',
       'portal.homework': '作业',
@@ -2668,7 +2688,7 @@
       'students.generate_code': 'Generate code',
       'students.regenerate_code': 'Regenerate code',
       'students.none_yet': 'No students yet.',
-      'students.login_code_prefix': 'Student login code',
+      'students.login_code_prefix': 'Student login code: {{code}}',
 
       'parents.add_title': 'Add parent',
       'parents.edit_title': 'Edit parent',
@@ -2819,7 +2839,7 @@
       'students.timeline_empty': 'No timeline entries yet.',
       'students.days_since_last': '{{days}} days since last session',
       'students.lesson_focus': 'Lesson focus',
-      'students.login_code_prefix': 'Student login code',
+      'students.login_code_prefix': 'Student login code: {{code}}',
       'students.no_due_date': 'No due date',
       'students.no_sessions_yet': 'No sessions yet.',
       'students.none_filter': 'None',
@@ -2851,6 +2871,10 @@
       'sessions.clash_warning': 'This session overlaps another scheduled session.',
       'sessions.quick_title': 'Session actions',
       'sessions.mark_attended_complete': 'Mark attended & completed',
+      'sessions.mark_attended': 'Mark attended',
+      'sessions.mark_complete': 'Mark complete',
+      'sessions.attended': 'Attended',
+      'sessions.completed': 'Completed',
 
       'resources.add_title': 'Add resource',
       'resources.edit_title': 'Edit resource',
@@ -2985,7 +3009,7 @@
       'students.generate_code': 'Generar código',
       'students.regenerate_code': 'Regenerar código',
       'students.none_yet': 'Aún no hay estudiantes.',
-      'students.login_code_prefix': 'Código de acceso del estudiante',
+      'students.login_code_prefix': 'Código de acceso del estudiante: {{code}}',
 
       'parents.add_title': 'Agregar padre/madre',
       'parents.edit_title': 'Editar padre/madre',
@@ -3136,7 +3160,7 @@
       'students.timeline_empty': 'Aún no hay entradas en la cronología.',
       'students.days_since_last': '{{days}} días desde la última sesión',
       'students.lesson_focus': 'Enfoque de la lección',
-      'students.login_code_prefix': 'Código de acceso del estudiante',
+      'students.login_code_prefix': 'Código de acceso del estudiante: {{code}}',
       'students.no_due_date': 'Sin fecha de entrega',
       'students.no_sessions_yet': 'Aún no hay sesiones.',
       'students.none_filter': 'Ninguno',
@@ -3168,6 +3192,10 @@
       'sessions.clash_warning': 'Esta sesión se superpone a otra sesión programada.',
       'sessions.quick_title': 'Acciones de la sesión',
       'sessions.mark_attended_complete': 'Marcar como asistida y completada',
+      'sessions.mark_attended': 'Marcar asistida',
+      'sessions.mark_complete': 'Marcar completada',
+      'sessions.attended': 'Asistida',
+      'sessions.completed': 'Completada',
 
       'resources.add_title': 'Agregar recurso',
       'resources.edit_title': 'Editar recurso',
@@ -3302,7 +3330,7 @@
       'students.generate_code': 'Générer un code',
       'students.regenerate_code': 'Régénérer le code',
       'students.none_yet': 'Aucun élève pour l’instant.',
-      'students.login_code_prefix': 'Code de connexion élève',
+      'students.login_code_prefix': 'Code de connexion élève : {{code}}',
 
       'parents.add_title': 'Ajouter un parent',
       'parents.edit_title': 'Modifier le parent',
@@ -3453,7 +3481,7 @@
       'students.timeline_empty': 'Aucune entrée de chronologie pour l’instant.',
       'students.days_since_last': '{{days}} jours depuis la dernière séance',
       'students.lesson_focus': 'Focus de la séance',
-      'students.login_code_prefix': 'Code de connexion élève',
+      'students.login_code_prefix': 'Code de connexion élève : {{code}}',
       'students.no_due_date': 'Aucune date d’échéance',
       'students.no_sessions_yet': 'Aucune séance pour l’instant.',
       'students.none_filter': 'Aucun',
@@ -3485,6 +3513,10 @@
       'sessions.clash_warning': 'Cette séance chevauche une autre séance planifiée.',
       'sessions.quick_title': 'Actions de la séance',
       'sessions.mark_attended_complete': 'Marquer comme assistée et terminée',
+      'sessions.mark_attended': 'Marquer présente',
+      'sessions.mark_complete': 'Marquer terminée',
+      'sessions.attended': 'Présente',
+      'sessions.completed': 'Terminée',
 
       'resources.add_title': 'Ajouter une ressource',
       'resources.edit_title': 'Modifier la ressource',
@@ -3619,7 +3651,7 @@
       'students.generate_code': '生成代码',
       'students.regenerate_code': '重新生成代码',
       'students.none_yet': '暂无学生。',
-      'students.login_code_prefix': '学生登录码',
+      'students.login_code_prefix': '学生登录码：{{code}}',
 
       'parents.add_title': '添加家长',
       'parents.edit_title': '编辑家长',
@@ -3770,7 +3802,7 @@
       'students.timeline_empty': '暂无时间线记录。',
       'students.days_since_last': '距离上次课 {{days}} 天',
       'students.lesson_focus': '课程重点',
-      'students.login_code_prefix': '学生登录码',
+      'students.login_code_prefix': '学生登录码：{{code}}',
       'students.no_due_date': '无截止日期',
       'students.no_sessions_yet': '暂无课时。',
       'students.none_filter': '无',
@@ -3802,6 +3834,10 @@
       'sessions.clash_warning': '该课程与其他已安排课程时间冲突。',
       'sessions.quick_title': '课程操作',
       'sessions.mark_attended_complete': '标记为已出席并完成',
+      'sessions.mark_attended': '标记已到',
+      'sessions.mark_complete': '标记完成',
+      'sessions.attended': '已到',
+      'sessions.completed': '已完成',
 
       'resources.add_title': '新增资源',
       'resources.edit_title': '编辑资源',
@@ -3913,6 +3949,7 @@
     let value = dict[key] ?? I18N.en[key] ?? key;
     if (vars && typeof value === 'string') {
       value = value.replace(/\{\{(\w+)\}\}/g, (_, k) => (vars[k] ?? ''));
+      value = value.replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? ''));
     }
     return value;
   }
@@ -3940,11 +3977,16 @@
 
   function updateInternalLinks() {
     const lang = getLanguage();
+    const basePath = window.location.pathname.replace(/[^/]*$/, '');
     document.querySelectorAll('a[href]').forEach(a => {
       const href = a.getAttribute('href') || '';
       if (!href || href.startsWith('http') || href.startsWith('mailto:') || href.startsWith('#')) return;
       try {
-        const url = new URL(href, window.location.origin);
+        let normalizedHref = href;
+        if (href.startsWith('/') && basePath !== '/' && !href.startsWith(basePath)) {
+          normalizedHref = basePath + href.replace(/^\/+/, '');
+        }
+        const url = new URL(normalizedHref, window.location.href);
         if (url.origin !== window.location.origin) return;
         url.searchParams.set('lang', lang);
         a.setAttribute('href', url.pathname + url.search + url.hash);
