@@ -3110,7 +3110,30 @@
           updated_at: new Date().toISOString()
         };
         try {
-          await supabaseClient.from('owner_settings').upsert(settingsRow, { onConflict: 'user_id' });
+          const { error: settingsErr } = await supabaseClient
+            .from('owner_settings')
+            .upsert(settingsRow, { onConflict: 'user_id' });
+          if (settingsErr) {
+            const msg = String(settingsErr.message || settingsErr).toLowerCase();
+            if (msg.includes('maintenance_start_at') || msg.includes('maintenance_end_at')) {
+              const legacyRow = {
+                user_id: uid,
+                maintenance_enabled: !!state.settings.maintenanceEnabled,
+                maintenance_start: state.settings.maintenanceStart || null,
+                maintenance_end: state.settings.maintenanceEnd || null,
+                maintenance_message: (state.settings.maintenanceMessage || '').trim() || null,
+                updated_at: new Date().toISOString()
+              };
+              const { error: legacyErr } = await supabaseClient
+                .from('owner_settings')
+                .upsert(legacyRow, { onConflict: 'user_id' });
+              if (legacyErr) {
+                console.warn('Owner settings sync failed', legacyErr);
+              }
+            } else {
+              console.warn('Owner settings sync failed', settingsErr);
+            }
+          }
         } catch (err) {
           console.warn('Owner settings sync skipped', err);
         }
@@ -6369,7 +6392,12 @@
           busyDaysRes = await supabaseClient.from('busy_days').select('*').in('user_id', Array.from(ownerIds));
         } catch { }
         try {
-          ownerSettingsRes = await supabaseClient.from('owner_settings').select('*').in('user_id', Array.from(ownerIds));
+          ownerSettingsRes = await supabaseClient
+            .from('owner_settings')
+            .select('*')
+            .in('user_id', Array.from(ownerIds))
+            .order('updated_at', { ascending: false })
+            .limit(1);
         } catch { }
       }
 
