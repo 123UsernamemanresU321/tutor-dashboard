@@ -32,81 +32,107 @@
     ul { padding-left: 18px; }
     .muted { color: #94a3b8; font-size: 13px; }
     a { color: #0f172a; }
+
+    .page-shell {
+      width: 100%;
+      max-width: 760px;
+    }
+
+    .lang-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .lang-label {
+      font-size: 11px;
+      color: #475569;
+      font-weight: 600;
+    }
+
+    .lang-select {
+      border: 1px solid #cbd5e1;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      background: #fff;
+      color: #0f172a;
+    }
+
+    .lang-banner {
+      background: #e0f2fe;
+      color: #0f172a;
+      border: 1px solid #bae6fd;
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-size: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 10px 24px -18px rgba(15, 23, 42, 0.35);
+    }
+
+    .lang-banner-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .lang-banner-actions button {
+      border: 1px solid #94a3b8;
+      background: #fff;
+      color: #0f172a;
+      padding: 4px 8px;
+      font-size: 11px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Privacy Policy</h1>
-    <div class="muted">Last Updated: <span data-terms-effective-date>TERMS_EFFECTIVE_DATE</span></div>
-    <p>This Privacy Policy describes how personal information is collected, used, and protected in connection with the tutoring dashboard (“Dashboard”). By creating an account or using the Dashboard, you consent to these practices.</p>
-
-    <h2>1. Information Collected</h2>
-    <h3>1.1 Account Information</h3>
-    <ul>
-      <li>Name and phone number</li>
-      <li>Email address (only if needed for receipts or communication)</li>
-      <li>Login code / OTP and authentication tokens (used for sign-in)</li>
-      <li>No passwords are stored</li>
-    </ul>
-    <h3>1.2 Academic Information</h3>
-    <ul>
-      <li>Subjects, session bookings, attendance, homework status, and resources accessed</li>
-    </ul>
-    <h3>1.3 Billing Information</h3>
-    <ul>
-      <li>Invoices and payment status only; no card or bank details are stored</li>
-    </ul>
-    <h3>1.4 Device-Only Data</h3>
-    <p>Preferences and cached content may be stored locally (e.g., localStorage/IndexedDB). This data stays on your device unless you clear it.</p>
-    <h3>1.5 Authentication</h3>
-    <p>Sign-in uses a code-based flow. You receive a unique login code and use it to access the Dashboard. Supabase stores the authentication tokens required for access. No passwords are collected or stored.</p>
-
-    <h2>2. Purpose of Use</h2>
-    <ul>
-      <li>Authenticate and manage accounts</li>
-      <li>Schedule and track tutoring sessions, homework, and resources</li>
-      <li>Display and manage invoices and payment status</li>
-      <li>Communicate regarding lessons, changes, or academic updates</li>
-    </ul>
-    <p>No personal data is used for marketing or advertising.</p>
-
-    <h2>3. Storage and Security</h2>
-    <ul>
-      <li>Supabase hosts authentication and academic data with industry-standard security.</li>
-      <li>Locally stored preferences remain on your device and are removed if you clear browser data.</li>
-      <li>Access is limited to me (the tutor) unless you request otherwise.</li>
-    </ul>
-
-    <h2>4. Sharing</h2>
-    <p>Data is not sold or rented. Disclosure occurs only if legally required or if you request sharing with a parent/teacher. No sharing with schools without your direction.</p>
-
-    <h2>5. Your Rights</h2>
-    <ul>
-      <li>Access, correct, export, or delete your data</li>
-      <li>Withdraw from using the Dashboard at any time</li>
-      <li>Submit requests via the contact below</li>
-    </ul>
-
-    <h2>6. Retention</h2>
-    <p>Data is retained while you are an active student. You may request deletion when lessons end.</p>
-
-    <h2>7. Minors</h2>
-    <p>Only essential data is collected. No non-academic use. Parent/guardian instructions are followed, including deletion requests. Where required for billing or merchant-of-record compliance, parent/guardian involvement is required.</p>
-
-    <h2>8. Updates</h2>
-    <p>This policy may be updated as the Dashboard evolves. Material changes will be communicated.</p>
-
-    <h2>9. Contact</h2>
-    <ul>
-      <li><strong>Operator and Service Provider:</strong> Shangjing Huang</li>
-      <li><strong>Merchant of Record:</strong> [PARENT_GUARDIAN_FULL_LEGAL_NAME]</li>
-      <li><strong>Payment Processing:</strong> PayFast</li>
-      <li><strong>Contact:</strong> <strong data-support-email>SUPPORT_EMAIL</strong></li>
-      <li><strong>Business location:</strong> Cape Town, South Africa</li>
-    </ul>
-    <footer class="muted" data-merchant-disclosure style="margin-top: 16px;"></footer>
+  <div class="page-shell">
+    <div id="langBanner" class="lang-banner hidden">
+      <div id="langBannerText" data-i18n="lang.banner">Choose language / Elige idioma / Choisissez la langue / 请选择语言</div>
+      <div class="lang-banner-actions">
+        <button type="button" data-lang-button="en">English</button>
+        <button type="button" data-lang-button="es">Español</button>
+        <button type="button" data-lang-button="fr">Français</button>
+        <button type="button" data-lang-button="zh">中文（简体）</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="lang-row">
+        <label class="lang-label" data-i18n="top.language_label">Language / Idioma / Langue / 中文</label>
+        <select class="lang-select" data-lang-select>
+          <option value="en" data-i18n="lang.option.en">English</option>
+          <option value="es" data-i18n="lang.option.es">Español</option>
+          <option value="fr" data-i18n="lang.option.fr">Français</option>
+          <option value="zh" data-i18n="lang.option.zh">中文（简体）</option>
+        </select>
+      </div>
+      <h1 data-i18n="privacy.title">Privacy Policy</h1>
+      <div class="muted"><span data-i18n="legal.last_updated">Last Updated:</span> <span data-terms-effective-date>TERMS_EFFECTIVE_DATE</span></div>
+      <div id="legalContent"></div>
+      <footer class="muted" data-merchant-disclosure style="margin-top: 16px;"></footer>
+    </div>
   </div>
+  <script src="./i18n.js"></script>
+  <script src="./legal-i18n.js"></script>
   <script src="./business-config.js"></script>
   <script src="./business-ui.js"></script>
+  <script>
+    if (window.initLanguageUI) initLanguageUI();
+    const container = document.getElementById('legalContent');
+    const renderLegal = () => {
+      const lang = window.getLanguage ? getLanguage() : 'en';
+      const html = (window.LEGAL_I18N?.PRIVACY_HTML?.[lang]) || window.LEGAL_I18N?.PRIVACY_HTML?.en || '';
+      if (container) container.innerHTML = html;
+      if (window.applyI18n) window.applyI18n(container || document);
+      if (window.applyBusinessText) window.applyBusinessText(document);
+    };
+    renderLegal();
+    window.addEventListener('i18n:change', renderLegal);
+  </script>
 </body>
 </html>

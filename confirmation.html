@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Email confirmed</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="./i18n.js"></script>
   <style>
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -44,19 +45,96 @@
       border: 1px solid rgba(148,163,184,0.4);
     }
     small { display: block; margin-top: 12px; color: #94a3b8; font-size: 12px; }
+
+    .page-shell {
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .lang-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .lang-label {
+      font-size: 11px;
+      color: #475569;
+      font-weight: 600;
+    }
+
+    .lang-select {
+      border: 1px solid #cbd5e1;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      background: #fff;
+      color: #0f172a;
+    }
+
+    .lang-banner {
+      background: #e0f2fe;
+      color: #0f172a;
+      border: 1px solid #bae6fd;
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-size: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 10px 24px -18px rgba(15, 23, 42, 0.35);
+    }
+
+    .lang-banner-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .lang-banner-actions button {
+      border: 1px solid #94a3b8;
+      background: #fff;
+      color: #0f172a;
+      padding: 4px 8px;
+      font-size: 11px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
-  <div class="card" id="card">
-    <h1 id="title">✅ Email confirmed</h1>
-    <p id="message">Your account is verified. You can now sign in to the tutor dashboard.</p>
-    <a class="button" href="./index.html" id="cta">Go to dashboard</a>
-    <small id="meta">You can close this tab if you’re already signed in elsewhere.</small>
-    <footer style="margin-top: 12px; color: #94a3b8; font-size: 12px;" data-merchant-disclosure></footer>
+  <div class="page-shell">
+    <div id="langBanner" class="lang-banner hidden">
+      <div id="langBannerText" data-i18n="lang.banner">Choose language / Elige idioma / Choisissez la langue / 请选择语言</div>
+      <div class="lang-banner-actions">
+        <button type="button" data-lang-button="en">English</button>
+        <button type="button" data-lang-button="es">Español</button>
+        <button type="button" data-lang-button="fr">Français</button>
+        <button type="button" data-lang-button="zh">中文（简体）</button>
+      </div>
+    </div>
+    <div class="card" id="card">
+      <div class="lang-row">
+        <label class="lang-label" data-i18n="top.language_label">Language / Idioma / Langue / 中文</label>
+        <select class="lang-select" data-lang-select>
+          <option value="en" data-i18n="lang.option.en">English</option>
+          <option value="es" data-i18n="lang.option.es">Español</option>
+          <option value="fr" data-i18n="lang.option.fr">Français</option>
+          <option value="zh" data-i18n="lang.option.zh">中文（简体）</option>
+        </select>
+      </div>
+      <h1 id="title" data-i18n="confirmation.title_email">✅ Email confirmed</h1>
+      <p id="message" data-i18n="confirmation.message_email">Your account is verified. You can now sign in to the tutor dashboard.</p>
+      <a class="button" href="./index.html" id="cta" data-i18n="confirmation.cta">Go to dashboard</a>
+      <small id="meta" data-i18n="confirmation.meta">You can close this tab if you’re already signed in elsewhere.</small>
+      <footer style="margin-top: 12px; color: #94a3b8; font-size: 12px;" data-merchant-disclosure></footer>
+    </div>
   </div>
   <script>
     // Supabase sends tokens in the hash; clear them from the URL for cleanliness.
     (function() {
+      if (window.initLanguageUI) initLanguageUI();
       const hash = window.location.hash || '';
       if (hash.startsWith('#')) {
         const params = new URLSearchParams(hash.slice(1));
@@ -64,11 +142,11 @@
         const title = document.getElementById('title');
         const message = document.getElementById('message');
         if (type === 'recovery') {
-          title.textContent = '🔑 Password reset';
-          message.textContent = 'Your password reset link is confirmed. You can now sign in with your new password.';
+          title.textContent = t('confirmation.title_recovery');
+          message.textContent = t('confirmation.message_recovery');
         } else {
-          title.textContent = '✅ Email confirmed';
-          message.textContent = 'Your account is verified. You can now sign in to the tutor dashboard.';
+          title.textContent = t('confirmation.title_email');
+          message.textContent = t('confirmation.message_email');
         }
         // Drop the hash from the address bar to avoid leaking tokens
         history.replaceState(null, '', window.location.pathname + window.location.search);

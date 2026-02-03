@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Confirm your email – Tutor Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="./i18n.js"></script>
   <style>
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -41,30 +42,107 @@
       border: 1px solid #cbd5e1;
     }
     small { display: block; margin-top: 12px; color: #94a3b8; font-size: 12px; }
+
+    .page-shell {
+      width: 100%;
+      max-width: 480px;
+    }
+
+    .lang-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .lang-label {
+      font-size: 11px;
+      color: #475569;
+      font-weight: 600;
+    }
+
+    .lang-select {
+      border: 1px solid #cbd5e1;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      background: #fff;
+      color: #0f172a;
+    }
+
+    .lang-banner {
+      background: #e0f2fe;
+      color: #0f172a;
+      border: 1px solid #bae6fd;
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-size: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 10px 24px -18px rgba(15, 23, 42, 0.35);
+    }
+
+    .lang-banner-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .lang-banner-actions button {
+      border: 1px solid #94a3b8;
+      background: #fff;
+      color: #0f172a;
+      padding: 4px 8px;
+      font-size: 11px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
-  <div class="card" id="card">
-    <h1 id="title">Check your email</h1>
-    <p id="msg1">We’ve sent a confirmation link to your inbox. Please click it to verify your email and activate your account.</p>
-    <p id="msg2">If you don’t see it, check your spam or promotions folder.</p>
-    <a class="button" href="./login.html" id="cta">Go to sign in</a>
-    <small id="meta">After confirming, return here to sign in.</small>
-    <footer style="margin-top: 12px; color: #94a3b8; font-size: 12px;" data-merchant-disclosure></footer>
+  <div class="page-shell">
+    <div id="langBanner" class="lang-banner hidden">
+      <div id="langBannerText" data-i18n="lang.banner">Choose language / Elige idioma / Choisissez la langue / 请选择语言</div>
+      <div class="lang-banner-actions">
+        <button type="button" data-lang-button="en">English</button>
+        <button type="button" data-lang-button="es">Español</button>
+        <button type="button" data-lang-button="fr">Français</button>
+        <button type="button" data-lang-button="zh">中文（简体）</button>
+      </div>
+    </div>
+    <div class="card" id="card">
+      <div class="lang-row">
+        <label class="lang-label" data-i18n="top.language_label">Language / Idioma / Langue / 中文</label>
+        <select class="lang-select" data-lang-select>
+          <option value="en" data-i18n="lang.option.en">English</option>
+          <option value="es" data-i18n="lang.option.es">Español</option>
+          <option value="fr" data-i18n="lang.option.fr">Français</option>
+          <option value="zh" data-i18n="lang.option.zh">中文（简体）</option>
+        </select>
+      </div>
+      <h1 id="title" data-i18n="confirm.title_default">Check your email</h1>
+      <p id="msg1" data-i18n="confirm.msg1_default">We’ve sent a confirmation link to your inbox. Please click it to verify your email and activate your account.</p>
+      <p id="msg2" data-i18n="confirm.msg2_default">If you don’t see it, check your spam or promotions folder.</p>
+      <a class="button" href="./login.html" id="cta" data-i18n="confirm.cta_default">Go to sign in</a>
+      <small id="meta" data-i18n="confirm.meta_default">After confirming, return here to sign in.</small>
+      <footer style="margin-top: 12px; color: #94a3b8; font-size: 12px;" data-merchant-disclosure></footer>
+    </div>
   </div>
 
   <script>
     // If arriving from the confirmation link (hash contains access_token), show "Email confirmed"
     (function() {
+      if (window.initLanguageUI) initLanguageUI();
       const hash = window.location.hash || '';
       if (!hash.startsWith('#')) return;
       const params = new URLSearchParams(hash.slice(1));
       if (params.get('access_token')) {
-        document.getElementById('title').textContent = 'Email confirmed';
-        document.getElementById('msg1').textContent = 'Your email is verified. You can now sign in.';
-        document.getElementById('msg2').textContent = 'If you run into issues signing in, request a password reset.';
+        document.getElementById('title').textContent = t('confirm.title_confirmed');
+        document.getElementById('msg1').textContent = t('confirm.msg1_confirmed');
+        document.getElementById('msg2').textContent = t('confirm.msg2_confirmed');
         const cta = document.getElementById('cta');
-        cta.textContent = 'Proceed to sign in';
+        cta.textContent = t('confirm.cta_confirmed');
         // Clean the hash to avoid leaking tokens
         history.replaceState(null, '', window.location.pathname + window.location.search);
       }

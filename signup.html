@@ -7,6 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://js.hcaptcha.com/1/api.js?onload=hcaptchaOnLoad&render=explicit" async defer></script>
+  <script src="./i18n.js"></script>
   <style>
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -96,62 +97,138 @@
       font-size: 12px;
       margin-top: 8px;
     }
+
+    .page-shell {
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .lang-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .lang-label {
+      font-size: 11px;
+      color: #475569;
+      font-weight: 600;
+    }
+
+    .lang-select {
+      border: 1px solid #cbd5e1;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      background: #fff;
+      color: #0f172a;
+    }
+
+    .lang-banner {
+      background: #e0f2fe;
+      color: #0f172a;
+      border: 1px solid #bae6fd;
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-size: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 10px 24px -18px rgba(15, 23, 42, 0.35);
+    }
+
+    .lang-banner-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .lang-banner-actions button {
+      border: 1px solid #94a3b8;
+      background: #fff;
+      color: #0f172a;
+      padding: 4px 8px;
+      font-size: 11px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
   </style>
 </head>
 
 <body>
-  <div class="card">
+  <div class="page-shell">
+    <div id="langBanner" class="lang-banner hidden">
+      <div id="langBannerText" data-i18n="lang.banner">Choose language / Elige idioma / Choisissez la langue / 请选择语言</div>
+      <div class="lang-banner-actions">
+        <button type="button" data-lang-button="en">English</button>
+        <button type="button" data-lang-button="es">Español</button>
+        <button type="button" data-lang-button="fr">Français</button>
+        <button type="button" data-lang-button="zh">中文（简体）</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="lang-row">
+        <label class="lang-label" data-i18n="top.language_label">Language / Idioma / Langue / 中文</label>
+        <select class="lang-select" data-lang-select>
+          <option value="en" data-i18n="lang.option.en">English</option>
+          <option value="es" data-i18n="lang.option.es">Español</option>
+          <option value="fr" data-i18n="lang.option.fr">Français</option>
+          <option value="zh" data-i18n="lang.option.zh">中文（简体）</option>
+        </select>
+      </div>
     <div id="step1">
-      <h1>Welcome</h1>
-      <p class="text-sm">Enter the invite code provided by your tutor.</p>
-      <p class="hint">By signing in, you agree to the <a href="./tos.html" target="_blank" rel="noopener">Terms of Service</a> and <a href="./privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>
+      <h1 data-i18n="signup.welcome">Welcome</h1>
+      <p class="text-sm" data-i18n="signup.invite_prompt">Enter the invite code provided by your tutor.</p>
+      <p class="hint" data-i18n-html="auth.terms_privacy_notice">By signing in, you agree to the <a href="./tos.html" target="_blank" rel="noopener">Terms of Service</a> and <a href="./privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>
       <form id="codeForm" class="mt-4">
         <div class="mt-3">
-          <label>Invite Code</label>
+          <label data-i18n="auth.access_code">Invite Code</label>
           <input type="text" name="code" required placeholder="e.g. A1B2C3D4"
             style="text-transform: uppercase; letter-spacing: 2px; font-family: monospace; font-size: 16px;">
         </div>
-        <button type="submit" class="primary mt-4">Verify Code</button>
+        <button type="submit" class="primary mt-4" data-i18n="signup.verify_code">Verify Code</button>
       </form>
       <div id="msg1" class="error"></div>
     </div>
 
     <div id="step2" class="hidden">
-      <h1>Create account</h1>
-      <p class="text-sm">Finish setting up your profile for <strong id="inviteName"></strong>.</p>
-      <p class="hint">By creating an account, you agree to the <a href="./tos.html" target="_blank" rel="noopener">Terms of Service</a> and <a href="./privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>
+      <h1 data-i18n="signup.create_account">Create account</h1>
+      <p class="text-sm"><span data-i18n="signup.finish_profile">Finish setting up your profile for</span> <strong id="inviteName"></strong>.</p>
+      <p class="hint" data-i18n-html="auth.terms_privacy_notice">By creating an account, you agree to the <a href="./tos.html" target="_blank" rel="noopener">Terms of Service</a> and <a href="./privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>
       <form id="signupForm" class="mt-3">
         <div class="mt-3">
-          <label>Email</label>
+          <label data-i18n="auth.email">Email</label>
           <input type="email" name="email" required autocomplete="email">
         </div>
         <div class="mt-3">
-          <label>Password</label>
+          <label data-i18n="auth.password">Password</label>
           <input type="password" name="password" required autocomplete="new-password" minlength="12">
-          <div class="hint">Use at least 12 characters; include letters, numbers, and a symbol.</div>
+          <div class="hint" data-i18n="signup.password_hint">Use at least 12 characters; include letters, numbers, and a symbol.</div>
         </div>
         <div class="mt-3">
-          <label>Confirm password</label>
+          <label data-i18n="signup.confirm_password">Confirm password</label>
           <input type="password" name="confirm" required autocomplete="new-password">
         </div>
 
         <label class="mt-3 text-sm">
-          <input type="checkbox" name="consent"> I consent to receive account emails.
+          <input type="checkbox" name="consent"> <span data-i18n="signup.consent">I consent to receive account emails.</span>
         </label>
         <div id="hcaptchaContainer" class="mt-3"></div>
         <div class="text-sm mt-2">
-          By signing up you agree to the <a href="./tos.html" target="_blank" rel="noopener">Terms of Service</a>
-          and <a href="./privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.
+          <span data-i18n-html="auth.terms_privacy_notice">By signing up you agree to the <a href="./tos.html" target="_blank" rel="noopener">Terms of Service</a>
+          and <a href="./privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</span>
         </div>
-        <button type="submit" class="primary mt-4">Create Account</button>
+        <button type="submit" class="primary mt-4" data-i18n="signup.create_btn">Create Account</button>
       </form>
       <div id="msg2" class="error"></div>
     </div>
 
     <div class="text-sm mt-4 text-center">
-      Already have an account? <a href="./login.html">Sign in</a>
+      <span data-i18n="signup.already_account">Already have an account?</span> <a href="./login.html" data-i18n="signup.sign_in_link">Sign in</a>
     </div>
     <footer class="hint mt-4" data-merchant-disclosure></footer>
+    </div>
   </div>
 
   <script>
@@ -161,14 +238,16 @@
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const SIGNUP_DISABLED = true;
 
+    if (window.initLanguageUI) initLanguageUI();
+
     if (SIGNUP_DISABLED) {
       document.addEventListener('DOMContentLoaded', () => {
         const card = document.querySelector('.card');
         if (card) {
           card.innerHTML = `
-            <h1>Sign-up disabled</h1>
-            <p class="text-sm">Students and parents now log in with a code from the tutor. Use the sign-in page to enter your code.</p>
-            <a href="./login.html" class="primary mt-4" style="display:block;text-align:center;text-decoration:none;">Go to sign in</a>
+            <h1>${t('signup.disabled_title')}</h1>
+            <p class="text-sm">${t('signup.disabled_body')}</p>
+            <a href="./login.html" class="primary mt-4" style="display:block;text-align:center;text-decoration:none;">${t('signup.disabled_cta')}</a>
           `;
         }
         setTimeout(() => { window.location.href = './login.html'; }, 2600);
@@ -198,7 +277,7 @@
 
     codeForm.onsubmit = async (e) => {
       e.preventDefault();
-      msg1.textContent = 'Verifying...';
+      msg1.textContent = t('signup.verifying');
       const code = codeForm.code.value.trim().toUpperCase();
 
       try {
@@ -235,7 +314,7 @@
 
       } catch (err) {
         console.error(err);
-        msg1.textContent = err.message || 'Verification failed';
+        msg1.textContent = err.message || t('signup.error_verify_failed');
       }
     };
 
@@ -248,7 +327,7 @@
       e.preventDefault();
       msg2.textContent = '';
       if (!inviteData) {
-        msg2.textContent = 'Session invalid. Please refresh.';
+        msg2.textContent = t('signup.error_session_invalid');
         return;
       }
 
@@ -257,24 +336,24 @@
       const confirm = signupForm.confirm.value.trim();
 
       if (password !== confirm) {
-        msg2.textContent = 'Passwords do not match.';
+        msg2.textContent = t('signup.error_password_mismatch');
         return;
       }
       if (!strongPassword(password)) {
-        msg2.textContent = 'Use at least 12 characters with letters, numbers, and at least one symbol.';
+        msg2.textContent = t('signup.error_password_strength');
         return;
       }
       if (!signupForm.consent.checked) {
-        msg2.textContent = 'Please provide consent.';
+        msg2.textContent = t('signup.error_consent');
         return;
       }
       if (!hcaptchaToken) {
-        msg2.textContent = 'Please complete hCaptcha.';
+        msg2.textContent = t('signup.error_captcha');
         return;
       }
 
       try {
-        msg2.textContent = 'Creating account...';
+        msg2.textContent = t('signup.creating');
 
         // 1. Create Auth User
         const { data: signUpData, error } = await supabaseClient.auth.signUp({
@@ -356,7 +435,7 @@
         window.location.href = './confirm-signup.html';
       } catch (err) {
         console.error(err);
-        msg2.textContent = err?.message || 'Signup failed';
+        msg2.textContent = err?.message || t('signup.error_failed');
       } finally {
         if (window.hcaptcha && hcaptchaWidgetId != null) hcaptcha.reset(hcaptchaWidgetId);
         hcaptchaToken = '';

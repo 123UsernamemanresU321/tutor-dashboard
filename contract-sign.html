@@ -4,9 +4,12 @@
   <meta charset="UTF-8">
   <title>Sign Tutoring Contract</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="./i18n.js"></script>
+  <script src="./legal-i18n.js"></script>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #0f172a; padding: 1.5rem; }
-    .page { max-width: 900px; margin: 0 auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.5rem; box-shadow: 0 20px 60px -40px rgba(15,23,42,0.4); }
+    .page-shell { max-width: 940px; margin: 0 auto; }
+    .page { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.5rem; box-shadow: 0 20px 60px -40px rgba(15,23,42,0.4); }
     h1 { margin: 0 0 0.3rem 0; }
     .muted { color:#64748b; font-size:12px; }
     .field-inline { border: 1px solid #cbd5e1; border-radius: 8px; padding: 4px 6px; min-width: 160px; font-size: 13px; }
@@ -17,497 +20,108 @@
     ul { padding-left: 1.2rem; }
     li { margin-bottom: 4px; }
     .inline-label { font-weight: 600; }
+    .lang-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .lang-label { font-size: 11px; color: #475569; font-weight: 600; }
+    .lang-select { border: 1px solid #cbd5e1; border-radius: 10px; padding: 6px 10px; font-size: 12px; }
+    .lang-banner {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      color: #7c2d12;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .lang-banner.hidden { display: none; }
+    .lang-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+    .lang-btn { border: 1px solid #fdba74; background: #fff; padding: 6px 10px; border-radius: 10px; font-size: 12px; cursor: pointer; }
   </style>
 </head>
 <body>
-  <form id="signForm">
-  <div class="page" id="contractPage">
-    <div id="status" class="status"></div>
-    <div id="studentName" class="muted"></div>
-    <h1>Tutoring Services Agreement (Minor Tutor Version)</h1>
-    <p class="muted">Please read the full agreement and complete the fields inline. When done, click “Sign & Download PDF”.</p>
-
-    <p>Agreement date: <input class="field-inline" name="date" data-field type="date" required></p>
-
-    <p class="section-title">PARTIES</p>
-    <p><span class="inline-label">Tutor's Legal Guardian (Contracting Party):</span><br>
-    Name: <input class="field-inline" name="guardian_name" data-field required value="Yu Qin" readonly><br>
-    Email: <input class="field-inline" name="guardian_email" data-field type="email" required value="17449125@qq.com" readonly><br>
-    Mobile / WhatsApp: <input class="field-inline" name="guardian_phone" data-field value="+27 736696754" readonly></p>
-
-    <p class="section-title">Minor Tutor (Service Provider):</p>
-    <p>Name: <input class="field-inline" name="tutor_name" data-field value="Shangjing Huang" readonly><br>
-    Age: 16<br>
-    Email: <input class="field-inline" name="tutor_email" data-field value="erichuang.shangjing@outlook.com" readonly></p>
-
-    <p class="section-title">Client (Parent/Guardian):</p>
-    <p>Name: <input class="field-inline" name="parent_name" data-field required><br>
-    Email: <input class="field-inline" name="parent_email" data-field type="email" required><br>
-    Mobile / WhatsApp: <input class="field-inline" name="parent_phone" data-field></p>
-
-    <p>For the benefit of the Student:<br>
-    Student name: <input class="field-inline" name="student_name" data-field required><br>
-    Date of birth: <input class="field-inline" name="student_dob" data-field type="date" required><br>
-    School: <input class="field-inline" name="student_school" data-field required></p>
-
-    <p>The Guardian and the Client are the “Parties.” The Guardian contracts on behalf of the Minor Tutor. The Minor Tutor signs only to acknowledge professional expectations; legal rights and obligations under this Agreement are between the Guardian and the Client.</p>
-
-    <p class="section-title">1. DEFINITIONS</p>
-    <ul>
-      <li>“Student” means the learner receiving tutoring.</li>
-      <li>“Session” means a scheduled tutoring lesson (online or in-person).</li>
-      <li>“Fees” means the amounts payable by the Client to the Guardian for Services.</li>
-      <li>“Services” means the tutoring and related support described in clause 2.</li>
-      <li>“Business Day” means a day other than a Saturday, Sunday or South African public holiday.</li>
-      <li>“Writing / written” includes email and WhatsApp messages.</li>
-    </ul>
-
-    <p class="section-title">2. SCOPE OF SERVICES</p>
-    <p>The Minor Tutor will provide academic tutoring in Maths, Physics, Chemistry including: explaining concepts, exam prep, practice questions, and study skills. The Tutor does not guarantee specific marks or provide other professional services.</p>
-
-    <p class="section-title">3. LESSON FORMAT & LOCATION</p>
-    <p>Sessions may be online or in-person (Student home at <input class="field-inline" name="address" data-field> or mutually agreed location). Client ensures a safe environment and adult presence for in-person; suitable device/internet for online.</p>
-
-    <p class="section-title">4. SCHEDULE, ATTENDANCE & PUNCTUALITY</p>
-    <p>Sessions are scheduled according to the weekly slots agreed for the Student (one or more slots per week). Session length may vary by slot and is recorded in the schedule. If the Tutor is late, time is extended/credited; if the Student is late, the Session still ends on time.</p>
-
-    <p class="section-title">5. FEES, INVOICING & PAYMENT</p>
-    <p>Standard rate: ZAR 200 per 60-minute Session (pro-rated for longer Sessions). Invoices are issued monthly in advance for Sessions scheduled from the earliest upcoming slot after contract signing until the last available slot before month end. Payment is required before Sessions take place; sessions are scheduled only after payment is received. If payment is late, Sessions that have already passed are not billed and will not be rescheduled, and the invoice total is reduced accordingly. Payment instructions will be provided on each invoice; reference: Student surname + invoice number.</p>
-    <p>If payment is overdue, the Guardian may suspend sessions and may charge a reasonable admin fee for rebooking or additional processing, if applicable and communicated in writing.</p>
-
-    <p class="section-title">6. CANCELLATIONS & RESCHEDULING</p>
-    <p>Client requests to cancel or reschedule must be made to the Guardian/Tutor (clients do not change sessions directly in the system). Cancellations with ≥24h notice are refunded for that Session and the lesson is forfeited. &lt;24h notice or no-show: the lesson is forfeited and no refund is issued. Lessons moved within 24 hours are treated as an additional Session: an adjustment invoice is issued and the additional Session is scheduled only after that invoice is paid.</p>
-
-    <p class="section-title">7. HOLIDAYS & EXAM SEASONS</p>
-    <p>Schedule confirmed in advance. Prepaid packages valid <input class="field-inline" name="package_months" data-field value="6" readonly> months unless agreed otherwise.</p>
-
-    <p class="section-title">8. ACADEMIC INTEGRITY</p>
-    <p>Tutor will not do the Student’s work, take tests, or log into school platforms. Student remains responsible for submissions and honesty policies.</p>
-
-    <p class="section-title">9. RESPONSIBILITIES OF MINOR TUTOR</p>
-    <p>Prepare/deliver sessions with care; tailor explanations; inform of concerns; maintain boundaries; comply with law under Guardian supervision.</p>
-
-    <p class="section-title">10. RESPONSIBILITIES OF STUDENT & PARENT</p>
-    <p>Student attends on time, completes work, behaves respectfully. Parent ensures attendance, safe environment, device/internet, updates on relevant changes, pays fees on time.</p>
-
-    <p class="section-title">11. SAFEGUARDING</p>
-    <p>Tutor keeps professional boundaries; no unsafe meetings or social media connections; Parent supervises Student. Guardian may report risk of harm.</p>
-
-    <p class="section-title">12. DATA PROTECTION</p>
-    <p>Guardian processes personal info for tutoring, scheduling, progress, invoicing, compliance. Data may be stored with third-party tools (inside/outside SA). Parent consents and is authorized for the Student. Data requests should be sent to the Guardian at 17449125@qq.com.</p>
-
-    <p class="section-title">13. CONFIDENTIALITY & IP</p>
-    <p>Tutor keeps academic info confidential (except law/safety/consent). Teaching materials remain Tutor IP; personal study use only.</p>
-
-    <p class="section-title">14. ONLINE LESSONS & LOAD-SHEDDING</p>
-    <p>Online depends on third parties. If >50% lost due to Tutor side, reschedule/credit. Loss on Client side not obliged to reschedule.</p>
-
-    <p class="section-title">15. GROUP LESSONS (IF APPLICABLE)</p>
-    <p>Fees may be per student/group; cancellation by one does not cancel for others.</p>
-
-    <p class="section-title">16. MARKETING</p>
-    <p>No public use of student name/photo without permission; anonymised examples only with consent.</p>
-
-    <p class="section-title">17. RATE CHANGES</p>
-    <p>Tutor will notify at least 30 days before any rate change.</p>
-
-    <p class="section-title">18. FORCE MAJEURE</p>
-    <p>No liability for uncontrollable events; obligations paused; reschedule in good faith.</p>
-
-    <p class="section-title">19. LIMITATION OF LIABILITY</p>
-    <p>Care and skill but no guaranteed result. Liability limited to fees paid in prior 3 months; excludes indirect loss; not excluding death/personal injury by negligence.</p>
-
-    <p class="section-title">20. LESSON MATERIALS & RESOURCE USE</p>
-    <p>Materials shared through the dashboard are for the Student’s personal learning only and may not be resold, published, or shared publicly without written permission.</p>
-
-    <p class="section-title">21. SESSION RECORDINGS & COMMUNICATIONS</p>
-    <p>No session will be recorded without written consent. Routine communication may be via WhatsApp/email/dashboard and is part of the service record.</p>
-
-    <p class="section-title">22. HEALTH, SAFETY & CONDUCT</p>
-    <p>The Client must inform the Guardian of any health or safety issues affecting sessions. The Guardian may reschedule in-person sessions if the environment is unsafe or appropriate supervision is not available.</p>
-
-    <p class="section-title">23. SUBSTITUTE TUTOR (IF REQUIRED)</p>
-    <p>If the Minor Tutor is unavailable for an extended period, the Guardian may offer a substitute tutor with notice; the Client may accept or decline without penalty.</p>
-
-    <p class="section-title">24. COMPLAINTS & FEEDBACK</p>
-    <p>Concerns should be raised in writing; the Guardian will respond in good faith and work to resolve issues promptly.</p>
-
-    <p class="section-title">25. DATA RETENTION</p>
-    <p>Session records, invoices, and signed contract records are retained for a reasonable period for operational and legal purposes. Records may be retained for up to 5 years for accounting and legal compliance, unless a longer period is required by law, after which they are securely deleted.</p>
-
-    <p class="section-title">26. TERM & TERMINATION</p>
-    <p>Either may terminate with 30 days’ notice; immediate termination for nonpayment/abuse/breach. On termination, outstanding fees due; prepaid refunded/credited less delivered sessions and valid charges.</p>
-
-    <p class="section-title">27. NOTICES</p>
-    <p>Routine via WhatsApp/email; formal notices via email/WhatsApp to listed contacts; deemed received when delivered/no bounce.</p>
-
-    <p class="section-title">28. GOVERNING LAW & DISPUTE RESOLUTION</p>
-    <p>South African law; good-faith discussion; mediation after 30 days; court thereafter.</p>
-
-    <p class="section-title">29. GENERAL</p>
-    <p>Entire agreement; changes in writing; invalid clauses severable; electronic signatures valid.</p>
-
-    <p class="section-title">30. ELECTRONIC SIGNATURES & ONLINE ACCEPTANCE</p>
-    <p>Typing a name, ticking a confirmation box, or clicking “Sign & Accept” constitutes a legally binding electronic signature under ECTA. By clicking “Sign & Download PDF”, you confirm that this action is your electronic signature and that you intend to be legally bound.</p>
-
-    <p class="section-title">31. SYSTEM STATUS</p>
-    <p>Dashboard may show “INVALID – CONTRACT NOT SIGNED” until signed; services may be withheld while invalid; status can revert to invalid on termination/breach.</p>
-
-    <p class="section-title">SIGNATURES</p>
-    <p><strong>Tutor's Legal Guardian (Contracting Party)</strong><br>
-    Signature: <input class="field-inline" name="guardian_signature" data-field required value="Yu Qin" readonly><br>
-    Name: <input class="field-inline" name="guardian_name_sig" data-field required value="Yu Qin" readonly><br>
-    Date: <input class="field-inline" name="date_guardian" data-field></p>
-
-    <p><strong>Parent/Guardian (Client)</strong><br>
-    Signature: <input class="field-inline" name="parent_signature" data-field required><br>
-    Name: <input class="field-inline" name="parent_name_sig" data-field required><br>
-    Relationship to Student: <input class="field-inline" name="relationship" data-field required><br>
-    Date: <input class="field-inline" name="date_parent" data-field></p>
-
-    <p><label class="muted"><input type="checkbox" name="confirm" required style="width:auto; margin-right:6px;"> I confirm I am the parent/legal guardian, have read the contract, and agree to be legally bound by it.</label></p>
-
-    <div style="margin-top:1rem; display:flex; gap:0.5rem;">
-      <button id="signBtn">Sign & Download PDF</button>
-      <span id="message" class="muted"></span>
+  <div class="page-shell">
+    <div id="langBanner" class="lang-banner hidden">
+      <div data-lang-banner-text>Choose language / Elige idioma / Choisissez la langue / 请选择语言</div>
+      <div class="lang-buttons">
+        <button type="button" class="lang-btn" data-lang-button="en">English</button>
+        <button type="button" class="lang-btn" data-lang-button="es">Español</button>
+        <button type="button" class="lang-btn" data-lang-button="fr">Français</button>
+        <button type="button" class="lang-btn" data-lang-button="zh">中文（简体）</button>
+      </div>
     </div>
-  </div>
-  </form>
 
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <div class="lang-row">
+      <div class="lang-label" data-i18n="top.language_label">Language / Idioma / Langue / 中文</div>
+      <select class="lang-select" data-lang-select>
+        <option value="en" data-i18n="lang.option.en">English</option>
+        <option value="es" data-i18n="lang.option.es">Español</option>
+        <option value="fr" data-i18n="lang.option.fr">Français</option>
+        <option value="zh" data-i18n="lang.option.zh">中文（简体）</option>
+      </select>
+    </div>
+
+    <form id="signForm">
+      <div class="page" id="contractPage">
+        <div id="message" class="muted"></div>
+        <div id="contractContent"></div>
+      </div>
+    </form>
+  </div>
+
+  <footer style="margin: 16px auto; max-width: 900px; color: #64748b; font-size: 12px; text-align: center;" data-merchant-disclosure></footer>
+
   <script>
     const SUPABASE_URL = 'https://wdsqnbebutuhwckjpwqf.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkc3FuYmVidXR1aHdja2pwd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxMDE1NzcsImV4cCI6MjA3OTY3NzU3N30.pJglpTaZouSQFUVCbQONHK1UsB9CgWewKQCIV13NOEM';
+
     const params = new URLSearchParams(location.search);
     const studentId = params.get('student_id');
     const studentNameParam = (params.get('student_name') || '').trim();
     const version = params.get('v') || 'v1';
     const signingToken = (params.get('token') || '').trim();
-    const statusEl = document.getElementById('status');
+
     const msgEl = document.getElementById('message');
     const form = document.getElementById('signForm');
-    const signBtn = document.getElementById('signBtn');
-    let studentNameForText = '';
-    const contractTemplate = `
-TUTORING SERVICES AGREEMENT (Minor Tutor Version)
-This Tutoring Services Agreement ("Agreement") is made on [date] between:
-PARTIES
-Tutor's Legal Guardian (Contracting Party):
-Name: Yu Qin
-ID / Passport No.: N/A
-Email: 17449125@qq.com
-Mobile / WhatsApp: +27 736696754
-
-Minor Tutor (Service Provider):
-Name: Shangjing Huang
-Age: 16
-Email: erichuang.shangjing@outlook.com
-
-Client (Parent/Guardian):
-Name: [Parent/Guardian full name]
-ID / Passport No.: [optional]
-Email: [Parent email]
-Mobile / WhatsApp: [Parent phone]
-
-For the benefit of the Student:
-Student name: [Student full name]
-Date of birth: [Student DOB]
-School: [School]
-
-The Guardian and the Client are the “Parties.” The Guardian contracts on behalf of the Minor Tutor. The Minor Tutor signs only to acknowledge professional expectations; legal rights and obligations under this Agreement are between the Guardian and the Client.
-1. DEFINITIONS
-In this Agreement:
-
-"Student" means the learner receiving tutoring.
-
-"Session" means a scheduled tutoring lesson (online or in-person).
-
-"Fees" means the amounts payable by the Client to the Guardian for Services.
-
-"Services" means the tutoring and related support described in clause 2.
-
-"Business Day" means a day other than a Saturday, Sunday or South African public holiday.
-
-"Writing / written" includes email and WhatsApp messages.
-2. SCOPE OF SERVICES
-2.1 The Minor Tutor will provide academic tutoring in [subjects - e.g. Physics, Chemistry, Mathematics] for the Student, including:
-- Explaining concepts and course content
-- Supporting exam and test preparation
-- Providing practice questions and feedback
-- Advising on study skills and revision strategies
-
-2.2 The Minor Tutor does not:
-- Guarantee specific marks, grades, or admissions outcomes; or
-- Provide psychological, medical, legal, or any other professional services.
-3. LESSON FORMAT & LOCATION
-3.1 Sessions may be held:
-- Online, via platforms such as Zoom, Google Meet, or similar; and/or
-- In-person, at:
-  • the Student's home at [address], and/or
-  • another mutually agreed location.
-
-3.2 For in-person Sessions, the Client is responsible for:
-- Providing a safe, reasonably quiet environment; and
-- Ensuring that an adult is present in the home.
-
-3.3 For online Sessions, the Client is responsible for:
-- Providing the Student with a suitable device, audio, and stable internet;
-- Ensuring the Student has a quiet, safe space for lessons.
-4. SCHEDULE, ATTENDANCE & PUNCTUALITY
-4.1 Sessions are scheduled according to the weekly slots agreed for the Student (one or more slots per week). Session length may vary by slot and is recorded in the schedule.
-
-4.2 Both Parties agree to be punctual.
-- If the Minor Tutor is late, the Minor Tutor will either extend the Session (where possible) or credit the missed time to a future Session.
-- If the Student joins late, the Session will still end at the scheduled time, and the full Fee will remain payable.
-5. FEES, INVOICING & PAYMENT
-Standard rate: ZAR 200 per 60-minute Session (pro-rated for longer Sessions). Invoices are issued monthly in advance for Sessions scheduled from the earliest upcoming slot after contract signing until the last available slot before month end. Payment is required before Sessions take place; sessions are scheduled only after payment is received. If payment is late, Sessions that have already passed are not billed and will not be rescheduled, and the invoice total is reduced accordingly. Payment instructions will be provided on each invoice; reference: Student surname + invoice number.
-If payment is overdue, the Guardian may suspend sessions and may charge a reasonable admin fee for rebooking or additional processing, if applicable and communicated in writing.
-6. CANCELLATIONS & RESCHEDULING
-Client requests to cancel or reschedule must be made to the Guardian/Tutor (clients do not change sessions directly in the system). Cancellations with ≥24h notice are refunded for that Session and the lesson is forfeited. <24h notice or no-show: the lesson is forfeited and no refund is issued. Lessons moved within 24 hours are treated as an additional Session: an adjustment invoice is issued and the additional Session is scheduled only after that invoice is paid.
-7. HOLIDAYS, LONG BREAKS & EXAM SEASONS
-7.1 The Parties will confirm in advance how Sessions will run during school holidays.
-
-7.2 For extended absences (travel, medical, etc.) lasting more than [2] weeks, the Client must notify the Guardian in Writing as early as possible to arrange:
-- A temporary pause of Sessions; and/or
-- An adjusted schedule.
-
-7.3 Any prepaid package:
-- Will be honoured for [e.g. 6 months] from the start date, subject to this Agreement;
-- Unused Sessions after that period may lapse unless otherwise agreed in Writing.
-
-7.4 During exam seasons, the timetable may be adjusted by mutual agreement.
-8. ACADEMIC INTEGRITY
-8.1 The Minor Tutor will support the Student in understanding and preparing their work but will not:
-- Write essays, assignments, or coursework for the Student to submit as their own;
-- Complete tests, exams, or online assessments on the Student's behalf;
-- Log into school platforms (e.g. ManageBac, school portals) as the Student.
-
-8.2 The Student remains responsible for:
-- Submitting their own work;
-- Complying with school and examination rules; and
-- Observing all academic honesty policies.
-
-8.3 The Guardian and Minor Tutor will not be liable for any academic penalties, sanctions, or disciplinary action arising from the Student's misuse of tutoring support.
-9. RESPONSIBILITIES OF THE MINOR TUTOR
-The Minor Tutor will:
-- Prepare and deliver Sessions with reasonable care and skill;
-- Tailor explanations as far as reasonably possible to the Student's needs;
-- Keep the Client informed of serious concerns about progress, attendance, or behaviour (usually via the Parent);
-- Maintain appropriate professional boundaries with the Student;
-- Comply with applicable laws, under the supervision of the Guardian.
-10. RESPONSIBILITIES OF THE STUDENT AND PARENT/GUARDIAN
-10.1 The Student will:
-- Attend Sessions on time and with necessary materials;
-- Complete agreed homework/practice tasks;
-- Maintain respectful behaviour towards the Minor Tutor.
-
-10.2 The Parent/Guardian (Client) will:
-- Ensure the Student's regular attendance and punctuality;
-- Provide a safe, appropriate environment (in-person or online);
-- Monitor the Student's use of devices and internet access;
-- Promptly inform the Guardian of relevant changes (health, school issues, timetable changes);
-- Ensure Fees are paid on time.
-11. SAFEGUARDING & CHILD PROTECTION
-11.1 The Guardian and Minor Tutor will maintain professional conduct and appropriate boundaries at all times.
-
-11.2 The Minor Tutor will not:
-- Engage in any physical contact with the Student except where clearly appropriate (e.g. brief handshake) and only if necessary;
-- Request or share personal social media connections with the Student;
-- Meet the Student alone in any location that is unsafe or inappropriate.
-
-11.3 The Parent/Guardian is responsible for general supervision of the Student:
-- During in-person Sessions at home; and
-- Around the Student's overall use of technology and online platforms.
-
-11.4 The Guardian may be legally obliged to report suspected abuse, serious neglect, or risk of harm to appropriate authorities and reserves the right to do so.
-12. DATA PROTECTION & PRIVACY (POPIA)
-12.1 The Guardian will collect and process certain Personal Information about the Client and Student, including:
-- Names, contact details, and emergency contacts;
-- School, year/grade, subjects, and curriculum;
-- Academic performance data (e.g. marks, reports, test results);
-- Session records and scheduling information;
-- Invoicing and payment information.
-
-12.2 Personal Information is processed for the purposes of:
-- Providing tutoring Services;
-- Scheduling Sessions and managing attendance;
-- Monitoring and reporting on the Student's progress;
-- Invoicing and accounting;
-- Complying with legal obligations.
-
-12.3 Personal Information may be stored in secure digital tools and tutoring systems (including third-party service providers) which may be located inside or outside South Africa.
-
-12.4 By signing this Agreement, the Client:
-- Consents to the collection, use, storage, and processing of their and the Student's Personal Information for the purposes described above;
-- Consents to the transfer of such Personal Information to third-party service providers (including those located outside South Africa) for secure data storage and communication;
-- Confirms that they are legally authorised to give such consent on behalf of the Student.
-
-12.5 The Client may request access to, or correction of, Personal Information held by the Guardian, subject to reasonable written request. Data requests should be sent to [Guardian email].
-
-12.6 The Guardian will take reasonable technical and organisational measures to protect Personal Information but cannot guarantee absolute security of data transmitted over the internet.
-13. CONFIDENTIALITY & INTELLECTUAL PROPERTY
-13.1 The Guardian and Minor Tutor will keep all information about the Student's academic performance and personal circumstances confidential, except:
-- Where disclosure is required by law; or
-- Where disclosure is necessary to protect the Student or others from serious harm; or
-- Where the Client has explicitly consented in Writing.
-
-13.2 All worksheets, notes, explanations, slides, and other teaching materials created by the Minor Tutor remain the intellectual property of the Minor Tutor (under the Guardian's supervision).
-
-13.3 The Client and Student may use such materials only for personal study and may not:
-- Share, publish, resell, or distribute them to others; or
-- Upload them to public websites or platforms,
-without the Guardian's prior written consent.
-14. ONLINE LESSONS, TECHNOLOGY & LOAD-SHEDDING
-14.1 The Client acknowledges that online Sessions depend on third-party services (internet providers, platforms, power supply) which are outside the Guardian's and Minor Tutor's control.
-
-14.2 If more than 50% of a Session is lost due to technical issues on the Minor Tutor's side (e.g. power failure or internet outage), the missed portion will be rescheduled at no additional cost.
-
-14.3 If time is lost due to technical issues on the Student's / Client's side (e.g. weak Wi-Fi, device failure, local load-shedding), the Guardian is not obliged to extend or reschedule, but may choose to offer a partial reschedule at their discretion.
-
-14.4 Both Parties will make reasonable efforts to plan around known load-shedding schedules.
-15. GROUP LESSONS (IF APPLICABLE)
-15.1 If the Student is part of a group Session:
-- Fees may be charged per Student or per group, as set out in Writing;
-- Cancellation by one Student does not cancel the group Session for others.
-
-15.2 Group dynamics, including different levels and learning speeds, will be managed reasonably, but the Minor Tutor cannot individualise every minute of a group Session.
-16. MARKETING, TESTIMONIALS & USE OF STUDENT WORK
-16.1 The Guardian will not use the Student's full name, photo, or identifiable work in any public marketing without the Client's explicit written consent.
-
-16.2 The Guardian may, with the Client's written permission, use anonymised examples such as:
-- "A student improved from 60% to 80% in [subject] after [x] months of lessons" (no names or identifying details); or
-- Anonymised samples of work for teaching or training purposes.
-
-16.3 Granting or refusing consent for such use will not affect the Services provided.
-17. RATE CHANGES
-17.1 The Guardian may review and change the Standard Rate and other Fees from time to time.
-
-17.2 Any change in Fees will be communicated to the Client in Writing with at least [30] days' notice.
-
-17.3 If the Client continues to book Sessions after the effective date of the new Fees, this will be treated as acceptance of the new Fees.
-18. FORCE MAJEURE
-18.1 Neither Party will be liable for failure or delay in performing obligations under this Agreement (other than payment obligations) where such failure or delay is caused by events beyond their reasonable control, including but not limited to:
-- Natural disasters, war, unrest, or pandemics;
-- Government restrictions;
-- Widespread power or communication failures;
-- Serious illness or injury.
-
-18.2 In such cases, the affected obligations will be suspended for the duration of the force majeure event, and the Parties will work in good faith to reschedule missed Sessions where possible.
-19. LIMITATION OF LIABILITY
-19.1 The Guardian and Minor Tutor will provide Services with reasonable care and skill but do not guarantee any particular academic result or outcome.
-
-19.2 To the maximum extent permitted by law, the Guardian's total liability arising out of or in connection with this Agreement (whether in contract, delict, or otherwise) is limited to the total Fees actually paid by the Client to the Guardian in the 3 months immediately preceding the event giving rise to the claim.
-
-19.3 The Guardian and Minor Tutor will not be liable for:
-- Any indirect, consequential, or special loss;
-- Loss of opportunity, future earnings, or reputational damage;
-- Any actions taken by the Student, Client, school, or third parties.
-
-19.4 Nothing in this Agreement limits liability for death or personal injury caused by negligence, or any other liability which cannot lawfully be excluded or limited.
-20. LESSON MATERIALS & RESOURCE USE
-20.1 Any notes, worksheets, explanations, recordings (if permitted), or digital resources shared through the dashboard are for the Student's personal learning use only.
-
-20.2 The Client and Student may not resell, publish, or distribute these materials without prior written permission from the Guardian.
-
-20.3 The Client is responsible for keeping any dashboard links or access details private.
-21. SESSION RECORDINGS & COMMUNICATIONS
-21.1 No session will be recorded without prior written consent from the Client.
-
-21.2 Routine communication, scheduling, and updates may be carried out by WhatsApp, email, or the tutoring dashboard and will form part of the service record.
-22. HEALTH, SAFETY & CONDUCT
-22.1 The Client must inform the Guardian of any illness, injury, or special needs that may affect Sessions.
-
-22.2 The Guardian may reschedule in-person Sessions if the environment is unsafe, the Student is unwell, or appropriate adult supervision is not available.
-23. SUBSTITUTE TUTOR (IF REQUIRED)
-23.1 If the Minor Tutor is unavailable for an extended period, the Guardian may propose a substitute tutor with reasonable notice.
-
-23.2 The Client may accept or decline a substitute without penalty. If declined, the Guardian will offer alternative scheduling or a credit/refund for affected Sessions.
-24. COMPLAINTS & FEEDBACK
-24.1 The Client may raise concerns in writing. The Guardian will respond in good faith within a reasonable time and attempt to resolve issues promptly.
-25. DATA RETENTION
-25.1 Session records, invoices, and signed contract records will be retained for a reasonable period for operational and legal purposes. Records may be retained for up to 5 years for accounting and legal compliance, unless a longer period is required by law, after which they are securely deleted.
-26. TERM & TERMINATION
-26.1 This Agreement starts on the date stated above and continues until terminated in accordance with this clause.
-
-26.2 Either Party may terminate this Agreement for any reason by giving 30 days' written notice to the other Party.
-
-26.3 The Guardian may terminate this Agreement with immediate effect if:
-- Fees remain unpaid for more than [x] days after the due date;
-- The Student or Client engages in abusive, unsafe, or inappropriate behaviour;
-- There is a serious or repeated breach of this Agreement.
-
-26.4 On termination:
-- All outstanding Fees for completed Sessions become immediately due;
-- Prepaid Sessions not yet delivered will be refunded or credited, less any Sessions already delivered and any valid cancellation charges.
-27. NOTICES & COMMUNICATION
-27.1 Routine communication, scheduling, and updates may be carried out by WhatsApp or email.
-
-27.2 Formal notices under this Agreement (e.g. termination, fee changes) may be sent by email or WhatsApp to the contact details at the top of this Agreement.
-
-27.3 A notice is deemed received:
-- When it shows as "delivered" on WhatsApp or similar; or
-- When sent to the correct email address with no bounce-back, on the same day if sent before 20:00, or the next Business Day if sent after 20:00.
-
-The Parties must promptly notify each other of any change in contact details.
-28. GOVERNING LAW & DISPUTE RESOLUTION
-28.1 This Agreement is governed by the laws of the Republic of South Africa.
-
-28.2 The Parties will first try to resolve any dispute amicably through good-faith discussion.
-
-28.3 If they cannot resolve a dispute within 30 days, either Party may propose mediation by an independent mediator agreed by the Parties. If mediation fails, either Party may pursue legal remedies in the competent courts of South Africa.
-29. GENERAL
-29.1 This Agreement contains the entire understanding between the Parties and supersedes all prior oral or written agreements about the Services.
-
-29.2 Any changes to this Agreement must be made in Writing and agreed by both Parties.
-
-29.3 If any provision is found to be invalid or unenforceable, the remaining provisions remain in full force and effect.
-
-29.4 This Agreement may be signed in counterparts and by electronic signature (including scanned or photographed signatures). All counterparts together form one Agreement.
-30. ELECTRONIC SIGNATURES & ONLINE DASHBOARD ACCEPTANCE
-30.1 The Client agrees that this Agreement may be accepted and signed electronically via the Tutor's online dashboard or other electronic means.
-
-30.2 Under the Electronic Communications and Transactions Act 25 of 2002 (ECTA), a typed name, tick-box confirmation, click on a "Sign & Accept" button, or similar electronic action constitutes a legally binding electronic signature.
-
-30.3 By clicking “Sign & Download PDF”, the Client confirms that this action is their electronic signature and that they intend to be legally bound.
-
-30.4 The Parties agree that electronic signatures have the same force and effect as handwritten signatures and that a timestamped electronic record of acceptance stored in the Guardian's systems is sufficient proof of signature and consent.
-31. SYSTEM STATUS & STUDENT DASHBOARD VALIDITY
-31.1 The Student's online dashboard and account may display a status of "INVALID - CONTRACT NOT SIGNED" until this Agreement has been accepted and electronically signed by the Client.
-
-31.2 The Guardian and Minor Tutor are not obliged to begin tutoring, schedule lessons, provide materials, or maintain bookings while the Student's status is INVALID.
-
-31.3 Once this Agreement is validly signed, the system status will change to "VALID - CONTRACT SIGNED", at which point the Student may access the full features of the tutoring platform, subject to this Agreement.
-
-31.4 If this Agreement is terminated or materially breached, the Guardian may change the status back to INVALID and restrict access to the system and Sessions.
-SIGNATURES
-Tutor's Legal Guardian (Contracting Party)
-Signature: [Guardian signature typed/online]
-Name: [Guardian full name]
-Date: [date]
-
-Parent/Guardian (Client)
-Signature: [Parent signature typed/online]
-Name: [Parent/Guardian full name]
-Relationship to Student: [relationship]
-Date: [date]
-
-Minor Tutor (Acknowledgement Only)
-Signature: Shangjing Huang
-Name: Shangjing Huang
-Date: [date]
-`;
-
-    if (!studentId) {
-      statusEl.textContent = 'Missing student_id in the link.';
-    } else if (!signingToken) {
-      statusEl.textContent = 'Signing link is missing or expired. Please request a new signing link.';
-      if (signBtn) {
-        signBtn.disabled = true;
-        signBtn.style.opacity = '0.6';
-        signBtn.style.cursor = 'not-allowed';
+    let statusEl = null;
+    let studentNameEl = null;
+    let signBtn = null;
+
+    function renderContract() {
+      const lang = typeof getLanguage === 'function' ? getLanguage() : 'en';
+      const html = window.LEGAL_I18N?.CONTRACT_HTML?.[lang] || window.LEGAL_I18N?.CONTRACT_HTML?.en || '';
+      const container = document.getElementById('contractContent');
+      if (container) container.innerHTML = html;
+      if (typeof applyI18n === 'function') applyI18n(container || document);
+      statusEl = document.getElementById('status');
+      studentNameEl = document.getElementById('studentName');
+      signBtn = document.getElementById('signBtn');
+      hydrateDefaults();
+      updateStatus();
+    }
+
+    function updateStatus() {
+      if (!statusEl) return;
+      if (!studentId) {
+        statusEl.textContent = t('contract.status_missing_student');
+      } else if (!signingToken) {
+        statusEl.textContent = t('contract.status_missing_token');
+        if (signBtn) {
+          signBtn.disabled = true;
+          signBtn.style.opacity = '0.6';
+          signBtn.style.cursor = 'not-allowed';
+        }
+      } else {
+        statusEl.textContent = t('contract.status_ready');
       }
-    } else {
-      statusEl.textContent = 'Ready to sign';
     }
 
     function normalizeSpaces(value) {
@@ -538,25 +152,20 @@ Date: [date]
         parent_signature: normalizeSpaces(get('parent_signature')),
         date_guardian: get('date_guardian') || today,
         date_parent: get('date_parent') || today,
-        signature: normalizeSpaces(get('parent_signature'))
+        guardian_signature_name: get('guardian_signature_name'),
+        parent_signature_name: get('parent_signature_name'),
+        guardian_signature_date: get('guardian_signature_date') || today,
+        parent_signature_date: get('parent_signature_date') || today,
+        tutor_signature_date: get('tutor_signature_date') || today,
+        signature: normalizeSpaces(get('signature_text')),
+        parent_signature_text: normalizeSpaces(get('signature_text')),
       };
     }
 
-    async function loadStudent() {
-      if (studentNameParam) {
-        studentNameForText = studentNameParam;
-        const studentNameEl = document.getElementById('studentName');
-        if (studentNameEl) studentNameEl.textContent = `Student: ${studentNameForText}`;
-        if (form.student_name && !form.student_name.value) {
-          form.student_name.value = studentNameForText;
-        }
+    function hydrateDefaults() {
+      if (studentNameParam && studentNameEl) {
+        studentNameEl.textContent = studentNameParam;
       }
-      const today = new Date().toISOString().slice(0,10);
-      ['date','date_guardian','date_parent'].forEach(n => {
-        const el = document.querySelector(`[name="${n}"]`);
-        if (el && !el.value) el.value = today;
-      });
-      // auto-fill tutor/guardian fixed fields if empty
       const setIfEmpty = (name, val) => {
         const el = document.querySelector(`[name="${name}"]`);
         if (el && !el.value) el.value = val;
@@ -565,61 +174,72 @@ Date: [date]
       setIfEmpty('guardian_email', '17449125@qq.com');
       setIfEmpty('guardian_phone', '+27 736696754');
       setIfEmpty('guardian_signature', 'Yu Qin');
-      setIfEmpty('guardian_name_sig', 'Yu Qin');
+      setIfEmpty('guardian_signature_name', 'Yu Qin');
       setIfEmpty('tutor_name', 'Shangjing Huang');
       setIfEmpty('tutor_email', 'erichuang.shangjing@outlook.com');
       setIfEmpty('package_months', '6');
     }
 
-    function buildContractSnapshot(fields, executionRecord) {
-      const base = contractTemplate
-        .replaceAll('[date]', fields.date)
-        .replaceAll('[Guardian full name]', fields.guardian_name)
-        .replaceAll('[Guardian email]', fields.guardian_email)
-        .replaceAll('[Guardian phone]', fields.guardian_phone || '')
-        .replaceAll('[optional]', fields.guardian_id || '')
-        .replaceAll('[Tutor full name]', fields.tutor_name || fields.guardian_name)
-        .replaceAll('[Tutor email, optional]', fields.tutor_email || fields.guardian_email)
-        .replaceAll('[Parent/Guardian full name]', fields.parent_name)
-        .replaceAll('[Parent email]', fields.parent_email)
-        .replaceAll('[Parent phone]', fields.parent_phone || '')
-        .replaceAll('[Parent ID / Passport No.]', fields.parent_id || '')
-        .replaceAll('[Student full name]', fields.student_name)
-        .replaceAll('[Student DOB]', fields.student_dob)
-        .replaceAll('[School]', fields.student_school)
-        .replaceAll('[relationship]', fields.relationship || '')
-        .replaceAll('[address]', fields.address || '')
-        .replaceAll('[Guardian signature typed/online]', fields.guardian_signature || '')
-        .replaceAll('[Parent signature typed/online]', fields.parent_signature || '')
-        .replaceAll('[date]', fields.date_parent || fields.date);
-      return executionRecord ? `${base}\n${executionRecord}` : base;
+    function buildContractSnapshotFromDom(executionRecord) {
+      const source = document.getElementById('contractContent');
+      if (!source) return executionRecord || '';
+      const clone = source.cloneNode(true);
+      clone.querySelectorAll('#status, #studentName').forEach(el => el.remove());
+      clone.querySelectorAll('button').forEach(el => el.remove());
+      clone.querySelectorAll('input, textarea, select').forEach(input => {
+        const span = document.createElement('span');
+        span.textContent = input.value || '';
+        input.replaceWith(span);
+      });
+      let text = clone.innerText || clone.textContent || '';
+      text = text.replace(/\n{3,}/g, '\n\n').trim();
+      return executionRecord ? `${text}\n${executionRecord}` : text;
+    }
+
+    async function loadStudent() {
+      if (!studentId) return;
+      try {
+        const resp = await fetch(`${SUPABASE_URL}/rest/v1/students?id=eq.${studentId}&select=name,contract_signed`, {
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+          }
+        });
+        const data = await resp.json();
+        const student = data && data[0];
+        if (student && student.name && studentNameEl) {
+          studentNameEl.textContent = student.name;
+        }
+      } catch (_err) {
+        // ignore
+      }
     }
 
     form.onsubmit = async (e) => {
       e.preventDefault();
       if (!studentId) {
-        msgEl.textContent = 'Missing student_id in the link.';
+        msgEl.textContent = t('contract.error_missing_student');
         return;
       }
       if (!signingToken) {
-        msgEl.textContent = 'Signing link is missing or expired. Please request a new signing link.';
+        msgEl.textContent = t('contract.error_missing_token');
         return;
       }
       const fields = getFieldsFromInputs();
-      if (!fields.parent_name || !fields.parent_email || !fields.student_name || !fields.student_dob || !fields.student_school || !fields.relationship || !form.confirm.checked || !fields.signature) {
-        msgEl.textContent = 'Please fill all fields and confirm.';
+      if (!fields.parent_name || !fields.parent_email || !fields.student_name || !fields.student_dob || !fields.student_school || !fields.relationship || !fields.signature) {
+        msgEl.textContent = t('contract.error_missing_fields');
         return;
       }
       if (fields.parent_phone) {
         const digits = fields.parent_phone.replace(/\D/g, '');
         if (digits.length < 7) {
-          msgEl.textContent = 'Please enter a valid phone number.';
+          msgEl.textContent = t('contract.error_invalid_phone');
           return;
         }
       }
       const name = fields.parent_name;
       const email = fields.parent_email;
-      msgEl.textContent = 'Preparing contract...';
+      msgEl.textContent = t('contract.msg_preparing');
       try {
         const userAgent = navigator.userAgent || '';
         const executionRecord = [
@@ -632,8 +252,9 @@ Date: [date]
           `Contract version: ${version}`,
           `User agent: ${userAgent}`
         ].join('\n');
-        const contractTextSnapshot = buildContractSnapshot(fields, executionRecord);
-        msgEl.textContent = 'Generating PDF...';
+
+        const contractTextSnapshot = buildContractSnapshotFromDom(executionRecord);
+        msgEl.textContent = t('contract.msg_generating_pdf');
         let pdfBase64 = '';
         let pdfName = 'signed_contract.pdf';
         const jsPDF = window.jspdf?.jsPDF;
@@ -657,7 +278,7 @@ Date: [date]
           const safeName = (fields.student_name || 'student').replace(/[^a-z0-9_-]+/gi, '_');
           pdfName = `signed_contract_${safeName}.pdf`;
         }
-        msgEl.textContent = 'Submitting signature...';
+        msgEl.textContent = t('contract.msg_submitting');
         const resp = await fetch(`${SUPABASE_URL}/functions/v1/sign-contract`, {
           method: 'POST',
           headers: {
@@ -691,17 +312,22 @@ Date: [date]
         if (!resp.ok || !json?.success) {
           throw new Error(json?.error || text || `Failed with status ${resp.status}`);
         }
-        msgEl.textContent = 'Signed! You may close this window.';
-        statusEl.textContent = 'VALID – CONTRACT SIGNED';
-        statusEl.style.color = '#16a34a';
+        msgEl.textContent = t('contract.msg_success');
+        if (statusEl) {
+          statusEl.textContent = t('contract.status_signed');
+          statusEl.style.color = '#16a34a';
+        }
       } catch (err) {
-        msgEl.textContent = 'Error: ' + (err?.message || err);
+        msgEl.textContent = t('contract.msg_error', { error: err?.message || err });
       }
     };
 
+    if (window.initLanguageUI) initLanguageUI();
+    renderContract();
+    window.addEventListener('i18n:change', renderContract);
+
     loadStudent();
   </script>
-  <footer style="margin: 16px auto; max-width: 900px; color: #64748b; font-size: 12px; text-align: center;" data-merchant-disclosure></footer>
   <script src="./business-config.js"></script>
   <script src="./business-ui.js"></script>
 </body>
