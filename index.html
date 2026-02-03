@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <title>Tutoring Dashboard – Physics • Chemistry • Maths</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; img-src 'self' https: data: blob:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://js.hcaptcha.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.deepseek.com; frame-src https://hcaptcha.com https://*.hcaptcha.com https://8x8.vc https://*.8x8.vc;">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -1486,7 +1487,7 @@
             </div>
 
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
-              <div class="card p-4 space-y-2">
+              <div id="portalAiCard" class="card p-4 space-y-2">
                 <div class="flex items-center justify-between">
                   <h3 class="text-sm font-semibold">Upcoming sessions</h3>
                   <span class="hint">All upcoming</span>
@@ -2649,6 +2650,20 @@
       return trimmed;
     }
 
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/`/g, '&#96;');
+    }
+
+    function esc(value) {
+      return escapeHtml(value);
+    }
+
     function sanitizeState(st) {
       ['students', 'parents', 'parentLinks', 'sessions', 'sessionCancellations', 'busyDays', 'resources', 'homework', 'documents', 'contracts', 'invoices', 'studentTodos', 'studentCheckins', 'messages'].forEach(key => {
         if (!Array.isArray(st[key])) st[key] = [];
@@ -3549,7 +3564,9 @@
     async function callLLM(mode, payload) {
       if (tourMode) throw new Error('AI helpers are disabled in tour mode.');
       if (!supabaseAvailable) throw new Error('Supabase not configured.');
-      const token = supabaseSession?.access_token || SUPABASE_ANON_KEY;
+      if (!isOwner()) throw new Error('AI helpers are available to the tutor only.');
+      const token = supabaseSession?.access_token;
+      if (!token) throw new Error('Please sign in again to use AI helpers.');
       const res = await fetch(`${FUNCTIONS_URL}/call-llm`, {
         method: 'POST',
         headers: {
@@ -4164,10 +4181,10 @@
       list.innerHTML = items.slice(0, 25).map(a => `
         <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80 flex justify-between items-center">
           <div>
-            <div class="font-medium">${a.action}</div>
-            <div class="text-[10px] text-slate-500">${a.detail || ''}</div>
+            <div class="font-medium">${esc(a.action)}</div>
+            <div class="text-[10px] text-slate-500">${esc(a.detail || '')}</div>
           </div>
-          <div class="text-[10px] text-slate-500">${a.created_at ? new Date(a.created_at).toLocaleString() : ''}</div>
+          <div class="text-[10px] text-slate-500">${esc(a.created_at ? new Date(a.created_at).toLocaleString() : '')}</div>
         </li>
       `).join('');
     }
@@ -4304,7 +4321,7 @@
           busyList.innerHTML = upcomingBusy.map(b => `
             <li class="flex items-start gap-2">
               <span class="busy-badge">Busy</span>
-              <span>${b.date}${b.note ? ` • ${b.note}` : ''}</span>
+              <span>${esc(b.date)}${b.note ? ` • ${esc(b.note)}` : ''}</span>
             </li>
           `).join('');
         }
@@ -4322,22 +4339,23 @@
           const isOnline = isOnlineSession(s);
           const isBusyDay = isBusyDate(s.date);
           const busyLabel = isBusyDay ? '<span class="session-chip session-chip-busy">Busy date</span>' : '';
+          const safeSessionId = cleanId(s.id);
           const joinBtn = isOnline
             ? (isBusyDay
               ? `<button class="ml-auto px-2 py-0.5 rounded-lg border border-rose-200 text-[10px] text-rose-600 cursor-not-allowed" disabled>
                   Tutor busy on this date
                 </button>`
               : canJoinMeetingNow(s)
-              ? `<button class="ml-auto px-2 py-0.5 rounded-lg bg-indigo-600 text-white text-[10px]" onclick="openMeetingForSession('${s.id}')">Join online</button>`
+              ? `<button class="ml-auto px-2 py-0.5 rounded-lg bg-indigo-600 text-white text-[10px]" onclick="openMeetingForSession('${safeSessionId}')">Join online</button>`
               : `<button class="ml-auto px-2 py-0.5 rounded-lg border border-slate-200 text-[10px] text-slate-500 cursor-not-allowed" disabled>
                   Join 10 min before
                 </button>`)
             : '';
           return `
           <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
-            <div class="font-medium">${s.subject} • ${s.topic || 'Lesson'}</div>
+            <div class="font-medium">${esc(s.subject)} • ${esc(s.topic || 'Lesson')}</div>
             <div class="text-[10px] text-slate-500 flex items-center gap-2">
-              <span>${s.date} ${s.startTime || ''} • ${s.durationHours || 1}h • ${modeLabel}</span>
+              <span>${esc(s.date)} ${esc(s.startTime || '')} • ${esc(s.durationHours || 1)}h • ${esc(modeLabel)}</span>
               ${busyLabel}
               ${joinBtn}
             </div>
@@ -4352,8 +4370,8 @@
         hwUl.innerHTML = myHw.length ? myHw.map(hw => {
           const res = getResourceById(hw.resourceId);
           return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
-            <div class="font-medium">${res?.title || 'Homework'}</div>
-            <div class="text-[10px] text-slate-500">Status: ${hw.status} • Due ${hw.dueDate || 'n/a'}</div>
+            <div class="font-medium">${esc(res?.title || 'Homework')}</div>
+            <div class="text-[10px] text-slate-500">Status: ${esc(hw.status)} • Due ${esc(hw.dueDate || 'n/a')}</div>
           </li>`;
         }).join('') : '<li class="text-slate-500 text-xs">No open homework.</li>';
       }
@@ -4365,13 +4383,13 @@
           const methodLabel = getInvoicePaymentLabel(inv);
           return `
           <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
-            <div class="font-medium">Invoice ${inv.id}</div>
+            <div class="font-medium">Invoice ${esc(inv.id)}</div>
             <div class="text-[10px] text-slate-500">
-              Issued ${inv.issueDate || 'n/a'} • Due ${inv.dueDate || 'n/a'}
-              ${inv.servicePeriodStart && inv.servicePeriodEnd ? ` • ${inv.servicePeriodStart} → ${inv.servicePeriodEnd}` : ''}
-              ${inv.numSessions ? ` • ${inv.numSessions} sessions` : ''}
-              • R ${Number(inv.total || 0).toFixed(2)} • ${getInvoiceStatusLabel(inv)}
-              ${methodLabel ? ` • ${methodLabel}` : ''}
+              Issued ${esc(inv.issueDate || 'n/a')} • Due ${esc(inv.dueDate || 'n/a')}
+              ${inv.servicePeriodStart && inv.servicePeriodEnd ? ` • ${esc(inv.servicePeriodStart)} → ${esc(inv.servicePeriodEnd)}` : ''}
+              ${inv.numSessions ? ` • ${esc(inv.numSessions)} sessions` : ''}
+              • R ${esc(Number(inv.total || 0).toFixed(2))} • ${esc(getInvoiceStatusLabel(inv))}
+              ${methodLabel ? ` • ${esc(methodLabel)}` : ''}
               ${(inv.invoiceType || inv.invoice_type) === 'adjustment' ? ' • Adjustment' : ''}
               ${(inv.invoiceType || inv.invoice_type) === 'refund' ? ' • Refund' : ''}
             </div>
@@ -4386,9 +4404,9 @@
       if (resUl) {
         resUl.innerHTML = myRes.length ? myRes.map(r => `
           <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
-            <div class="font-medium">${r.title}</div>
-            <div class="text-[10px] text-slate-500">${r.subject} • ${r.level || ''}</div>
-            ${getResourceOpenUrl(r) ? `<a class="text-[10px] text-indigo-600" href="${getResourceOpenUrl(r)}" target="_blank">Open resource</a>` : ''}
+            <div class="font-medium">${esc(r.title)}</div>
+            <div class="text-[10px] text-slate-500">${esc(r.subject)} • ${esc(r.level || '')}</div>
+            ${getResourceOpenUrl(r) ? `<a class="text-[10px] text-indigo-600" href="${esc(getResourceOpenUrl(r))}" target="_blank">Open resource</a>` : ''}
           </li>
         `).join('') : '<li class="text-slate-500 text-xs">No resources assigned.</li>';
       }
@@ -4403,9 +4421,9 @@
           <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
             <div class="flex justify-between text-[10px] text-slate-500">
               <span>${m.sender === 'owner' ? 'Tutor' : 'You'}</span>
-              <span>${m.created_at ? new Date(m.created_at).toLocaleString() : ''}</span>
+              <span>${esc(m.created_at ? new Date(m.created_at).toLocaleString() : '')}</span>
             </div>
-            <div>${m.text}</div>
+            <div>${esc(m.text)}</div>
           </li>
         `).join('') : '<li class="text-slate-500 text-xs">No messages yet.</li>';
       }
@@ -4415,6 +4433,8 @@
       const aiQ = document.getElementById('portalAiQuestion');
       const aiOut = document.getElementById('portalAiAnswer');
       const aiStatus = document.getElementById('portalAiStatus');
+      const aiCard = document.getElementById('portalAiCard');
+      if (aiCard) aiCard.classList.toggle('hidden', !isOwner());
       if (aiBtn && aiQ && aiOut) {
         aiBtn.onclick = async () => {
           const question = aiQ.value.trim();
@@ -4534,11 +4554,11 @@
         <form id="parentSelfProfileForm" class="space-y-2 text-xs">
           <div>
             <label class="block text-[11px] mb-1">Name</label>
-            <input name="name" value="${parent.name || ''}" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" required>
+            <input name="name" value="${esc(parent.name || '')}" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" required>
           </div>
           <div>
             <label class="block text-[11px] mb-1">Email (optional)</label>
-            <input name="email" value="${parent.email || ''}" placeholder="name@email.com"
+            <input name="email" value="${esc(parent.email || '')}" placeholder="name@email.com"
               class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
           </div>
           <div>
@@ -4548,12 +4568,12 @@
                 ${PHONE_CODES.map(c => `<option value="${c}" ${phoneCode === c ? 'selected' : ''}>${c}</option>`).join('')}
                 <option value="" ${!phoneCode ? 'selected' : ''}>Code</option>
               </select>
-              <input name="phoneLocal" value="${phoneLocal}" class="flex-1 border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="Number">
+              <input name="phoneLocal" value="${esc(phoneLocal)}" class="flex-1 border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="Number">
             </div>
           </div>
           <div>
             <label class="block text-[11px] mb-1">Notes (optional)</label>
-            <textarea name="notes" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${parent.notes || ''}</textarea>
+            <textarea name="notes" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${esc(parent.notes || '')}</textarea>
           </div>
           <div id="parentSelfProfileStatus" class="text-[10px] text-rose-600"></div>
           <div class="flex justify-between items-center mt-3">
@@ -4687,30 +4707,34 @@
       const sList = document.getElementById('parentStudentsList');
       if (sList) {
         sList.innerHTML = students.length ? students.map(s => {
+          const safeStudentId = cleanId(s.id);
           const sig = getLatestSignature(s.id);
           const signed = !!s.contractSigned;
           const contractLabel = signed ? 'VALID – CONTRACT SIGNED' : 'INVALID – CONTRACT NOT SIGNED';
           const contractClass = signed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700';
           const contractAction = signed
             ? '<button class="px-2 py-1 rounded-lg border border-slate-300 opacity-60 cursor-not-allowed" disabled>Contract signed</button>'
-            : `<button class="px-2 py-1 rounded-lg bg-amber-500 text-white border border-amber-500 hover:bg-amber-600 shadow-sm" onclick="openContractLink('${s.id}')">Sign contract</button>`;
+            : `<button class="px-2 py-1 rounded-lg bg-amber-500 text-white border border-amber-500 hover:bg-amber-600 shadow-sm" onclick="openContractLink('${safeStudentId}')">Sign contract</button>`;
+          const aiSummaryBtn = isOwner()
+            ? `<button id="btn-summary-${safeStudentId}" class="px-2 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50" onclick="parentSummaryAI('${safeStudentId}')">AI summary (30d)</button>`
+            : '';
           return `
-            <li class="border border-slate-200 rounded-lg px-3 py-2 bg-white/80 space-y-1" data-student-id="${s.id}">
+            <li class="border border-slate-200 rounded-lg px-3 py-2 bg-white/80 space-y-1" data-student-id="${safeStudentId}">
               <div class="flex items-center justify-between">
                 <div>
-                  <div class="font-medium">${s.name}</div>
-                  <div class="text-[10px] text-slate-500">${s.gradeLevel || ''}</div>
+                  <div class="font-medium">${esc(s.name)}</div>
+                  <div class="text-[10px] text-slate-500">${esc(s.gradeLevel || '')}</div>
                 </div>
                 <span class="text-[10px] px-2 py-0.5 rounded-full ${contractClass}">${contractLabel}</span>
               </div>
-              <div class="text-[10px] text-slate-500">${s.subjects?.join(', ') || 'Subjects not set'}</div>
-              <div class="text-[10px] text-slate-500">Email: ${s.studentEmail || '—'}</div>
-              <div class="text-[10px] text-slate-500">${sig ? `Signed by ${sig.parentName || 'Parent'} on ${sig.signedAt ? new Date(sig.signedAt).toLocaleDateString() : ''}` : 'No signed contract yet.'}</div>
+              <div class="text-[10px] text-slate-500">${esc(s.subjects?.join(', ') || 'Subjects not set')}</div>
+              <div class="text-[10px] text-slate-500">Email: ${esc(s.studentEmail || '—')}</div>
+              <div class="text-[10px] text-slate-500">${sig ? `Signed by ${esc(sig.parentName || 'Parent')} on ${esc(sig.signedAt ? new Date(sig.signedAt).toLocaleDateString() : '')}` : 'No signed contract yet.'}</div>
               <div class="flex flex-wrap items-center gap-2 text-[10px]">
                 ${contractAction}
-                <button id="btn-summary-${s.id}" class="px-2 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50" onclick="parentSummaryAI('${s.id}')">AI summary (30d)</button>
+                ${aiSummaryBtn}
               </div>
-              <div id="ai-summary-${s.id}" class="text-[10px] text-slate-600 whitespace-pre-wrap"></div>
+              <div id="ai-summary-${safeStudentId}" class="text-[10px] text-slate-600 whitespace-pre-wrap"></div>
             </li>
           `;
         }).join('') : '<li class="text-slate-500 text-xs">No linked students.</li>';
@@ -4753,13 +4777,16 @@
             <div class="border border-slate-200 rounded-lg p-2 bg-white/80">
               <div class="font-medium text-[11px]">1) Sign the contract for each student</div>
               <ul class="mt-1 space-y-1">
-                ${unsignedStudents.map(s => `
+                ${unsignedStudents.map(s => {
+                  const safeStudentId = cleanId(s.id);
+                  return `
                   <li class="flex items-center justify-between gap-2">
-                    <span>${s.name}</span>
+                    <span>${esc(s.name)}</span>
                     <button class="px-2 py-1 rounded-lg bg-amber-500 text-white border border-amber-500 hover:bg-amber-600 text-[10px] shadow-sm"
-                      onclick="openContractLink('${s.id}')">Open & sign</button>
+                      onclick="openContractLink('${safeStudentId}')">Open & sign</button>
                   </li>
-                `).join('')}
+                `;
+                }).join('')}
               </ul>
               <div class="mt-1 text-[10px] text-slate-500">Signing opens in a new tab so you can return here easily.</div>
             </div>
@@ -4775,11 +4802,12 @@
               <ul class="mt-1 space-y-1">
                 ${pendingInvoices.map(inv => {
                   const stu = getStudentById(inv.studentId);
+                  const safeInvId = cleanId(inv.id);
                   return `
                     <li class="flex items-center justify-between gap-2">
-                      <span>${stu?.name || 'Student'} • ${inv.dueDate || 'n/a'} • R ${Number(inv.total || 0).toFixed(2)}</span>
+                      <span>${esc(stu?.name || 'Student')} • ${esc(inv.dueDate || 'n/a')} • R ${esc(Number(inv.total || 0).toFixed(2))}</span>
                       <button class="px-2 py-1 rounded-lg bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700 text-[10px] shadow-sm"
-                        onclick="startPayfastPayment('${inv.id}')">Pay now</button>
+                        onclick="startPayfastPayment('${safeInvId}')">Pay now</button>
                     </li>
                   `;
                 }).join('')}
@@ -4821,7 +4849,7 @@
           parentBusyList.innerHTML = upcomingBusy.map(b => `
             <li class="flex items-start gap-2">
               <span class="busy-badge">Busy</span>
-              <span>${b.date}${b.note ? ` • ${b.note}` : ''}</span>
+              <span>${esc(b.date)}${b.note ? ` • ${esc(b.note)}` : ''}</span>
             </li>
           `).join('');
         }
@@ -4843,7 +4871,8 @@
       const mySessions = [...upcomingSessions, ...pastSessions].map(s => s.session);
       if (sessionsUl) {
         sessionsUl.innerHTML = mySessions.length ? mySessions.map(s => {
-          const names = s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+          const namesRaw = s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+          const names = esc(namesRaw);
           const when = new Date(s.date + 'T' + (s.startTime || '00:00'));
           const isPast = when < now;
           const status = s.completed ? 'Completed' : (isPast ? 'Past' : 'Upcoming');
@@ -4852,23 +4881,24 @@
           const isOnline = isOnlineSession(s);
           const isBusyDay = isBusyDate(s.date);
           const busyLabel = isBusyDay ? '<span class="session-chip session-chip-busy">Busy date</span>' : '';
+          const safeSessionId = cleanId(s.id);
           const joinBtn = isOnline
             ? (isBusyDay
               ? `<button class="mt-1 px-2 py-1 rounded-lg border border-rose-200 text-[10px] text-rose-600 cursor-not-allowed" disabled>
                   Tutor busy on this date
                 </button>`
               : canJoinMeetingNow(s)
-              ? `<button class="mt-1 px-2 py-1 rounded-lg bg-indigo-600 text-white text-[10px]" onclick="openMeetingForSession('${s.id}')">Join online session</button>`
+              ? `<button class="mt-1 px-2 py-1 rounded-lg bg-indigo-600 text-white text-[10px]" onclick="openMeetingForSession('${safeSessionId}')">Join online session</button>`
               : `<button class="mt-1 px-2 py-1 rounded-lg border border-slate-200 text-[10px] text-slate-500 cursor-not-allowed" disabled>
                   Join available 10 min before
                 </button>`)
             : '';
           return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
             <div class="flex items-center justify-between gap-2">
-              <div class="font-medium">${s.subject} • ${s.topic || 'Lesson'}</div>
-              <span class="text-[10px] px-2 py-0.5 rounded-full ${statusClass}">${status}</span>
+              <div class="font-medium">${esc(s.subject)} • ${esc(s.topic || 'Lesson')}</div>
+              <span class="text-[10px] px-2 py-0.5 rounded-full ${statusClass}">${esc(status)}</span>
             </div>
-            <div class="text-[10px] text-slate-500">${s.date} ${s.startTime || ''} • ${s.durationHours || 1}h • ${names} • ${modeLabel}</div>
+            <div class="text-[10px] text-slate-500">${esc(s.date)} ${esc(s.startTime || '')} • ${esc(s.durationHours || 1)}h • ${names} • ${esc(modeLabel)}</div>
             ${busyLabel ? `<div class="mt-1">${busyLabel}</div>` : ''}
             ${joinBtn}
           </li>`;
@@ -4881,8 +4911,8 @@
           const res = getResourceById(hw.resourceId);
           const stu = getStudentById(hw.studentId);
           return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
-            <div class="font-medium">${res?.title || 'Homework'}</div>
-            <div class="text-[10px] text-slate-500">${stu?.name || ''} • Status: ${hw.status} • Due ${hw.dueDate || 'n/a'}</div>
+            <div class="font-medium">${esc(res?.title || 'Homework')}</div>
+            <div class="text-[10px] text-slate-500">${esc(stu?.name || '')} • Status: ${esc(hw.status)} • Due ${esc(hw.dueDate || 'n/a')}</div>
           </li>`;
         }).join('') : '<li class="text-slate-500 text-xs">No homework posted.</li>';
       }
@@ -4892,9 +4922,9 @@
       if (resUl) {
         resUl.innerHTML = myRes.length ? myRes.map(r => `
           <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
-            <div class="font-medium">${r.title}</div>
-            <div class="text-[10px] text-slate-500">${r.subject} • ${r.level || ''}</div>
-            ${getResourceOpenUrl(r) ? `<a class="text-[10px] text-indigo-600" href="${getResourceOpenUrl(r)}" target="_blank">Open resource</a>` : ''}
+            <div class="font-medium">${esc(r.title)}</div>
+            <div class="text-[10px] text-slate-500">${esc(r.subject)} • ${esc(r.level || '')}</div>
+            ${getResourceOpenUrl(r) ? `<a class="text-[10px] text-indigo-600" href="${esc(getResourceOpenUrl(r))}" target="_blank">Open resource</a>` : ''}
           </li>
         `).join('') : '<li class="text-slate-500 text-xs">No resources yet.</li>';
       }
@@ -4905,22 +4935,26 @@
         invUl.innerHTML = myInv.length ? myInv.map(inv => {
           const s = getStudentById(inv.studentId);
           const methodLabel = getInvoicePaymentLabel(inv);
+          const safeInvId = cleanId(inv.id);
+          const aiBtn = isOwner()
+            ? `<button id="btn-inv-${safeInvId}" class="px-2 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50" onclick="explainInvoiceAI('${safeInvId}')">Explain with AI</button>`
+            : '';
           return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
-            <div class="font-medium">Invoice ${inv.id}</div>
+            <div class="font-medium">Invoice ${esc(inv.id)}</div>
             <div class="text-[10px] text-slate-500">
-              ${s?.name || ''} • Issued ${inv.issueDate || 'n/a'} • Due ${inv.dueDate || 'n/a'}
-              ${inv.servicePeriodStart && inv.servicePeriodEnd ? ` • ${inv.servicePeriodStart} → ${inv.servicePeriodEnd}` : ''}
-              ${inv.numSessions ? ` • ${inv.numSessions} sessions` : ''}
-              • R ${Number(inv.total || 0).toFixed(2)} • ${getInvoiceStatusLabel(inv)}
-              ${methodLabel ? ` • ${methodLabel}` : ''}
+              ${esc(s?.name || '')} • Issued ${esc(inv.issueDate || 'n/a')} • Due ${esc(inv.dueDate || 'n/a')}
+              ${inv.servicePeriodStart && inv.servicePeriodEnd ? ` • ${esc(inv.servicePeriodStart)} → ${esc(inv.servicePeriodEnd)}` : ''}
+              ${inv.numSessions ? ` • ${esc(inv.numSessions)} sessions` : ''}
+              • R ${esc(Number(inv.total || 0).toFixed(2))} • ${esc(getInvoiceStatusLabel(inv))}
+              ${methodLabel ? ` • ${esc(methodLabel)}` : ''}
               ${(inv.invoiceType || inv.invoice_type) === 'adjustment' ? ' • Adjustment' : ''}
               ${(inv.invoiceType || inv.invoice_type) === 'refund' ? ' • Refund' : ''}
             </div>
             <div class="flex flex-wrap gap-2 mt-1 text-[10px]">
-              <button id="btn-inv-${inv.id}" class="px-2 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50" onclick="explainInvoiceAI('${inv.id}')">Explain with AI</button>
-              ${!inv.paid && !isInvoiceVoid(inv) && (inv.invoiceType || inv.invoice_type) !== 'refund' ? `<button class="px-2 py-1 rounded-lg bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700 shadow-sm" onclick="startPayfastPayment('${inv.id}')">Pay Now</button>` : ''}
+              ${aiBtn}
+              ${!inv.paid && !isInvoiceVoid(inv) && (inv.invoiceType || inv.invoice_type) !== 'refund' ? `<button class="px-2 py-1 rounded-lg bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700 shadow-sm" onclick="startPayfastPayment('${safeInvId}')">Pay Now</button>` : ''}
             </div>
-            <div id="ai-invoice-${inv.id}" class="text-[10px] text-slate-600 whitespace-pre-wrap"></div>
+            <div id="ai-invoice-${safeInvId}" class="text-[10px] text-slate-600 whitespace-pre-wrap"></div>
           </li>`;
         }).join('') : '<li class="text-slate-500 text-xs">No invoices yet.</li>';
       }
@@ -4933,10 +4967,10 @@
           const s = getStudentById(m.studentId);
           return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
             <div class="flex justify-between text-[10px] text-slate-500">
-              <span>${s?.name || 'Student'}</span>
-              <span>${m.created_at ? new Date(m.created_at).toLocaleString() : ''}</span>
+              <span>${esc(s?.name || 'Student')}</span>
+              <span>${esc(m.created_at ? new Date(m.created_at).toLocaleString() : '')}</span>
             </div>
-            <div>${m.text}</div>
+            <div>${esc(m.text)}</div>
           </li>`;
         }).join('') : '<li class="text-slate-500 text-xs">No messages yet.</li>';
       }
@@ -5409,11 +5443,11 @@
       const hours = Math.floor(mins / 60);
       const minutes = mins % 60;
       const countdown = mins ? (hours ? `${hours}h ${minutes}m` : `${minutes}m`) : 'now';
-      const timeLabel = sess.startTime || 'TBD';
-      const subject = sess.subject || 'Lesson';
-      const names = studentMode ? '' : sess.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+      const timeLabel = esc(sess.startTime || 'TBD');
+      const subject = esc(sess.subject || 'Lesson');
+      const names = studentMode ? '' : esc(sess.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', '));
       const who = names ? ` • ${names}` : '';
-      const modeLabel = getSessionModeLabel(sess.sessionMode ?? sess.session_mode ?? sess.mode);
+      const modeLabel = esc(getSessionModeLabel(sess.sessionMode ?? sess.session_mode ?? sess.mode));
       return `<li><strong>${timeLabel}</strong> (${countdown}) • ${subject}${who} • ${modeLabel}</li>`;
     }
 
@@ -5439,10 +5473,13 @@
       const meetingSessions = parentMode ? [] : sessions.filter(canJoinMeetingNow);
       const meetingBlock = meetingSessions.length ? `
         <div class="mt-2 flex flex-wrap gap-2">
-          ${meetingSessions.map(s => `
-            <button class="px-2 py-1 rounded-lg bg-indigo-600 text-white text-[11px]" onclick="openMeetingForSession('${s.id}')">
-              Join ${s.startTime || 'lesson'} online
-            </button>`).join('')}
+          ${meetingSessions.map(s => {
+            const safeSessionId = cleanId(s.id);
+            return `
+              <button class="px-2 py-1 rounded-lg bg-indigo-600 text-white text-[11px]" onclick="openMeetingForSession('${safeSessionId}')">
+                Join ${esc(s.startTime || 'lesson')} online
+              </button>`;
+          }).join('')}
         </div>` : '';
       banner.innerHTML = `
         <div class="flex items-start justify-between gap-4">
@@ -5655,7 +5692,7 @@
       if (message) {
         banner.innerHTML = `
           <div class="flex items-center justify-between gap-3">
-            <span>${message}</span>
+            <span>${esc(message)}</span>
             <button id="supabaseRetryBtn" class="px-2 py-1 rounded-lg border border-amber-300 text-amber-900 text-[10px] hover:bg-amber-100">
               Force refresh
             </button>
@@ -5802,7 +5839,7 @@
           for (const bucket of tryBuckets) {
             const path = stripBucketPrefix(pathRaw, bucket);
             if (!path || !supabaseClient.storage) continue;
-            const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 60 * 60 * 24);
+            const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 60 * 60);
             if (!error && data?.signedUrl) return data.signedUrl;
           }
           return '';
@@ -5894,7 +5931,7 @@
             let signedUrl = '';
             try {
               if (r.storage_path && supabaseClient.storage) {
-                const { data, error } = await supabaseClient.storage.from('resources').createSignedUrl(r.storage_path, 60 * 60 * 24);
+                const { data, error } = await supabaseClient.storage.from('resources').createSignedUrl(r.storage_path, 60 * 60);
                 if (!error && data?.signedUrl) signedUrl = data.signedUrl;
               }
             } catch (err) {
@@ -6270,6 +6307,11 @@
       const shouldUseSnapshot = !!sessionLoginCode || sessionRole === 'student' || sessionRole === 'parent';
       if (shouldUseSnapshot) {
         try {
+          const accessToken = supabaseSession?.access_token;
+          if (!accessToken) {
+            console.warn('Portal snapshot requires sign-in.');
+            return merged;
+          }
           const body = {};
           if (sessionLoginCode) body.code = sessionLoginCode;
           if (sessionRole) body.role = sessionRole;
@@ -6277,15 +6319,16 @@
           if (sessionParentId) body.parentId = sessionParentId;
           const { data: snapshot, error: snapErr } = await supabaseClient.functions.invoke('portal-snapshot', {
             body,
-            headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
+            headers: { Authorization: `Bearer ${accessToken}` }
           });
           if (snapErr) throw snapErr;
           if (snapshot) {
             return await mapSnapshotToState(snapshot);
           }
         } catch (err) {
-          console.warn('Portal snapshot fetch failed; falling back to direct queries', err);
+          console.warn('Portal snapshot fetch failed; snapshot is required for this role.', err);
         }
+        return merged;
       }
 
       let studentsRes = { data: [] };
@@ -6491,7 +6534,7 @@
           let signedUrl = r.signed_url || '';
           if (!signedUrl && r.storage_path && supabaseClient.storage) {
             try {
-              const { data, error } = await supabaseClient.storage.from('resources').createSignedUrl(r.storage_path, 60 * 60 * 24);
+              const { data, error } = await supabaseClient.storage.from('resources').createSignedUrl(r.storage_path, 60 * 60);
               if (!error && data?.signedUrl) signedUrl = data.signedUrl;
             } catch (err) {
               console.warn('Student/parent resource signed URL fetch failed', err);
@@ -6569,7 +6612,7 @@
         for (const bucket of tryBuckets) {
           const path = stripBucketPrefix(pathRaw, bucket);
           if (!path || !supabaseClient.storage) continue;
-          const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 60 * 60 * 24);
+          const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 60 * 60);
           if (!error && data?.signedUrl) return data.signedUrl;
         }
         return '';
@@ -6905,9 +6948,9 @@
       }
 
       resultsBox.innerHTML = results.map(r => `
-        <div class="px-3 py-1.5 hover:bg-slate-50 cursor-pointer" data-type="${r.type}" data-id="${r.id}">
-          <span class="text-[10px] uppercase text-slate-400">${r.type}</span>
-          <div class="text-xs">${r.label}</div>
+        <div class="px-3 py-1.5 hover:bg-slate-50 cursor-pointer" data-type="${esc(r.type)}" data-id="${cleanId(r.id)}">
+          <span class="text-[10px] uppercase text-slate-400">${esc(r.type)}</span>
+          <div class="text-xs">${esc(r.label)}</div>
         </div>
       `).join('');
       resultsBox.classList.remove('hidden');
@@ -7059,11 +7102,11 @@
         upcomingList.innerHTML = '<li class="text-slate-500">No upcoming sessions in the next 7 days.</li>';
       } else {
         upcomingList.innerHTML = upcoming.map(s => {
-          const names = s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+          const names = esc(s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', '));
           return `<li class="border border-slate-200 bg-white/80 rounded-lg px-2 py-1">
               <div class="font-medium">${names}</div>
-              <div class="text-[10px] text-slate-500">${s.subject} • ${s.date} • ${s.startTime || ''} (${s.durationHours || 1}h)</div>
-              <div class="text-[10px]">${s.topic || ''}</div>
+              <div class="text-[10px] text-slate-500">${esc(s.subject)} • ${esc(s.date)} • ${esc(s.startTime || '')} (${esc(s.durationHours || 1)}h)</div>
+              <div class="text-[10px]">${esc(s.topic || '')}</div>
             </li>`;
         }).join('');
       }
@@ -7083,8 +7126,8 @@
       } else {
         atRiskList.innerHTML = atRisk.map(item => `
           <li class="border border-amber-200 bg-amber-50 rounded-lg px-2 py-1">
-            <div class="font-medium">${item.student.name}</div>
-            <div class="text-[10px] text-slate-600">${item.daysSince} days since last session</div>
+            <div class="font-medium">${esc(item.student.name)}</div>
+            <div class="text-[10px] text-slate-600">${esc(item.daysSince)} days since last session</div>
           </li>
         `).join('');
       }
@@ -7097,8 +7140,8 @@
           const res = getResourceById(hw.resourceId);
           const stu = getStudentById(hw.studentId);
           return `<li class="border border-slate-200 bg-white/80 rounded-lg px-2 py-1">
-            <div class="font-medium">${res?.title || 'Homework'}</div>
-            <div class="text-[10px] text-slate-500">${stu?.name || ''} • Due ${hw.dueDate}</div>
+            <div class="font-medium">${esc(res?.title || 'Homework')}</div>
+            <div class="text-[10px] text-slate-500">${esc(stu?.name || '')} • Due ${esc(hw.dueDate)}</div>
           </li>`;
         }).join('');
       }
@@ -7109,15 +7152,16 @@
         prepQueue.innerHTML = '<li class="text-slate-500">No prep needed right now.</li>';
       } else {
         prepQueue.innerHTML = prepItems.map(sess => {
-          const names = sess.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+          const names = esc(sess.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', '));
+          const safeSessionId = cleanId(sess.id);
           return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80 flex justify-between items-center">
             <div>
               <div class="font-medium">${names}</div>
-              <div class="text-[10px] text-slate-500">${sess.date} • ${sess.startTime || ''} • ${sess.subject}</div>
-              <div class="text-[10px]">${sess.topic || 'Lesson focus'}</div>
+              <div class="text-[10px] text-slate-500">${esc(sess.date)} • ${esc(sess.startTime || '')} • ${esc(sess.subject)}</div>
+              <div class="text-[10px]">${esc(sess.topic || 'Lesson focus')}</div>
             </div>
             <button class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
-                    onclick="openSessionQuickActions('${sess.id}')">Open</button>
+                    onclick="openSessionQuickActions('${safeSessionId}')">Open</button>
           </li>`;
         }).join('');
       }
@@ -7163,24 +7207,25 @@
           const nextLabel = next ? `${next.date} ${next.startTime || ''}` : 'Unscheduled';
           const presence = presenceMap.get((s.studentEmail || '').toLowerCase()) || presenceMap.get(cleanId(s.id));
           const online = !!presence?.fresh;
+          const safeStudentId = cleanId(s.id);
           return `<li class="border border-slate-200 bg-white/85 rounded-xl px-3 py-2 cursor-pointer hover:bg-slate-50 flex flex-col gap-1"
-                     data-student-id="${s.id}">
+                     data-student-id="${safeStudentId}">
               <div class="flex items-center justify-between">
                 <div>
-                  <div class="font-semibold">${s.name}</div>
-                  <div class="text-[10px] text-slate-500">${s.gradeLevel || ''}</div>
+                  <div class="font-semibold">${esc(s.name)}</div>
+                  <div class="text-[10px] text-slate-500">${esc(s.gradeLevel || '')}</div>
                 </div>
                 <div class="text-right flex items-center gap-2">
                   <span class="inline-flex items-center gap-1 text-[10px] ${online ? 'text-emerald-600' : 'text-slate-500'}">
                     <span class="h-2.5 w-2.5 rounded-full ${online ? 'bg-emerald-500' : 'bg-slate-400'}"></span>
                     ${online ? 'Online' : 'Offline'}
                   </span>
-                  <span class="text-[11px] text-slate-600">${s.subjects?.join(', ') || ''}</span>
+                  <span class="text-[11px] text-slate-600">${esc(s.subjects?.join(', ') || '')}</span>
                 </div>
               </div>
               <div class="flex items-center justify-between text-[10px] text-slate-500">
-                <span>${daysSince != null ? `${daysSince}d since last` : 'No sessions yet'}</span>
-                <span>${nextLabel}</span>
+                <span>${esc(daysSince != null ? `${daysSince}d since last` : 'No sessions yet')}</span>
+                <span>${esc(nextLabel)}</span>
               </div>
               <div class="mt-1 w-full h-1.5 rounded-full bg-slate-100 overflow-hidden flex">
                 <div style="width:${pPhysics}%" class="bg-indigo-500"></div>
@@ -7306,15 +7351,16 @@
       list.innerHTML = state.parents.map(p => {
         const kids = getParentLinkedStudents(p.id);
         const kidNames = kids.map(k => k.name).join(', ') || 'No students linked';
-        const codeChip = p.loginCode ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-mono text-[10px] border border-indigo-100">${p.loginCode}</span>` : '';
+        const codeChip = p.loginCode ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-mono text-[10px] border border-indigo-100">${esc(p.loginCode)}</span>` : '';
+        const safeParentId = cleanId(p.id);
         return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80 flex items-start justify-between gap-2">
           <div>
-            <div class="font-semibold">${p.name || p.email}</div>
-            <div class="text-[10px] text-slate-500">${p.email}</div>
-            <div class="text-[10px] text-slate-500">${kidNames}</div>
+            <div class="font-semibold">${esc(p.name || p.email || '')}</div>
+            <div class="text-[10px] text-slate-500">${esc(p.email || '')}</div>
+            <div class="text-[10px] text-slate-500">${esc(kidNames)}</div>
             ${codeChip ? `<div class="mt-1">${codeChip}</div>` : ''}
           </div>
-          <button data-parent-id="${p.id}" class="px-2 py-1 text-[10px] rounded-lg border border-slate-300 hover:bg-slate-50">Edit</button>
+          <button data-parent-id="${safeParentId}" class="px-2 py-1 text-[10px] rounded-lg border border-slate-300 hover:bg-slate-50">Edit</button>
         </li>`;
       }).join('');
       list.querySelectorAll('[data-parent-id]').forEach(btn => {
@@ -7328,14 +7374,14 @@
     function openParentModal(parent) {
       if (!guardEdit()) return;
       const isEdit = !!parent;
-      const parentEmailOptions = getAvailableParentEmails(parent?.email).map(e => `<option value="${e}">`).join('');
+      const parentEmailOptions = getAvailableParentEmails(parent?.email).map(e => `<option value="${esc(e)}">`).join('');
       const linked = new Set(
         state.parentLinks.filter(pl => pl.parentId === parent?.id).map(pl => pl.studentId)
       );
       const studentChecks = state.students.map(s => `
         <label class="flex items-center gap-2 text-[11px]">
-          <input type="checkbox" name="studentIds" value="${s.id}" ${linked.has(s.id) ? 'checked' : ''}>
-          <span>${s.name}</span>
+          <input type="checkbox" name="studentIds" value="${cleanId(s.id)}" ${linked.has(s.id) ? 'checked' : ''}>
+          <span>${esc(s.name)}</span>
         </label>
       `).join('');
       const existingCode = normalizeCode(parent?.loginCode);
@@ -7347,11 +7393,11 @@
         <form id="parentForm" class="space-y-2 text-xs">
           <div>
             <label class="block text-[11px] mb-1">Name</label>
-            <input name="name" value="${parent?.name || ''}" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            <input name="name" value="${esc(parent?.name || '')}" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
           </div>
           <div>
             <label class="block text-[11px] mb-1">Email</label>
-            <input list="parentEmailOptions" name="email" value="${parent?.email || ''}" placeholder="Optional (for notifications)"
+            <input list="parentEmailOptions" name="email" value="${esc(parent?.email || '')}" placeholder="Optional (for notifications)"
               class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
             <datalist id="parentEmailOptions">
               ${parentEmailOptions}
@@ -7364,12 +7410,12 @@
                 ${PHONE_CODES.map(c => `<option value="${c}" ${phoneCode === c ? 'selected' : ''}>${c}</option>`).join('')}
                 <option value="" ${!phoneCode ? 'selected' : ''}>Code</option>
               </select>
-              <input name="phoneLocal" value="${phoneLocal}" class="flex-1 border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="Number">
+              <input name="phoneLocal" value="${esc(phoneLocal)}" class="flex-1 border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="Number">
             </div>
           </div>
           <div>
             <label class="block text-[11px] mb-1">Notes</label>
-            <textarea name="notes" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${parent?.notes || ''}</textarea>
+            <textarea name="notes" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${esc(parent?.notes || '')}</textarea>
           </div>
           <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
             <div class="flex items-center justify-between mb-1">
@@ -7377,7 +7423,7 @@
                 <div class="text-xs font-semibold text-indigo-900">Parent login code</div>
                 <div class="text-[10px] text-indigo-700">They sign in with this code—no account setup needed.</div>
               </div>
-              ${existingCode ? `<span class="text-[10px] text-indigo-700 font-semibold">${existingCode}</span>` : ''}
+              ${existingCode ? `<span class="text-[10px] text-indigo-700 font-semibold">${esc(existingCode)}</span>` : ''}
             </div>
             <div class="flex gap-2">
               <button type="button" id="parentGenerateCodeBtn" class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 transition shadow-sm w-full">
@@ -7388,11 +7434,11 @@
             <div id="parentCodeResult" class="${existingCode ? '' : 'hidden'} mt-2 p-2 bg-white border border-indigo-200 rounded-lg">
               <div class="text-[10px] text-slate-500 mb-1">Share this code with the parent:</div>
               <div class="flex items-center gap-2">
-                <code id="parentGeneratedCode" class="text-base font-mono font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded select-all tracking-wide">${existingCode || ''}</code>
+                <code id="parentGeneratedCode" class="text-base font-mono font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded select-all tracking-wide">${esc(existingCode || '')}</code>
                 <button type="button" id="parentCopyBtn" class="text-[10px] text-indigo-600 hover:underline">Copy</button>
               </div>
             </div>
-            <input type="hidden" name="loginCode" id="parentHiddenLoginCode" value="${existingCode || ''}">
+            <input type="hidden" name="loginCode" id="parentHiddenLoginCode" value="${esc(existingCode || '')}">
           </div>
           <div class="space-y-1">
             <div class="text-[11px] font-semibold">Link students</div>
@@ -7608,9 +7654,14 @@
       }
       if (contractMeta) {
         if (latestSig) {
-          contractMeta.innerHTML = `Signed by ${latestSig.parentName || 'Parent'} on ${latestSig.signedAt ? new Date(latestSig.signedAt).toLocaleString() : ''} • Version ${latestSig.contractVersion || 'v1'} ${latestSig.renderedPdfUrl ? `<a href="${latestSig.renderedPdfUrl}" target="_blank" rel="noopener" class="underline text-indigo-600">View signed copy</a>` : ''}`;
+          const signedName = esc(latestSig.parentName || 'Parent');
+          const signedAt = esc(latestSig.signedAt ? new Date(latestSig.signedAt).toLocaleString() : '');
+          const signedVersion = esc(latestSig.contractVersion || 'v1');
+          const signedUrl = latestSig.renderedPdfUrl ? esc(latestSig.renderedPdfUrl) : '';
+          contractMeta.innerHTML = `Signed by ${signedName} on ${signedAt} • Version ${signedVersion} ${signedUrl ? `<a href="${signedUrl}" target="_blank" rel="noopener" class="underline text-indigo-600">View signed copy</a>` : ''}`;
         } else if (contractEntry?.signedUrl) {
-          contractMeta.innerHTML = `Signed contract on file. <a href="${contractEntry.signedUrl}" target="_blank" rel="noopener" class="underline text-indigo-600">View signed copy</a>`;
+          const entryUrl = esc(contractEntry.signedUrl);
+          contractMeta.innerHTML = `Signed contract on file. <a href="${entryUrl}" target="_blank" rel="noopener" class="underline text-indigo-600">View signed copy</a>`;
         } else {
           contractMeta.textContent = 'No signed contract on file.';
         }
@@ -7859,8 +7910,8 @@
             ev.type === 'Document' ? 'bg-amber-500' :
               'bg-slate-400'}"></div>
           <div>
-            <div class="text-[10px] text-slate-500">${ev.date} • ${ev.type}</div>
-            <div>${ev.description}</div>
+            <div class="text-[10px] text-slate-500">${esc(ev.date)} • ${esc(ev.type)}</div>
+            <div>${esc(ev.description)}</div>
           </div>
         </li>
       `).join('');
@@ -7877,12 +7928,12 @@
       ul.innerHTML = sessions.map(sess => `
         <li class="border border-slate-200 rounded-lg px-2 py-1 flex justify-between items-center bg-white/80">
           <div>
-            <div class="font-medium">${sess.subject} – ${sess.topic || 'Lesson'}</div>
-            <div class="text-[10px] text-slate-500">${sess.date} • ${sess.startTime || ''} • ${sess.durationHours || 1}h</div>
+            <div class="font-medium">${esc(sess.subject)} – ${esc(sess.topic || 'Lesson')}</div>
+            <div class="text-[10px] text-slate-500">${esc(sess.date)} • ${esc(sess.startTime || '')} • ${esc(sess.durationHours || 1)}h</div>
             ${sess.completed ? '<div class="text-[10px] text-emerald-600">Completed</div>' : ''}
           </div>
             <button data-owner-only class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
-                    onclick="if(guardEdit()) openSessionModal(getSessionById('${sess.id}'))">
+                    onclick="if(guardEdit()) openSessionModal(getSessionById('${cleanId(sess.id)}'))">
             Edit
           </button>
         </li>
@@ -7899,11 +7950,11 @@
       ul.innerHTML = docs.map(doc => `
         <li class="border border-slate-200 rounded-lg px-2 py-1 flex justify-between items-center bg-white/85">
           <div>
-            <div class="font-medium">${doc.title}</div>
-            <div class="text-[10px] text-slate-500">${doc.status} • ${doc.date || ''}</div>
+            <div class="font-medium">${esc(doc.title)}</div>
+            <div class="text-[10px] text-slate-500">${esc(doc.status)} • ${esc(doc.date || '')}</div>
           </div>
           <button data-owner-only class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
-                  onclick="if(guardEdit()) openDocumentModal(getDocumentById('${doc.id}'))">
+                  onclick="if(guardEdit()) openDocumentModal(getDocumentById('${cleanId(doc.id)}'))">
             Edit
           </button>
         </li>
@@ -7927,25 +7978,26 @@
       }
       ul.innerHTML = invs.map(inv => {
         const methodLabel = getInvoicePaymentLabel(inv);
+        const safeInvId = cleanId(inv.id);
         return `
         <li class="border border-slate-200 rounded-lg px-2 py-1 flex justify-between items-center bg-white/80">
           <div>
-            <div class="font-medium">${inv.id}</div>
+            <div class="font-medium">${esc(inv.id)}</div>
             <div class="text-[10px] text-slate-500">
-              Issued ${inv.issueDate} • Due ${inv.dueDate || '—'}
-              ${inv.servicePeriodStart && inv.servicePeriodEnd ? ` • Period ${inv.servicePeriodStart} → ${inv.servicePeriodEnd}` : ''}
-              ${inv.numSessions ? ` • ${inv.numSessions} sessions` : ''}
-              • Total R ${Number(inv.total || 0).toFixed(2)}
-              • ${getInvoiceStatusLabel(inv)}
-              ${methodLabel ? ` • ${methodLabel}` : ''}
+              Issued ${esc(inv.issueDate)} • Due ${esc(inv.dueDate || '—')}
+              ${inv.servicePeriodStart && inv.servicePeriodEnd ? ` • Period ${esc(inv.servicePeriodStart)} → ${esc(inv.servicePeriodEnd)}` : ''}
+              ${inv.numSessions ? ` • ${esc(inv.numSessions)} sessions` : ''}
+              • Total R ${esc(Number(inv.total || 0).toFixed(2))}
+              • ${esc(getInvoiceStatusLabel(inv))}
+              ${methodLabel ? ` • ${esc(methodLabel)}` : ''}
               ${(inv.invoiceType || inv.invoice_type) === 'adjustment' ? ' • Adjustment' : ''}
               ${(inv.invoiceType || inv.invoice_type) === 'refund' ? ' • Refund' : ''}
-              ${inv.lateApplied && inv.lateFeePercent ? ` • Late fee ${inv.lateFeePercent}%` : ''}
-              ${inv.shortApplied && inv.shortNoticePercent ? ` • Short notice ${inv.shortNoticePercent}%` : ''}
+              ${inv.lateApplied && inv.lateFeePercent ? ` • Late fee ${esc(inv.lateFeePercent)}%` : ''}
+              ${inv.shortApplied && inv.shortNoticePercent ? ` • Short notice ${esc(inv.shortNoticePercent)}%` : ''}
             </div>
           </div>
           <button data-owner-only class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
-                  onclick="if(guardEdit()) openInvoiceModal(getInvoiceById('${inv.id}'))">
+                  onclick="if(guardEdit()) openInvoiceModal(getInvoiceById('${safeInvId}'))">
             Edit
           </button>
         </li>
@@ -7964,14 +8016,14 @@
       list.innerHTML = todos.map(t => `
         <li class="border border-slate-200 rounded-lg px-2 py-1 flex justify-between items-center bg-white/80">
           <div>
-            <div class="${t.done ? 'line-through text-slate-400' : ''}">${t.text}</div>
-            <div class="text-[10px] text-slate-500">${t.dueDate ? 'Due ' + t.dueDate : 'No due date'}</div>
+            <div class="${t.done ? 'line-through text-slate-400' : ''}">${esc(t.text)}</div>
+            <div class="text-[10px] text-slate-500">${esc(t.dueDate ? 'Due ' + t.dueDate : 'No due date')}</div>
           </div>
           <div class="flex gap-1">
             <button class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300"
-                    onclick="toggleTodoStatus('${t.id}')">${t.done ? 'Undo' : 'Done'}</button>
+                    onclick="toggleTodoStatus('${cleanId(t.id)}')">${t.done ? 'Undo' : 'Done'}</button>
             <button class="text-[10px] px-2 py-0.5 rounded-lg border border-rose-200 text-rose-600"
-                    onclick="deleteTodo('${t.id}')">✕</button>
+                    onclick="deleteTodo('${cleanId(t.id)}')">✕</button>
           </div>
         </li>
       `).join('');
@@ -8016,20 +8068,23 @@
       }
       list.innerHTML = contracts.map(c => {
         const hasFile = !!c.signedUrl;
-        const viewLink = hasFile ? `<a class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" href="${c.signedUrl}" target="_blank" rel="noopener">View</a>` : '';
-        const downloadLink = hasFile ? `<a class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" href="${c.signedUrl}" download="${c.fileName || 'contract.pdf'}">Download</a>` : '';
+        const signedUrl = hasFile ? esc(c.signedUrl) : '';
+        const safeFileName = esc(c.fileName || 'contract.pdf');
+        const viewLink = hasFile ? `<a class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" href="${signedUrl}" target="_blank" rel="noopener">View</a>` : '';
+        const downloadLink = hasFile ? `<a class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" href="${signedUrl}" download="${safeFileName}">Download</a>` : '';
+        const safeContractId = cleanId(c.id);
         return `
         <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80 flex justify-between items-center">
           <div>
-            <div class="font-medium flex items-center gap-1">${c.fileName || 'Contract'} <span class="text-[10px] px-2 py-0.5 rounded-full ${c.status === 'Signed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${c.status || 'Pending'}</span></div>
-            <div class="text-[10px] text-slate-500">Uploaded ${c.uploadedAt || ''}</div>
+            <div class="font-medium flex items-center gap-1">${esc(c.fileName || 'Contract')} <span class="text-[10px] px-2 py-0.5 rounded-full ${c.status === 'Signed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${esc(c.status || 'Pending')}</span></div>
+            <div class="text-[10px] text-slate-500">Uploaded ${esc(c.uploadedAt || '')}</div>
             ${!hasFile ? '<div class="text-[10px] text-amber-600">Signed file not available yet; refresh or re-sign if needed.</div>' : ''}
           </div>
           <div class="flex gap-1">
             ${viewLink}
             ${downloadLink}
             <button data-owner-only class="text-[10px] px-2 py-0.5 rounded-lg border border-emerald-300 text-emerald-700"
-                    onclick="if(guardEdit()) markContractStatus('${c.id}', '${c.status === 'Signed' ? 'Pending' : 'Signed'}')">
+                    onclick="if(guardEdit()) markContractStatus('${safeContractId}', '${c.status === 'Signed' ? 'Pending' : 'Signed'}')">
               ${c.status === 'Signed' ? 'Mark pending' : 'Mark signed'}
             </button>
           </div>
@@ -8050,8 +8105,8 @@
       }
       list.innerHTML = notes.map(n => `
         <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
-          <div class="text-[10px] text-slate-500">${n.date}</div>
-          <div>${n.text}</div>
+          <div class="text-[10px] text-slate-500">${esc(n.date)}</div>
+          <div>${esc(n.text)}</div>
         </li>
       `).join('');
     }
@@ -8070,9 +8125,9 @@
         <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
           <div class="flex items-center justify-between text-[10px] text-slate-500">
             <span>${m.sender === 'owner' ? 'Tutor' : 'Student'}</span>
-            <span>${m.created_at ? new Date(m.created_at).toLocaleString() : ''}</span>
+            <span>${esc(m.created_at ? new Date(m.created_at).toLocaleString() : '')}</span>
           </div>
-          <div>${m.text}</div>
+          <div>${esc(m.text)}</div>
         </li>
       `).join('');
     }
@@ -8082,7 +8137,7 @@
       if (!student) return;
       if (!guardEdit()) return;
       const html = `
-        <h2 class="text-sm font-semibold mb-3">Upload contract for ${student.name}</h2>
+        <h2 class="text-sm font-semibold mb-3">Upload contract for ${esc(student.name)}</h2>
         <form id="contractForm" class="space-y-2">
           <div>
             <label class="block text-[11px] mb-1">Contract file (PDF or image)</label>
@@ -8365,10 +8420,10 @@
             </button>`
           : (isBusy ? '<span class="busy-badge">Busy</span>' : '');
         const busyNote = isBusy
-          ? `<div class="mt-1 text-[10px] text-rose-600">${busyEntry?.note ? `Busy: ${busyEntry.note}` : 'Tutor busy on this date'}</div>`
+          ? `<div class="mt-1 text-[10px] text-rose-600">${busyEntry?.note ? `Busy: ${esc(busyEntry.note)}` : 'Tutor busy on this date'}</div>`
           : '';
         grid.innerHTML += `
-          <div class="calendar-day ${isBusy ? 'busy-day' : ''}" data-date="${isoDate}">
+          <div class="calendar-day ${isBusy ? 'busy-day' : ''}" data-date="${esc(isoDate)}">
             <div class="calendar-day-header mb-1">
               <div class="calendar-day-title">
                 <span class="font-semibold">${dayName}</span>
@@ -8384,24 +8439,25 @@
             : s.subject === 'Chemistry'
               ? 'text-emerald-700'
               : 'text-rose-700';
-          const names = s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+          const names = esc(s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', '));
           const completedClass = s.completed ? 'completed' : '';
           const modeLabel = isOnlineSession(s) ? 'Online' : 'In person';
           const modeClass = isOnlineSession(s) ? 'session-chip-online' : 'session-chip-inperson';
           const completedChip = s.completed ? '<span class="session-chip session-chip-completed">Completed</span>' : '';
           const busyChip = isBusy ? '<span class="session-chip session-chip-busy">Busy date</span>' : '';
-          return `<div class="session-card ${completedClass} cursor-pointer" onclick="openSessionQuickActions('${s.id}')">
+          const safeSessionId = cleanId(s.id);
+          return `<div class="session-card ${completedClass} cursor-pointer" onclick="openSessionQuickActions('${safeSessionId}')">
                             <div class="flex items-center justify-between">
-                              <span class="session-time ${subjectClass}">${s.startTime || ''}</span>
-                              <span class="text-[10px] text-slate-500">${s.durationHours ? `${Number(s.durationHours).toFixed(1)}h` : ''}</span>
+                              <span class="session-time ${subjectClass}">${esc(s.startTime || '')}</span>
+                              <span class="text-[10px] text-slate-500">${esc(s.durationHours ? `${Number(s.durationHours).toFixed(1)}h` : '')}</span>
                             </div>
                             <div class="text-[11px] font-semibold text-slate-800">${names}</div>
-                            <div class="text-[10px] text-slate-600 leading-snug">${s.topic || ''}</div>
+                            <div class="text-[10px] text-slate-600 leading-snug">${esc(s.topic || '')}</div>
                             <div class="session-chip-row session-chip-row-center mt-1">
                               ${completedChip}
                               ${busyChip}
-                              <span class="session-chip ${modeClass}">${modeLabel}</span>
-                              <span class="session-chip ${subjectClass}">${s.subject}</span>
+                              <span class="session-chip ${modeClass}">${esc(modeLabel)}</span>
+                              <span class="session-chip ${subjectClass}">${esc(s.subject)}</span>
                             </div>
                           </div>`;
         }).join('')
@@ -8447,26 +8503,27 @@
         todayList.innerHTML = '<li class="text-slate-500">No sessions today.</li>';
       } else {
         todayList.innerHTML = todaySessions.map(s => {
-          const names = s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+          const names = esc(s.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', '));
           const completedClass = s.completed ? 'completed' : '';
           const modeLabel = isOnlineSession(s) ? 'Online' : 'In person';
           const modeClass = isOnlineSession(s) ? 'session-chip-online' : 'session-chip-inperson';
           const completedChip = s.completed ? '<span class="session-chip session-chip-completed">Completed</span>' : '';
           const busyChip = isBusyDate(s.date) ? '<span class="session-chip session-chip-busy">Busy date</span>' : '';
+          const safeSessionId = cleanId(s.id);
           return `<li class="session-card ${completedClass}">
             <div class="flex items-center justify-between">
-              <div class="text-[10px] uppercase tracking-wide text-slate-500">${s.subject}</div>
-              <div class="session-time">${s.startTime || ''}</div>
+              <div class="text-[10px] uppercase tracking-wide text-slate-500">${esc(s.subject)}</div>
+              <div class="session-time">${esc(s.startTime || '')}</div>
             </div>
             <div class="text-[11px] font-semibold text-slate-800">${names}</div>
-            <div class="text-[10px] text-slate-600">${s.topic || ''} • ${s.durationHours || 1}h</div>
+            <div class="text-[10px] text-slate-600">${esc(s.topic || '')} • ${esc(s.durationHours || 1)}h</div>
             <div class="session-chip-row mt-1">
               ${completedChip}
               ${busyChip}
-              <span class="session-chip ${modeClass}">${modeLabel}</span>
+              <span class="session-chip ${modeClass}">${esc(modeLabel)}</span>
             </div>
             <button class="mt-1 text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50"
-                    onclick="openSessionQuickActions('${s.id}')">
+                    onclick="openSessionQuickActions('${safeSessionId}')">
               Open
             </button>
           </li>`;
@@ -8501,13 +8558,13 @@
         return;
       }
       ul.innerHTML = clashes.slice(0, 10).map(c => {
-        const names = c.sharedStudents.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+        const names = esc(c.sharedStudents.map(id => getStudentById(id)?.name || 'Unknown').join(', '));
         return `<li class="border border-amber-300 bg-amber-50 text-amber-900 rounded-lg px-2 py-1">
           <div class="font-medium">Clash for ${names}</div>
           <div class="text-[10px]">
-            ${c.a.date} • ${c.a.startTime || ''} vs ${c.b.startTime || ''}<br>
-            ${c.a.subject} – ${c.a.topic || 'Lesson'} <br>
-            ${c.b.subject} – ${c.b.topic || 'Lesson'}
+            ${esc(c.a.date)} • ${esc(c.a.startTime || '')} vs ${esc(c.b.startTime || '')}<br>
+            ${esc(c.a.subject)} – ${esc(c.a.topic || 'Lesson')} <br>
+            ${esc(c.b.subject)} – ${esc(c.b.topic || 'Lesson')}
           </div>
         </li>`;
       }).join('');
@@ -8537,11 +8594,11 @@
         return;
       }
       list.innerHTML = tight.slice(0, 6).map(item => {
-        const aNames = item.a.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
-        const bNames = item.b.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
+        const aNames = esc(item.a.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', '));
+        const bNames = esc(item.b.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', '));
         return `<li class="border border-amber-200 bg-amber-50 rounded-lg px-2 py-1">
-          <div class="font-medium">${item.gap} min gap</div>
-          <div class="text-[10px]">${item.date}: ${item.a.startTime || ''} ${aNames} → ${item.b.startTime || ''} ${bNames}</div>
+          <div class="font-medium">${esc(item.gap)} min gap</div>
+          <div class="text-[10px]">${esc(item.date)}: ${esc(item.a.startTime || '')} ${aNames} → ${esc(item.b.startTime || '')} ${bNames}</div>
         </li>`;
       }).join('');
     }
@@ -9244,15 +9301,16 @@
     function openSessionQuickActions(sessionId) {
       const sess = getSessionById(sessionId);
       if (!sess) return;
-      const names = sess.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', ');
-      const modeLabel = getSessionModeLabel(sess.sessionMode ?? sess.session_mode ?? sess.mode);
+      const names = esc(sess.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', '));
+      const modeLabel = esc(getSessionModeLabel(sess.sessionMode ?? sess.session_mode ?? sess.mode));
+      const safeSessionId = cleanId(sess.id);
       const joinBtn = (!parentMode && canJoinMeetingNow(sess))
         ? `<button id="sessionJoinBtn" class="w-full px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium">Join online session</button>`
         : '';
       openModal(`
         <h2 class="text-sm font-semibold mb-2">Session with ${names}</h2>
-        <p class="text-[11px] mb-2">${sess.subject} • ${sess.date} • ${sess.startTime || ''} (${sess.durationHours || 1}h) • ${modeLabel}</p>
-        <p class="text-[11px] mb-3">${sess.topic || ''}</p>
+        <p class="text-[11px] mb-2">${esc(sess.subject)} • ${esc(sess.date)} • ${esc(sess.startTime || '')} (${esc(sess.durationHours || 1)}h) • ${modeLabel}</p>
+        <p class="text-[11px] mb-3">${esc(sess.topic || '')}</p>
 
         <div class="space-y-2">
           ${joinBtn}
@@ -9265,7 +9323,7 @@
         </div>
       `, () => {
         const joinButton = document.getElementById('sessionJoinBtn');
-        if (joinButton) joinButton.onclick = () => openMeetingForSession(sess.id);
+        if (joinButton) joinButton.onclick = () => openMeetingForSession(safeSessionId);
         document.getElementById('sessionMarkCompletedBtn').onclick = () => {
           if (!guardEdit()) return;
           if (!guardSessionCompletion(sess)) {
@@ -9344,7 +9402,7 @@
         .slice(0, 8);
       if (tagFiltersEl) {
         tagFiltersEl.innerHTML = (topTags.length ? topTags.map(([tag, count]) => `
-          <button class="chip-btn ${activeTag === tag.toLowerCase() ? 'active' : ''}" data-tag="${tag}">#${tag} (${count})</button>
+          <button class="chip-btn ${activeTag === tag.toLowerCase() ? 'active' : ''}" data-tag="${esc(tag)}">#${esc(tag)} (${esc(count)})</button>
         `).join('') : '<span class="text-slate-500">Tags will appear after you add resources.</span>')
           + (activeTag ? ' <button class="chip-btn" data-tag="">Clear</button>' : '');
         tagFiltersEl.querySelectorAll('button[data-tag]').forEach(btn => {
@@ -9382,35 +9440,42 @@
           const progress = stats.total ? Math.round((stats.completed / stats.total) * 100) : 0;
           const openUrl = getResourceOpenUrl(r);
           const assignmentLines = !ownerView ? getResourceAssignments(r.id, viewerStudentIds).map(a => `
-            <div class="text-[10px] text-slate-500">${studentMode ? '' : `${a.studentName} • `}${a.status} • Due ${a.dueDate || 'n/a'}</div>
+            <div class="text-[10px] text-slate-500">${studentMode ? '' : `${esc(a.studentName)} • `}${esc(a.status)} • Due ${esc(a.dueDate || 'n/a')}</div>
           `).join('') : '';
           const metaBits = [
-            r.subject || 'Resource',
-            r.level || '',
-            r.resourceType || '',
-            r.estimatedMinutes ? `${r.estimatedMinutes} min` : ''
+            esc(r.subject || 'Resource'),
+            esc(r.level || ''),
+            esc(r.resourceType || ''),
+            r.estimatedMinutes ? `${esc(r.estimatedMinutes)} min` : ''
           ].filter(Boolean).join(' • ');
+          const safeResourceId = cleanId(r.id);
+          const safeTitle = esc(r.title);
+          const safeDescription = esc(r.description || '');
+          const safeOpenUrl = openUrl ? esc(openUrl) : '';
+          const safeSignedUrl = r.signedUrl ? esc(r.signedUrl) : '';
+          const safeDataUrl = r.dataUrl ? esc(r.dataUrl) : '';
+          const safeFileName = esc(r.fileName || 'resource');
           return `
-          <li class="border border-slate-200 rounded-xl px-3 py-2 bg-white/85" data-resource-card="${r.id}">
+          <li class="border border-slate-200 rounded-xl px-3 py-2 bg-white/85" data-resource-card="${safeResourceId}">
             <div class="flex justify-between items-start gap-2">
               <div>
-                <div class="font-semibold">${r.title}</div>
+                <div class="font-semibold">${safeTitle}</div>
                 <div class="text-[10px] text-slate-500">${metaBits || 'Resource'}</div>
               </div>
               ${ownerView ? `
                 <div class="flex items-center gap-1">
                   <button class="text-[12px]" title="Favorite"
-                          onclick="toggleResourceFavorite('${r.id}')">${r.favorite ? '⭐' : '☆'}</button>
+                          onclick="toggleResourceFavorite('${safeResourceId}')">${r.favorite ? '⭐' : '☆'}</button>
                   <button class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
-                          onclick="openResourceModal(getResourceById('${r.id}'))">
+                          onclick="openResourceModal(getResourceById('${safeResourceId}'))">
                     Edit
                   </button>
                 </div>
               ` : ''}
             </div>
-            ${r.description ? `<div class="mt-1 text-[10px]">${r.description}</div>` : ''}
+            ${r.description ? `<div class="mt-1 text-[10px]">${safeDescription}</div>` : ''}
             <div class="mt-1 flex flex-wrap">
-              ${(r.tags || []).map(tag => `<span class="tag-pill">#${tag}</span>`).join('')}
+              ${(r.tags || []).map(tag => `<span class="tag-pill">#${esc(tag)}</span>`).join('')}
             </div>
             <div class="mt-2">
               <div class="text-[10px] text-slate-500">${stats.total ? `Assigned ${stats.total}× • Completed ${stats.completed}` : 'Not assigned yet.'}</div>
@@ -9420,22 +9485,22 @@
             <div class="mt-2 flex gap-2 text-[11px] flex-wrap items-center">
               ${ownerView ? `
                 <button data-owner-only class="px-2 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
-                        onclick="if(guardEdit()) openAssignResourceModal('${r.id}')">
+                        onclick="if(guardEdit()) openAssignResourceModal('${safeResourceId}')">
                   Assign to student(s)
                 </button>
               ` : ''}
               ${openUrl ? `<button class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
-                        onclick="openResourceLink('${r.id}')">Open</button>` : ''}
+                        onclick="openResourceLink('${safeResourceId}')">Open</button>` : ''}
               ${ownerView && openUrl ? `<button class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
-                        onclick="copyResourceLink('${r.id}')">Copy link</button>` : ''}
-              ${r.signedUrl ? `<a class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50" href="${r.signedUrl}" target="_blank">Download file</a>` : ''}
-              ${!r.signedUrl && r.dataUrl ? `<a class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50" href="${r.dataUrl}" download="${r.fileName || 'resource'}" target="_blank">Download local copy</a>` : ''}
-              ${r.signedUrl && r.fileName && (r.fileName.endsWith('.png') || r.fileName.endsWith('.jpg') || r.fileName.endsWith('.jpeg')) ? `<img src="${r.signedUrl}" alt="${r.title}" class="h-12 rounded border border-slate-200">` : ''}
+                        onclick="copyResourceLink('${safeResourceId}')">Copy link</button>` : ''}
+              ${r.signedUrl ? `<a class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50" href="${safeSignedUrl}" target="_blank">Download file</a>` : ''}
+              ${!r.signedUrl && r.dataUrl ? `<a class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50" href="${safeDataUrl}" download="${safeFileName}" target="_blank">Download local copy</a>` : ''}
+              ${r.signedUrl && r.fileName && (r.fileName.endsWith('.png') || r.fileName.endsWith('.jpg') || r.fileName.endsWith('.jpeg')) ? `<img src="${safeSignedUrl}" alt="${safeTitle}" class="h-12 rounded border border-slate-200">` : ''}
             </div>
             ${ownerView && state.students.length ? `
-              <div class="mt-2 flex flex-wrap gap-2 items-center text-[10px]" data-quick-assign="${r.id}">
+              <div class="mt-2 flex flex-wrap gap-2 items-center text-[10px]" data-quick-assign="${safeResourceId}">
                 <select class="border border-slate-300 rounded-lg px-2 py-1 text-[10px]" data-quick-student>
-                  ${state.students.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+                  ${state.students.map(s => `<option value="${cleanId(s.id)}">${esc(s.name)}</option>`).join('')}
                 </select>
                 <input type="date" class="border border-slate-300 rounded-lg px-2 py-1 text-[10px]" data-quick-due value="${dueDefault}">
                 <button class="px-2 py-1 rounded-lg bg-indigo-600 text-white" data-quick-assign-btn>Quick assign</button>
@@ -9613,19 +9678,20 @@
 
       function makeCard(hwObj) {
         const hw = hwObj;
+        const safeHwId = cleanId(hw.id);
         return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/85">
-          <div class="font-medium">${hw.res.title}</div>
-          <div class="text-[10px] text-slate-500">${hw.student.name} • Due ${hw.dueDate || 'n/a'}</div>
+          <div class="font-medium">${esc(hw.res.title)}</div>
+          <div class="text-[10px] text-slate-500">${esc(hw.student.name)} • Due ${esc(hw.dueDate || 'n/a')}</div>
           <div class="mt-1 flex items-center gap-2">
             <select class="w-full border border-slate-300 rounded-lg px-1 py-0.5 text-[10px]"
                     ${readOnly ? 'disabled' : ''}
-                    onchange="updateHomeworkStatus('${hw.id}', this.value)">
+                    onchange="updateHomeworkStatus('${safeHwId}', this.value)">
               <option value="To do" ${hw.status === 'To do' ? 'selected' : ''}>To do</option>
               <option value="In progress" ${hw.status === 'In progress' ? 'selected' : ''}>In progress</option>
               <option value="Completed" ${hw.status === 'Completed' ? 'selected' : ''}>Completed</option>
             </select>
             ${readOnly ? '' : `<button class="px-2 py-0.5 text-[10px] rounded-lg border border-slate-300 hover:bg-slate-50"
-                    onclick="unassignHomework('${hw.id}')">Unassign</button>`}
+                    onclick="unassignHomework('${safeHwId}')">Unassign</button>`}
           </div>
         </li>`;
       }
@@ -9758,7 +9824,7 @@
             }
           });
           return `<tr>
-            <td class="py-1 pr-1">${s.name}</td>
+            <td class="py-1 pr-1">${esc(s.name || '')}</td>
             <td class="py-1 pr-1 text-right ${balance > 0 ? 'text-rose-600' : 'text-emerald-600'}">
               R ${balance.toFixed(2)}
             </td>
@@ -9777,21 +9843,22 @@
       } else {
         overdueList.innerHTML = overdue.map(inv => {
           const s = getStudentById(inv.studentId);
-          const studentName = s?.name || 'Unknown';
+          const studentName = esc(s?.name || 'Unknown');
+          const safeInvId = cleanId(inv.id);
           return `<li class="border border-rose-200 bg-rose-50 text-rose-900 rounded-lg px-2 py-1">
             <div class="flex justify-between items-center">
               <div>
                 <div class="font-medium">${studentName}</div>
-                <div class="text-[10px]">Invoice ${inv.id} • Due ${inv.dueDate} • R ${Number(inv.total || 0).toFixed(2)}</div>
-                ${(inv.lateApplied && inv.lateFeePercent) || (inv.shortApplied && inv.shortNoticePercent) ? `<div class="text-[10px]">Fees: ${inv.lateApplied && inv.lateFeePercent ? 'Late ' + inv.lateFeePercent + '%' : ''} ${inv.shortApplied && inv.shortNoticePercent ? 'Short ' + inv.shortNoticePercent + '%' : ''}</div>` : ''}
+                <div class="text-[10px]">Invoice ${esc(inv.id)} • Due ${esc(inv.dueDate || 'n/a')} • R ${esc(Number(inv.total || 0).toFixed(2))}</div>
+                ${(inv.lateApplied && inv.lateFeePercent) || (inv.shortApplied && inv.shortNoticePercent) ? `<div class="text-[10px]">Fees: ${esc(inv.lateApplied && inv.lateFeePercent ? 'Late ' + inv.lateFeePercent + '%' : '')} ${esc(inv.shortApplied && inv.shortNoticePercent ? 'Short ' + inv.shortNoticePercent + '%' : '')}</div>` : ''}
               </div>
               <div class="flex flex-col gap-1">
                 <button class="text-[10px] px-2 py-0.5 rounded-lg border border-rose-300 bg-rose-100"
-                        onclick="markInvoicePaid('${inv.id}')">
+                        onclick="markInvoicePaid('${safeInvId}')">
                   Mark paid
                 </button>
                 <button class="text-[10px] px-2 py-0.5 rounded-lg border border-rose-300 bg-white"
-                        onclick="generateReminder('${inv.id}')">
+                        onclick="generateReminder('${safeInvId}')">
                   Reminder text
                 </button>
               </div>
@@ -9825,10 +9892,10 @@
           unbilledList.innerHTML = unbilled.map(item => `
             <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80 flex justify-between items-center">
               <div>
-                <div class="font-medium">${item.student.name}</div>
-                <div class="text-[10px] text-slate-500">${item.hours.toFixed(1)}h unbilled • Last ${item.lastDate}</div>
+                <div class="font-medium">${esc(item.student.name || '')}</div>
+                <div class="text-[10px] text-slate-500">${esc(item.hours.toFixed(1))}h unbilled • Last ${esc(item.lastDate)}</div>
               </div>
-              <div class="text-right text-[11px] font-semibold">R ${item.amount.toFixed(0)}</div>
+              <div class="text-right text-[11px] font-semibold">R ${esc(item.amount.toFixed(0))}</div>
             </li>
           `).join('');
         }
@@ -9853,10 +9920,10 @@
             const s = getStudentById(inv.studentId);
             return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80 flex justify-between items-center">
               <div>
-                <div class="font-medium">${s?.name || 'Unknown'}</div>
-                <div class="text-[10px] text-slate-500">Invoice ${inv.id} • Due ${inv.dueDate}</div>
+                <div class="font-medium">${esc(s?.name || 'Unknown')}</div>
+                <div class="text-[10px] text-slate-500">Invoice ${esc(inv.id)} • Due ${esc(inv.dueDate || 'n/a')}</div>
               </div>
-              <div class="text-right text-[11px] font-semibold">R ${Number(inv.total || 0).toFixed(0)}</div>
+              <div class="text-right text-[11px] font-semibold">R ${esc(Number(inv.total || 0).toFixed(0))}</div>
             </li>`;
           }).join('');
         }
@@ -9910,16 +9977,16 @@
       const mixUl = document.getElementById('repSubjectMix');
       if (mixUl) {
         mixUl.innerHTML = Object.entries(subjectHours).map(([k, v]) => `
-          <li class="flex justify-between"><span>${k}</span><span>${v.toFixed(1)}h</span></li>
+          <li class="flex justify-between"><span>${esc(k)}</span><span>${esc(v.toFixed(1))}h</span></li>
         `).join('');
       }
       const unpaidUl = document.getElementById('repUnpaidList');
       if (unpaidUl) {
         unpaidUl.innerHTML = unpaid.length ? unpaid.map(inv => {
-          const stu = getStudentById(inv.studentId)?.name || 'Student';
+          const stu = esc(getStudentById(inv.studentId)?.name || 'Student');
           return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
             <div class="font-medium">${stu}</div>
-            <div class="text-[10px] text-slate-500">Invoice ${inv.id} • Due ${inv.dueDate || 'n/a'} • R ${Number(inv.total || 0).toFixed(2)}</div>
+            <div class="text-[10px] text-slate-500">Invoice ${esc(inv.id)} • Due ${esc(inv.dueDate || 'n/a')} • R ${esc(Number(inv.total || 0).toFixed(2))}</div>
           </li>`;
         }).join('') : '<li class="text-slate-500 text-xs">No unpaid invoices.</li>';
       }
@@ -9973,7 +10040,7 @@ Best regards,
 (${today})`;
       openModal(`
         <h2 class="text-sm font-semibold mb-2">Reminder text</h2>
-        <textarea class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]" rows="8">${text}</textarea>
+        <textarea class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]" rows="8">${esc(text)}</textarea>
         <p class="mt-2 text-[10px] text-slate-500">
           You can copy this message and paste it into email or WhatsApp.
         </p>
@@ -10014,7 +10081,7 @@ Best regards,
         await loadAccountEmails().catch(err => console.warn('Account email fetch failed', err));
       }
       const isEdit = !!student;
-      const emailOptions = getAvailableStudentEmails(student?.studentEmail).map(e => `<option value="${e}">${e}</option>`).join('');
+      const emailOptions = getAvailableStudentEmails(student?.studentEmail).map(e => `<option value="${esc(e)}">${esc(e)}</option>`).join('');
 
       const existingCode = normalizeCode(student?.loginCode);
       const scheduleSlots = getScheduleSlots(student || {});
@@ -10038,7 +10105,7 @@ Best regards,
           <div id="codeResult" class="${existingCode ? '' : 'hidden'} mt-2 p-2 bg-white border border-indigo-200 rounded-lg">
             <div class="text-[10px] text-slate-500 mb-1">Share this code with the student:</div>
             <div class="flex items-center gap-2">
-              <code id="generatedCodeDisplay" class="text-base font-mono font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded select-all tracking-wide">${existingCode || ''}</code>
+              <code id="generatedCodeDisplay" class="text-base font-mono font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded select-all tracking-wide">${esc(existingCode || '')}</code>
               <button type="button" id="copyCodeBtn" class="text-[10px] text-indigo-600 hover:underline">Copy</button>
             </div>
           </div>
@@ -10052,31 +10119,31 @@ Best regards,
         <form id="studentForm" class="space-y-2">
           <div>
             <label class="block text-[11px] mb-1">Name</label>
-            <input name="name" value="${student?.name || ''}" required
+            <input name="name" value="${esc(student?.name || '')}" required
                    class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
           </div>
-          <input type="hidden" name="loginCode" id="hiddenLoginCode" value="${existingCode || ''}">
+          <input type="hidden" name="loginCode" id="hiddenLoginCode" value="${esc(existingCode || '')}">
           
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-[11px] mb-1">Grade / Level</label>
-              <input name="gradeLevel" value="${student?.gradeLevel || ''}"
+              <input name="gradeLevel" value="${esc(student?.gradeLevel || '')}"
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
             </div>
             <div>
               <label class="block text-[11px] mb-1">Hourly rate (R)</label>
-              <input name="rate" type="number" step="0.01" value="${student?.rate || ''}"
+              <input name="rate" type="number" step="0.01" value="${esc(student?.rate || '')}"
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
             </div>
           </div>
           <div>
             <label class="block text-[11px] mb-1">Subjects (comma separated)</label>
-            <input name="subjects" value="${student?.subjects?.join(', ') || ''}"
+            <input name="subjects" value="${esc(student?.subjects?.join(', ') || '')}"
                    class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
           </div>
           <div>
             <label class="block text-[11px] mb-1">Notes</label>
-            <textarea name="notes" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${student?.notes || ''}</textarea>
+            <textarea name="notes" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${esc(student?.notes || '')}</textarea>
           </div>
           <div class="border border-slate-200 rounded-lg p-2 bg-slate-50">
             <div class="text-[11px] font-semibold mb-1">Schedule preferences</div>
@@ -10089,18 +10156,18 @@ Best regards,
             <div class="grid grid-cols-2 gap-2 mt-3">
               <div>
                 <label class="block text-[11px] mb-1">Start date</label>
-                <input type="date" name="scheduleStartDate" value="${scheduleStartDate}"
+                <input type="date" name="scheduleStartDate" value="${esc(scheduleStartDate)}"
                        class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
               </div>
               <div>
                 <label class="block text-[11px] mb-1">Timezone</label>
-                <input name="scheduleTimezone" value="${scheduleTimezone}"
+                <input name="scheduleTimezone" value="${esc(scheduleTimezone)}"
                        class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
               </div>
             </div>
             <div class="mt-2">
               <label class="block text-[11px] mb-1">Schedule notes</label>
-              <input name="scheduleNotes" value="${scheduleNotes}"
+              <input name="scheduleNotes" value="${esc(scheduleNotes)}"
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="Optional">
             </div>
           </div>
@@ -10180,11 +10247,11 @@ Best regards,
             </div>
             <div>
               <label class="block text-[10px] mb-1">Start time</label>
-              <input type="time" class="slot-time w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" value="${startTime}">
+              <input type="time" class="slot-time w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" value="${esc(startTime)}">
             </div>
             <div>
               <label class="block text-[10px] mb-1">Duration (hours)</label>
-              <input type="number" step="0.25" class="slot-duration w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" value="${durationHours}">
+              <input type="number" step="0.25" class="slot-duration w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" value="${esc(durationHours)}">
             </div>
             <div>
               <label class="block text-[10px] mb-1">Mode</label>
@@ -10335,9 +10402,9 @@ Best regards,
               ${state.students.length
           ? state.students.map(s => `
                       <label class="flex items-center gap-1 text-[11px]">
-                        <input type="checkbox" name="studentIds" value="${s.id}"
+                        <input type="checkbox" name="studentIds" value="${cleanId(s.id)}"
                           ${session?.studentIds?.includes(s.id) ? 'checked' : ''}>
-                        <span>${s.name}</span>
+                        <span>${esc(s.name)}</span>
                       </label>
                     `).join('')
           : '<div class="text-slate-500 text-[11px]">No students yet.</div>'
@@ -10347,19 +10414,19 @@ Best regards,
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-[11px] mb-1">Date</label>
-              <input type="date" name="date" value="${session?.date || new Date().toISOString().slice(0, 10)}"
+              <input type="date" name="date" value="${esc(session?.date || new Date().toISOString().slice(0, 10))}"
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" required>
             </div>
             <div>
               <label class="block text-[11px] mb-1">Start time</label>
-              <input type="time" name="startTime" value="${session?.startTime || '16:00'}"
+              <input type="time" name="startTime" value="${esc(session?.startTime || '16:00')}"
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
             </div>
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-[11px] mb-1">Duration (hours)</label>
-              <input type="number" step="0.25" name="durationHours" value="${(session?.durationHours ?? state.settings.defaultSessionDuration) || 1}"
+              <input type="number" step="0.25" name="durationHours" value="${esc((session?.durationHours ?? state.settings.defaultSessionDuration) || 1)}"
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
             </div>
             <div>
@@ -10385,12 +10452,12 @@ Best regards,
           </div>
           <div>
             <label class="block text-[11px] mb-1">Topic / focus</label>
-            <input name="topic" value="${session?.topic || ''}"
+            <input name="topic" value="${esc(session?.topic || '')}"
                    class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
           </div>
           <div>
             <label class="block text-[11px] mb-1">Notes</label>
-            <textarea name="notes" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${session?.notes || ''}</textarea>
+            <textarea name="notes" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${esc(session?.notes || '')}</textarea>
           </div>
           ${isEdit ? `
             <div class="rounded-lg border border-amber-200 bg-amber-50/70 p-2">
@@ -10658,7 +10725,7 @@ Best regards,
         <form id="resourceForm" class="space-y-2">
           <div>
             <label class="block text-[11px] mb-1">Title</label>
-            <input name="title" value="${resource?.title || ''}" required
+            <input name="title" value="${esc(resource?.title || '')}" required
                    class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
           </div>
           <div class="grid grid-cols-2 gap-2">
@@ -10672,13 +10739,13 @@ Best regards,
             </div>
             <div>
               <label class="block text-[11px] mb-1">Level</label>
-              <input name="level" value="${resource?.level || ''}"
+              <input name="level" value="${esc(resource?.level || '')}"
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
             </div>
           </div>
           <div>
             <label class="block text-[11px] mb-1">Tags (comma separated)</label>
-            <input name="tags" value="${(resource?.tags || []).join(', ')}"
+            <input name="tags" value="${esc((resource?.tags || []).join(', '))}"
                    class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
           </div>
           <div class="grid grid-cols-2 gap-2">
@@ -10695,26 +10762,26 @@ Best regards,
             </div>
             <div>
               <label class="block text-[11px] mb-1">Estimated minutes</label>
-              <input type="number" min="0" name="estimatedMinutes" value="${resource?.estimatedMinutes || ''}"
+              <input type="number" min="0" name="estimatedMinutes" value="${esc(resource?.estimatedMinutes || '')}"
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="e.g. 30">
             </div>
           </div>
           <div>
             <label class="block text-[11px] mb-1">External link (optional)</label>
-            <input name="linkUrl" value="${resource?.linkUrl || ''}"
+            <input name="linkUrl" value="${esc(resource?.linkUrl || '')}"
                    class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="https://">
           </div>
           <div>
             <label class="block text-[11px] mb-1">Description / location</label>
-            <textarea name="description" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${resource?.description || ''}</textarea>
+            <textarea name="description" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${esc(resource?.description || '')}</textarea>
           </div>
           <div class="border border-dashed border-slate-300 rounded-lg p-2 bg-slate-50">
             <label class="block text-[11px] mb-1">Attach file (PDF/Image/Doc)</label>
             <input type="file" name="file" class="w-full text-[11px]">
-            <p class="text-[10px] text-slate-500 mt-1">Uploads require Supabase sign-in. Current file: ${resource?.fileName || 'None'}.</p>
+            <p class="text-[10px] text-slate-500 mt-1">Uploads require Supabase sign-in. Current file: ${esc(resource?.fileName || 'None')}.</p>
             <div class="flex gap-2 mt-2">
               <button type="button" id="uploadResourceFileBtn" class="px-2 py-1 rounded-lg bg-slate-900 text-white text-[11px]">Upload</button>
-              ${resource?.signedUrl ? `<a class="px-2 py-1 rounded-lg border border-slate-300 text-[11px]" href="${resource.signedUrl}" target="_blank">Download</a>` : ''}
+              ${resource?.signedUrl ? `<a class="px-2 py-1 rounded-lg border border-slate-300 text-[11px]" href="${esc(resource.signedUrl)}" target="_blank">Download</a>` : ''}
             </div>
             <div id="uploadResourceStatus" class="text-[10px] text-slate-500 mt-1"></div>
           </div>
@@ -10871,7 +10938,7 @@ Best regards,
         }
         throw uploadErr;
       }
-      const { data: signed } = await supabaseClient.storage.from('resources').createSignedUrl(path, 60 * 60 * 24);
+      const { data: signed } = await supabaseClient.storage.from('resources').createSignedUrl(path, 60 * 60);
       return {
         storage_path: path,
         fileName: file.name,
@@ -10884,7 +10951,7 @@ Best regards,
       const res = getResourceById(resourceId);
       if (!res) return;
       const html = `
-        <h2 class="text-sm font-semibold mb-3">Assign "${res.title}"</h2>
+        <h2 class="text-sm font-semibold mb-3">Assign "${esc(res.title)}"</h2>
         <form id="assignForm" class="space-y-2">
           <div>
             <label class="block text-[11px] mb-1">Students</label>
@@ -10892,8 +10959,8 @@ Best regards,
               ${state.students.length
           ? state.students.map(s => `
                       <label class="flex items-center gap-1 text-[11px]">
-                        <input type="checkbox" name="studentIds" value="${s.id}">
-                        <span>${s.name}</span>
+                        <input type="checkbox" name="studentIds" value="${cleanId(s.id)}">
+                        <span>${esc(s.name)}</span>
                       </label>
                     `).join('')
           : '<div class="text-slate-500 text-[11px]">No students yet.</div>'
@@ -10947,9 +11014,9 @@ Best regards,
             <label class="block text-[11px] mb-1">Student</label>
             <select name="studentId" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
               ${state.students.map(s => `
-                  <option value="${s.id}"
+                  <option value="${cleanId(s.id)}"
                     ${(doc?.studentId === s.id || fixedStudentId === s.id) ? 'selected' : ''}>
-                    ${s.name}
+                    ${esc(s.name)}
                   </option>
                 `).join('')
         }
@@ -10957,7 +11024,7 @@ Best regards,
           </div>
           <div>
             <label class="block text-[11px] mb-1">Title</label>
-            <input name="title" value="${doc?.title || ''}"
+            <input name="title" value="${esc(doc?.title || '')}"
                    class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
           </div>
           <div>
@@ -10971,12 +11038,12 @@ Best regards,
           </div>
           <div>
             <label class="block text-[11px] mb-1">Date</label>
-            <input type="date" name="date" value="${doc?.date || new Date().toISOString().slice(0, 10)}"
+            <input type="date" name="date" value="${esc(doc?.date || new Date().toISOString().slice(0, 10))}"
                    class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
           </div>
           <div>
             <label class="block text-[11px] mb-1">Location / notes</label>
-            <textarea name="notes" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${doc?.notes || ''}</textarea>
+            <textarea name="notes" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${esc(doc?.notes || '')}</textarea>
           </div>
           <div class="flex justify-between items-center mt-3">
             <button type="submit" class="px-3 py-1.5 rounded-xl bg-amber-600 text-white text-xs font-medium">
@@ -11063,9 +11130,9 @@ Best regards,
             <label class="block text-[11px] mb-1">Student</label>
             <select name="studentId" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
               ${state.students.map(s => `
-                  <option value="${s.id}"
+                  <option value="${cleanId(s.id)}"
                     ${(inv?.studentId === s.id || (!inv && selectedStudentId === s.id)) ? 'selected' : ''}>
-                    ${s.name}
+                    ${esc(s.name)}
                   </option>
                 `).join('')
         }
@@ -11079,39 +11146,39 @@ Best regards,
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-[11px] mb-1">Invoice ID</label>
-              <input name="id" value="${inv?.id || generateId('inv')}"
+              <input name="id" value="${esc(inv?.id || generateId('inv'))}"
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
             </div>
             <div>
               <label class="block text-[11px] mb-1">Issue date</label>
-              <input type="date" name="issueDate" value="${inv?.issueDate || new Date().toISOString().slice(0, 10)}"
+              <input type="date" name="issueDate" value="${esc(inv?.issueDate || new Date().toISOString().slice(0, 10))}"
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
             </div>
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-[11px] mb-1">Due date</label>
-              <input type="date" name="dueDate" value="${inv?.dueDate || ''}"
+              <input type="date" name="dueDate" value="${esc(inv?.dueDate || '')}"
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
             </div>
             <div>
               <label class="block text-[11px] mb-1">Base amount (R)</label>
-              <input type="number" step="0.01" name="baseAmount" value="${inv?.baseAmount ?? inv?.total ?? ''}"
+              <input type="number" step="0.01" name="baseAmount" value="${esc(inv?.baseAmount ?? inv?.total ?? '')}"
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
             </div>
           </div>
           <div class="text-[10px] text-slate-500">
-            ${servicePeriodStart && servicePeriodEnd ? `Service period: ${servicePeriodStart} → ${servicePeriodEnd}` : 'Service period: n/a'}
-            ${numSessions ? ` • ${numSessions} sessions` : ''}
-            ${invoiceType ? ` • Type: ${invoiceType}` : ''}
+            ${servicePeriodStart && servicePeriodEnd ? `Service period: ${esc(servicePeriodStart)} → ${esc(servicePeriodEnd)}` : 'Service period: n/a'}
+            ${numSessions ? ` • ${esc(numSessions)} sessions` : ''}
+            ${invoiceType ? ` • Type: ${esc(invoiceType)}` : ''}
           </div>
-          <input type="hidden" name="servicePeriodStart" value="${servicePeriodStart}">
-          <input type="hidden" name="servicePeriodEnd" value="${servicePeriodEnd}">
-          <input type="hidden" name="numSessions" value="${numSessions}">
-          <input type="hidden" name="invoiceType" value="${invoiceType}">
+          <input type="hidden" name="servicePeriodStart" value="${esc(servicePeriodStart)}">
+          <input type="hidden" name="servicePeriodEnd" value="${esc(servicePeriodEnd)}">
+          <input type="hidden" name="numSessions" value="${esc(numSessions)}">
+          <input type="hidden" name="invoiceType" value="${esc(invoiceType)}">
           <input type="hidden" name="autoGenerated" value="${autoGenerated ? '1' : ''}">
-          <input type="hidden" name="paidAt" value="${paidAt}">
-          <input type="hidden" name="paymentProvider" value="${paymentProvider}">
+          <input type="hidden" name="paidAt" value="${esc(paidAt)}">
+          <input type="hidden" name="paymentProvider" value="${esc(paymentProvider)}">
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-[11px] mb-1">Late fee %</label>
@@ -11141,7 +11208,7 @@ Best regards,
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-[11px] mb-1">Total amount (R)</label>
-              <input type="number" step="0.01" name="total" value="${inv?.total || ''}"
+              <input type="number" step="0.01" name="total" value="${esc(inv?.total || '')}"
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
             </div>
             <div class="flex items-end">
@@ -11167,7 +11234,7 @@ Best regards,
           </div>
           <div>
             <label class="block text-[11px] mb-1">Notes</label>
-            <textarea name="notes" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${inv?.notes || ''}</textarea>
+            <textarea name="notes" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${esc(inv?.notes || '')}</textarea>
           </div>
           <p class="text-[10px] text-slate-500">
             Tip: set a base amount, tick “Apply” on late/short notice fees, and we’ll recalc the total automatically.
@@ -11220,11 +11287,12 @@ Best regards,
             return;
           }
           sessionBox.innerHTML = eligible.map(s => {
+            const safeSessionId = cleanId(s.id);
             const billedElsewhere = !!s.invoiceId && s.invoiceId !== (inv?.id || '');
-            const checked = selectedExisting.has(s.id) || s.invoiceId === inv?.id;
-            const detail = `${s.date} ${s.startTime || ''} • ${s.subject} • ${s.durationHours || 1}h`;
+            const checked = selectedExisting.has(safeSessionId) || s.invoiceId === inv?.id;
+            const detail = esc(`${s.date} ${s.startTime || ''} • ${s.subject} • ${s.durationHours || 1}h`);
             return `<label class="flex items-center gap-2 text-[11px] ${billedElsewhere ? 'opacity-50' : ''}">
-              <input type="checkbox" name="sessionIds" value="${s.id}" ${checked && !billedElsewhere ? 'checked' : ''} ${billedElsewhere ? 'disabled' : ''}>
+              <input type="checkbox" name="sessionIds" value="${safeSessionId}" ${checked && !billedElsewhere ? 'checked' : ''} ${billedElsewhere ? 'disabled' : ''}>
               <span>${detail}</span>
               ${billedElsewhere ? '<span class="text-amber-600 text-[10px]">(already billed)</span>' : ''}
             </label>`;
