@@ -1,5 +1,9 @@
 (() => {
   const config = window.BUSINESS_CONFIG || {};
+  const t = window.t || ((key, vars) => {
+    if (!vars) return key;
+    return key.replace(/\{\{(\w+)\}\}/g, (_, k) => (vars[k] ?? ''));
+  });
   const tokens = {
     brandName: config.brandName || 'BRAND_NAME',
     operatorName: config.operatorName || 'OPERATOR_NAME',
@@ -32,16 +36,16 @@
       el.textContent = tokens.termsEffectiveDate;
     });
     root.querySelectorAll('[data-merchant-disclosure]').forEach(el => {
-      el.textContent = `Service operated by ${tokens.operatorName}; merchant of record: ${tokens.merchantName}; payments processed securely via PayFast.`;
+      el.textContent = t('business.disclosure', tokens);
     });
     root.querySelectorAll('[data-yoco-merchant-line]').forEach(el => {
-      el.textContent = `Payments are processed securely by PayFast (merchant: ${tokens.merchantName}).`;
+      el.textContent = t('business.yoco_merchant_line', tokens);
     });
     root.querySelectorAll('[data-merchant-receipt]').forEach(el => {
-      el.textContent = `Merchant: ${tokens.merchantName}. Service Provider/Operator: ${tokens.operatorName}.`;
+      el.textContent = t('business.merchant_receipt', tokens);
     });
     root.querySelectorAll('[data-about-operator-merchant]').forEach(el => {
-      el.textContent = `Tutoring is delivered by ${tokens.operatorName}. Merchant of record: ${tokens.merchantName}. Payments are processed via PayFast.`;
+      el.textContent = t('business.about_operator_merchant', tokens);
     });
   }
 
@@ -52,4 +56,5 @@
   } else {
     applyText();
   }
+  window.addEventListener('i18n:change', () => applyText());
 })();
