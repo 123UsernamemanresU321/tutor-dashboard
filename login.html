@@ -248,6 +248,18 @@
         });
         if (error) {
           const ctx = error?.context || {};
+          const status = ctx.status || error.status || 0;
+          let retryAfter = data?.retry_after_sec;
+          if (!retryAfter && ctx.body) {
+            try {
+              const parsed = typeof ctx.body === 'string' ? JSON.parse(ctx.body) : ctx.body;
+              retryAfter = parsed?.retry_after_sec;
+            } catch { }
+          }
+          if (status === 429) {
+            const mins = retryAfter ? Math.max(1, Math.ceil(retryAfter / 60)) : 30;
+            throw new Error(`Too many attempts. Try again in about ${mins} minute(s).`);
+          }
           const details = ctx.error || ctx.message || data?.error || error.message || 'Login failed.';
           throw new Error(details);
         }
