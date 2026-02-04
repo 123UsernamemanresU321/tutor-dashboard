@@ -1733,6 +1733,10 @@
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
               <div class="card p-4 space-y-2">
                 <h3 class="text-sm font-semibold" data-i18n="parent.all_sessions">All sessions</h3>
+                <div id="parentSessionPaymentNotice" class="hidden rounded-lg border border-amber-200 bg-amber-50/70 p-2">
+                  <div class="text-[11px] font-medium text-amber-900" data-i18n="parent.sessions_locked_title">Upcoming sessions appear after payment</div>
+                  <div class="text-[10px] text-amber-800" data-i18n="parent.sessions_locked_detail">Pay the invoice to unlock the schedule.</div>
+                </div>
                 <ul id="parentSessions" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
               </div>
               <div class="card p-4 space-y-2">
@@ -1746,6 +1750,10 @@
                 <div id="parentInvoiceAlert" class="hidden rounded-lg border border-amber-200 bg-amber-50/70 p-2">
                   <div class="text-[11px] font-medium text-amber-900" data-i18n="parent.invoice_alert_title">Payment needed to schedule lessons</div>
                   <div class="text-[10px] text-amber-800" data-i18n="parent.invoice_alert_detail">Tap a “Pay now” button below to confirm payment.</div>
+                </div>
+                <div id="parentInvoiceStatus" class="hidden rounded-lg border border-amber-200 bg-amber-50/70 p-2">
+                  <div id="parentInvoiceStatusTitle" class="text-[11px] font-medium text-amber-900"></div>
+                  <div id="parentInvoiceStatusDetail" class="text-[10px] text-amber-800"></div>
                 </div>
                 <ul id="parentInvoices" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
                 <p id="parentInvoiceDisclosure" class="text-[10px] text-slate-500" data-merchant-receipt></p>
@@ -4975,6 +4983,37 @@
       if (invoiceAlert) {
         invoiceAlert.classList.toggle('hidden', pendingInvoices.length === 0);
       }
+      const invoiceStatus = document.getElementById('parentInvoiceStatus');
+      const invoiceStatusTitle = document.getElementById('parentInvoiceStatusTitle');
+      const invoiceStatusDetail = document.getElementById('parentInvoiceStatusDetail');
+      if (invoiceStatus && invoiceStatusTitle && invoiceStatusDetail) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const soonCutoff = new Date(today);
+        soonCutoff.setDate(soonCutoff.getDate() + 7);
+        const overdue = pendingInvoices.filter(inv => inv.dueDate && new Date(inv.dueDate) < today);
+        const dueSoon = pendingInvoices.filter(inv => inv.dueDate && new Date(inv.dueDate) >= today && new Date(inv.dueDate) <= soonCutoff);
+        const showStatus = overdue.length || dueSoon.length;
+        invoiceStatus.classList.toggle('hidden', !showStatus);
+        if (showStatus) {
+          const titleKey = overdue.length ? 'parent.invoice_status_title_overdue' : 'parent.invoice_status_title_due_soon';
+          invoiceStatusTitle.textContent = t(titleKey);
+          invoiceStatusDetail.textContent = t('parent.invoice_status_detail', {
+            overdue: overdue.length,
+            soon: dueSoon.length,
+            days: 7
+          });
+          invoiceStatus.className = overdue.length
+            ? 'rounded-lg border border-rose-200 bg-rose-50/70 p-2'
+            : 'rounded-lg border border-amber-200 bg-amber-50/70 p-2';
+          invoiceStatusTitle.className = overdue.length
+            ? 'text-[11px] font-medium text-rose-900'
+            : 'text-[11px] font-medium text-amber-900';
+          invoiceStatusDetail.className = overdue.length
+            ? 'text-[10px] text-rose-800'
+            : 'text-[10px] text-amber-800';
+        }
+      }
       const guideKey = `parent_guide_dismissed_${parent?.id || getSessionEmail() || 'session'}`;
       const guideDismissed = localStorage.getItem(guideKey) === '1';
       const showGuide = (unsignedStudents.length || pendingInvoices.length) && !guideDismissed;
@@ -5069,6 +5108,11 @@
       const now = new Date();
       const sessionsWithDates = state.sessions
         .filter(s => s.studentIds.some(id => childIds.has(id)))
+        .filter(s => {
+          if (!s.invoiceId) return false;
+          const inv = state.invoices.find(i => i.id === s.invoiceId);
+          return !!(inv && inv.paid && !isInvoiceVoid(inv));
+        })
         .map(s => ({
           session: s,
           when: new Date(s.date + 'T' + (s.startTime || '00:00'))
@@ -5080,6 +5124,10 @@
         .filter(s => s.when < now)
         .sort((a, b) => b.when - a.when);
       const mySessions = [...upcomingSessions, ...pastSessions].map(s => s.session);
+      const sessionNotice = document.getElementById('parentSessionPaymentNotice');
+      if (sessionNotice) {
+        sessionNotice.classList.toggle('hidden', pendingInvoices.length === 0);
+      }
       if (sessionsUl) {
         sessionsUl.innerHTML = mySessions.length ? mySessions.map(s => {
           const namesRaw = s.studentIds.map(id => getStudentById(id)?.name || t('common.unknown')).join(', ');
@@ -5113,7 +5161,7 @@
             ${busyLabel ? `<div class="mt-1">${busyLabel}</div>` : ''}
             ${joinBtn}
           </li>`;
-        }).join('') : `<li class="text-slate-500 text-xs">${esc(t('parent.no_sessions'))}</li>`;
+        }).join('') : `<li class="text-slate-500 text-xs">${esc(pendingInvoices.length ? t('parent.sessions_locked_detail') : t('parent.no_sessions'))}</li>`;
       }
 
       const myHw = state.homework.filter(hw => childIds.has(hw.studentId));
@@ -8972,6 +9020,51 @@
       return changed;
     }
 
+    function seedUnpaidInvoiceSessions(inv, student) {
+      if ((inv.invoiceType || inv.invoice_type) !== 'monthly') return false;
+      if (!inv.autoGenerated || inv.paid || isInvoiceVoid(inv)) return false;
+      const serviceStartStr = inv.servicePeriodStart || inv.service_period_start || '';
+      const serviceEndStr = inv.servicePeriodEnd || inv.service_period_end || '';
+      const serviceStart = parseDateOnly(serviceStartStr);
+      const serviceEnd = parseDateOnly(serviceEndStr);
+      if (!serviceStart || !serviceEnd) return false;
+      const linked = getLinkedInvoiceSessions(inv, student.id, serviceStartStr, serviceEndStr);
+      if (linked.length) return false;
+      const prefs = getSchedulePrefs(student);
+      if (!prefs.scheduleSlots.length) return false;
+      const occurrences = listScheduleOccurrences(prefs.scheduleSlots, serviceStart, serviceEnd);
+      if (!occurrences.length) return false;
+      let changed = false;
+      occurrences.forEach(occ => {
+        const slot = occ.slot;
+        const slotTime = normalizeTimeValue(slot.startTime || '');
+        if (!slotTime) return;
+        const durationHours = Number(slot.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1);
+        if (isCancelledOccurrence(student.id, occ.date, slotTime, durationHours)) {
+          return;
+        }
+        state.sessions.push({
+          id: generateId('sess'),
+          studentIds: [student.id],
+          date: occ.date,
+          startTime: slotTime,
+          durationHours,
+          subject: student.subjects?.[0] || 'Tutoring',
+          topic: 'Auto-scheduled session',
+          notes: '',
+          attended: false,
+          completed: false,
+          invoiceId: inv.id,
+          sessionMode: getSlotSessionMode(slot, 'in_person'),
+          meetingProvider: getSlotSessionMode(slot, 'in_person') === 'online' ? 'JaaS' : '',
+          meetingRoom: '',
+          meetingStatus: getSlotSessionMode(slot, 'in_person') === 'online' ? 'scheduled' : ''
+        });
+        changed = true;
+      });
+      return changed;
+    }
+
     function ensureMonthlyInvoiceForPeriod(student, periodStartDate, today) {
       const prefs = getSchedulePrefs(student);
       if (!student.contractSigned || !prefs.scheduleSlots.length) return false;
@@ -9091,6 +9184,10 @@
       const serviceStart = parseDateOnly(inv.servicePeriodStart || inv.service_period_start);
       const serviceEnd = parseDateOnly(inv.servicePeriodEnd || inv.service_period_end);
       if (!serviceStart || !serviceEnd) return false;
+      const linked = getLinkedInvoiceSessions(inv, student.id, inv.servicePeriodStart || inv.service_period_start || '', inv.servicePeriodEnd || inv.service_period_end || '');
+      if (linked.length) {
+        return false;
+      }
       const paidAtDate = parseDateOnly(inv.paidAt) || today;
       const scheduleStart = maxDate(serviceStart, paidAtDate);
       const occurrences = listScheduleOccurrences(prefs.scheduleSlots, scheduleStart, serviceEnd);
@@ -9168,6 +9265,7 @@
           if (linkUnbilledSessionsToMonthlyInvoice(inv, student)) changed = true;
         }
         if ((inv.invoiceType || inv.invoice_type) === 'monthly' && inv.autoGenerated && !inv.paid && !isInvoiceVoid(inv)) {
+          if (seedUnpaidInvoiceSessions(inv, student)) changed = true;
           if (recalculateMonthlyInvoice(inv, student, today)) changed = true;
         }
         if ((inv.invoiceType || inv.invoice_type) === 'monthly' && inv.paid && !isInvoiceVoid(inv)) {
