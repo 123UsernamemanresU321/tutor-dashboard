@@ -98,6 +98,7 @@
 
   <footer style="margin: 16px auto; max-width: 900px; color: #64748b; font-size: 12px; text-align: center;" data-merchant-disclosure></footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script>
     const SUPABASE_URL = 'https://wdsqnbebutuhwckjpwqf.supabase.co';
@@ -243,6 +244,69 @@
       return executionRecord ? `${text}\n${executionRecord}` : text;
     }
 
+    function buildContractRenderNode() {
+      const source = document.getElementById('contractContent');
+      if (!source) return null;
+      const clone = source.cloneNode(true);
+      clone.querySelectorAll('#status, #studentName').forEach(el => el.remove());
+      clone.querySelectorAll('button').forEach(el => el.remove());
+      clone.querySelectorAll('input, textarea, select').forEach(input => {
+        const span = document.createElement('span');
+        span.textContent = input.value || '';
+        span.className = input.className || '';
+        span.style.whiteSpace = 'pre-wrap';
+        input.replaceWith(span);
+      });
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'fixed';
+      wrapper.style.left = '-9999px';
+      wrapper.style.top = '0';
+      wrapper.style.width = '900px';
+      wrapper.style.padding = '16px';
+      wrapper.style.background = '#ffffff';
+      wrapper.appendChild(clone);
+      return wrapper;
+    }
+
+    async function renderPdfFromDom() {
+      const jsPDF = window.jspdf?.jsPDF;
+      if (!jsPDF || !window.html2canvas) return '';
+      const wrapper = buildContractRenderNode();
+      if (!wrapper) return '';
+      document.body.appendChild(wrapper);
+      let canvas = null;
+      try {
+        canvas = await window.html2canvas(wrapper, {
+          scale: 2,
+          backgroundColor: '#ffffff',
+          useCORS: true
+        });
+      } finally {
+        wrapper.remove();
+      }
+      if (!canvas) return '';
+
+      const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth;
+      const imgHeight = canvas.height * (imgWidth / canvas.width);
+      const imgData = canvas.toDataURL('image/png');
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      const dataUri = pdf.output('datauristring');
+      return dataUri.split(',')[1] || '';
+    }
+
     async function loadStudent() {
       if (!studentId) return;
       try {
@@ -314,27 +378,13 @@
         msgEl.textContent = t('contract.msg_generating_pdf');
         let pdfBase64 = '';
         let pdfName = 'signed_contract.pdf';
-        const jsPDF = window.jspdf?.jsPDF;
-        if (jsPDF) {
-          const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-          const margin = 40;
-          const pageWidth = doc.internal.pageSize.getWidth() - margin * 2;
-          const lineHeight = 14;
-          const lines = doc.splitTextToSize(contractTextSnapshot, pageWidth);
-          let y = margin;
-          lines.forEach(line => {
-            if (y > doc.internal.pageSize.getHeight() - margin) {
-              doc.addPage();
-              y = margin;
-            }
-            doc.text(line, margin, y);
-            y += lineHeight;
-          });
-          const dataUri = doc.output('datauristring');
-          pdfBase64 = dataUri.split(',')[1] || '';
-          const safeName = (fields.student_name || 'student').replace(/[^a-z0-9_-]+/gi, '_');
-          const langSuffix = contractLanguage && contractLanguage !== 'en' ? `_${contractLanguage}` : '';
-          pdfName = `signed_contract_${safeName}${langSuffix}.pdf`;
+        const safeName = (fields.student_name || 'student').replace(/[^a-z0-9_-]+/gi, '_');
+        const langSuffix = contractLanguage && contractLanguage !== 'en' ? `_${contractLanguage}` : '';
+        pdfName = `signed_contract_${safeName}${langSuffix}.pdf`;
+        try {
+          pdfBase64 = await renderPdfFromDom();
+        } catch (err) {
+          pdfBase64 = '';
         }
         msgEl.textContent = t('contract.msg_submitting');
         const resp = await fetch(`${SUPABASE_URL}/functions/v1/sign-contract`, {
