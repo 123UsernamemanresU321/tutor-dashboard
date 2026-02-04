@@ -3432,6 +3432,24 @@
       // Prune skipped to avoid accidental deletions; Supabase is source of truth.
     }
 
+    async function removeStorageByPrefix(bucket, prefix) {
+      if (!supabaseClient || !prefix) return;
+      let offset = 0;
+      const limit = 100;
+      while (true) {
+        const { data, error } = await supabaseClient.storage.from(bucket).list(prefix, { limit, offset });
+        if (error) {
+          console.warn('Storage list failed', bucket, prefix, error);
+          break;
+        }
+        const items = data || [];
+        if (!items.length) break;
+        await supabaseClient.storage.from(bucket).remove(items.map(item => `${prefix}/${item.name}`));
+        if (items.length < limit) break;
+        offset += items.length;
+      }
+    }
+
     async function deleteContractForStudent(signatureId, studentId) {
       // identify storage objects to remove
       const targets = signatureId
@@ -3495,6 +3513,13 @@
               await supabaseClient.storage.from(obj.bucket).remove([obj.path]);
             } catch (err) {
               console.warn('Storage delete failed', err);
+            }
+          }
+          const ownerPrefix = supabaseSession?.user?.id ? `${supabaseSession.user.id}/${studentId}` : '';
+          const prefixes = [ownerPrefix, studentId].filter(Boolean);
+          for (const prefix of prefixes) {
+            for (const bucket of ['signed_contracts', 'contracts']) {
+              await removeStorageByPrefix(bucket, prefix);
             }
           }
           await supabaseClient.from('students').update({
@@ -7862,7 +7887,9 @@
           const signedName = esc(latestSig.parentName || t('parent.parent_label'));
           const signedAt = esc(latestSig.signedAt ? new Date(latestSig.signedAt).toLocaleString() : '');
           const signedVersion = esc(latestSig.contractVersion || 'v1');
-          const signedUrl = latestSig.renderedPdfUrl ? esc(latestSig.renderedPdfUrl) : '';
+          const signedUrl = contractEntry?.signedUrl
+            ? esc(contractEntry.signedUrl)
+            : (latestSig.renderedPdfUrl ? esc(latestSig.renderedPdfUrl) : '');
           const hasSnapshot = !!latestSig.contractTextSnapshot;
           const signedLine = t('contract.signed_by_on', { name: signedName, date: signedAt, version: signedVersion });
           const signedLink = signedUrl
@@ -8110,7 +8137,7 @@
         events.push({
           date: c.uploadedAt || new Date().toISOString().slice(0, 10),
           type: typeContract,
-          description: `${c.fileName || t('contract.label')} [${contractStatus}]`
+          description: `${t('contract.label')} [${contractStatus}]`
         });
       });
 
@@ -8304,7 +8331,7 @@
         return `
         <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80 flex justify-between items-center">
           <div>
-            <div class="font-medium flex items-center gap-1">${esc(c.fileName || t('contract.label'))} <span class="text-[10px] px-2 py-0.5 rounded-full ${c.status === 'Signed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${esc(statusLabel)}</span></div>
+            <div class="font-medium flex items-center gap-1">${esc(t('contract.label'))} <span class="text-[10px] px-2 py-0.5 rounded-full ${c.status === 'Signed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${esc(statusLabel)}</span></div>
             <div class="text-[10px] text-slate-500">${t('contract.uploaded_label')} ${esc(c.uploadedAt || '')}</div>
             ${(!hasFile && !hasText) ? `<div class="text-[10px] text-amber-600">${t('contract.signed_missing')}</div>` : ''}
           </div>
