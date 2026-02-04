@@ -1970,6 +1970,9 @@
       'contract.msg_submitting': 'Submitting signature...',
       'contract.msg_success': 'Signed! You may close this window.',
       'contract.msg_error': 'Error: {{error}}',
+      'contract.popup_title_success': 'Contract signed',
+      'contract.popup_title_error': 'Signature failed',
+      'contract.popup_cta': 'Close',
 
       'email.confirm.heading': 'Confirm your signup',
       'email.confirm.greeting': 'Hi there,',
@@ -2186,6 +2189,9 @@
       'contract.msg_submitting': 'Enviando firma...',
       'contract.msg_success': '¡Firmado! Puedes cerrar esta ventana.',
       'contract.msg_error': 'Error: {{error}}',
+      'contract.popup_title_success': 'Contrato firmado',
+      'contract.popup_title_error': 'Error al firmar',
+      'contract.popup_cta': 'Cerrar',
 
       'email.confirm.heading': 'Confirma tu registro',
       'email.confirm.greeting': 'Hola,',
@@ -2402,6 +2408,9 @@
       'contract.msg_submitting': 'Soumission de la signature...',
       'contract.msg_success': 'Signé ! Vous pouvez fermer cette fenêtre.',
       'contract.msg_error': 'Erreur : {{error}}',
+      'contract.popup_title_success': 'Contrat signé',
+      'contract.popup_title_error': 'Échec de la signature',
+      'contract.popup_cta': 'Fermer',
 
       'email.confirm.heading': 'Confirmez votre inscription',
       'email.confirm.greeting': 'Bonjour,',
@@ -2618,6 +2627,9 @@
       'contract.msg_submitting': '正在提交签名...',
       'contract.msg_success': '已签署！你可以关闭此窗口。',
       'contract.msg_error': '错误：{{error}}',
+      'contract.popup_title_success': '合同已签署',
+      'contract.popup_title_error': '签署失败',
+      'contract.popup_cta': '关闭',
 
       'email.confirm.heading': '确认注册',
       'email.confirm.greeting': '你好，',
