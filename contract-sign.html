@@ -261,50 +261,51 @@
       wrapper.style.position = 'fixed';
       wrapper.style.left = '-9999px';
       wrapper.style.top = '0';
-      wrapper.style.width = '900px';
+      wrapper.style.width = '820px';
       wrapper.style.padding = '16px';
       wrapper.style.background = '#ffffff';
       wrapper.appendChild(clone);
       return wrapper;
     }
 
-    async function renderPdfFromDom() {
+    async function renderPdfFromDom(options = {}) {
       const jsPDF = window.jspdf?.jsPDF;
       if (!jsPDF || !window.html2canvas) return '';
+      const scale = options.scale || 1;
+      const quality = typeof options.quality === 'number' ? options.quality : 0.72;
       const wrapper = buildContractRenderNode();
       if (!wrapper) return '';
       document.body.appendChild(wrapper);
-      let canvas = null;
+      let pdfBase64 = '';
       try {
-        canvas = await window.html2canvas(wrapper, {
-          scale: 2,
-          backgroundColor: '#ffffff',
-          useCORS: true
-        });
+        const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const wrapperWidth = wrapper.getBoundingClientRect().width || 820;
+        const totalHeight = wrapper.scrollHeight || wrapper.getBoundingClientRect().height || 0;
+        const pageHeightPx = Math.floor(wrapperWidth * (pageHeight / pageWidth));
+        let offset = 0;
+        while (offset < totalHeight) {
+          const canvas = await window.html2canvas(wrapper, {
+            scale,
+            backgroundColor: '#ffffff',
+            useCORS: true,
+            width: wrapperWidth,
+            height: pageHeightPx,
+            y: offset,
+            scrollY: 0
+          });
+          const imgData = canvas.toDataURL('image/jpeg', quality);
+          if (offset > 0) pdf.addPage();
+          pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, pageHeight);
+          offset += pageHeightPx;
+        }
+        const dataUri = pdf.output('datauristring');
+        pdfBase64 = dataUri.split(',')[1] || '';
       } finally {
         wrapper.remove();
       }
-      if (!canvas) return '';
-
-      const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pageWidth;
-      const imgHeight = canvas.height * (imgWidth / canvas.width);
-      const imgData = canvas.toDataURL('image/png');
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-      const dataUri = pdf.output('datauristring');
-      return dataUri.split(',')[1] || '';
+      return pdfBase64;
     }
 
     async function loadStudent() {
@@ -382,7 +383,10 @@
         const langSuffix = contractLanguage && contractLanguage !== 'en' ? `_${contractLanguage}` : '';
         pdfName = `signed_contract_${safeName}${langSuffix}.pdf`;
         try {
-          pdfBase64 = await renderPdfFromDom();
+          pdfBase64 = await renderPdfFromDom({ scale: 1, quality: 0.72 });
+          if (pdfBase64 && pdfBase64.length > 12000000) {
+            pdfBase64 = await renderPdfFromDom({ scale: 0.9, quality: 0.58 });
+          }
         } catch (err) {
           pdfBase64 = '';
         }
