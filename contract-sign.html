@@ -383,9 +383,12 @@
         const langSuffix = contractLanguage && contractLanguage !== 'en' ? `_${contractLanguage}` : '';
         pdfName = `signed_contract_${safeName}${langSuffix}.pdf`;
         try {
-          pdfBase64 = await renderPdfFromDom({ scale: 1, quality: 0.72 });
+          pdfBase64 = await renderPdfFromDom({ scale: 1.15, quality: 0.8 });
+          if (pdfBase64 && pdfBase64.length > 14000000) {
+            pdfBase64 = await renderPdfFromDom({ scale: 1, quality: 0.72 });
+          }
           if (pdfBase64 && pdfBase64.length > 12000000) {
-            pdfBase64 = await renderPdfFromDom({ scale: 0.9, quality: 0.58 });
+            pdfBase64 = await renderPdfFromDom({ scale: 0.9, quality: 0.6 });
           }
         } catch (err) {
           pdfBase64 = '';
