@@ -7450,6 +7450,32 @@
       return sigs[0] || null;
     }
 
+    function getSignatureById(signatureId) {
+      return state.contractSignatures.find(cs => cs.id === signatureId) || null;
+    }
+
+    function buildContractTextDataUrl(text) {
+      return `data:text/plain;charset=utf-8,${encodeURIComponent(text || '')}`;
+    }
+
+    function openContractSnapshotModal(signatureId) {
+      const sig = getSignatureById(signatureId);
+      if (!sig || !sig.contractTextSnapshot) {
+        alert(t('contract.signed_missing'));
+        return;
+      }
+      const text = sig.contractTextSnapshot;
+      const defaultName = t('contract.file_default').replace(/\.pdf$/i, '.txt');
+      const downloadUrl = buildContractTextDataUrl(text);
+      openModal(`
+        <h2 class="text-sm font-semibold mb-2">${esc(t('contract.view_signed_copy'))}</h2>
+        <div class="border border-slate-200 rounded-lg p-2 text-[11px] whitespace-pre-wrap max-h-[50vh] overflow-y-auto bg-white/80">${esc(text)}</div>
+        <div class="mt-3 flex gap-2">
+          <a class="text-[11px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50" href="${downloadUrl}" download="${esc(defaultName)}">${t('common.download')}</a>
+        </div>
+      `);
+    }
+
     function ensureStudentContractState(student) {
       if (!student) return false;
       if (student.contractSigned) return false;
@@ -7837,10 +7863,11 @@
           const signedAt = esc(latestSig.signedAt ? new Date(latestSig.signedAt).toLocaleString() : '');
           const signedVersion = esc(latestSig.contractVersion || 'v1');
           const signedUrl = latestSig.renderedPdfUrl ? esc(latestSig.renderedPdfUrl) : '';
+          const hasSnapshot = !!latestSig.contractTextSnapshot;
           const signedLine = t('contract.signed_by_on', { name: signedName, date: signedAt, version: signedVersion });
           const signedLink = signedUrl
             ? `<a href="${signedUrl}" target="_blank" rel="noopener" class="underline text-indigo-600">${t('contract.view_signed_copy')}</a>`
-            : '';
+            : (hasSnapshot ? `<button class="underline text-indigo-600" onclick="openContractSnapshotModal('${cleanId(latestSig.id)}')">${t('contract.view_signed_copy')}</button>` : '');
           contractMeta.innerHTML = `${signedLine} ${signedLink}`.trim();
         } else if (contractEntry?.signedUrl) {
           const entryUrl = esc(contractEntry.signedUrl);
@@ -8260,9 +8287,18 @@
       list.innerHTML = contracts.map(c => {
         const hasFile = !!c.signedUrl;
         const signedUrl = hasFile ? esc(c.signedUrl) : '';
+        const signature = getSignatureById(c.id);
+        const textSnapshot = signature?.contractTextSnapshot || c.contractTextSnapshot || '';
+        const hasText = !!textSnapshot;
         const safeFileName = esc(c.fileName || t('contract.file_default'));
-        const viewLink = hasFile ? `<a class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" href="${signedUrl}" target="_blank" rel="noopener">${t('common.view')}</a>` : '';
-        const downloadLink = hasFile ? `<a class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" href="${signedUrl}" download="${safeFileName}">${t('common.download')}</a>` : '';
+        const safeTextName = esc((c.fileName || t('contract.file_default')).replace(/\.pdf$/i, '.txt'));
+        const textUrl = hasText ? buildContractTextDataUrl(textSnapshot) : '';
+        const viewLink = hasFile
+          ? `<a class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" href="${signedUrl}" target="_blank" rel="noopener">${t('common.view')}</a>`
+          : (hasText ? `<button class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" onclick="openContractSnapshotModal('${cleanId(c.id)}')">${t('common.view')}</button>` : '');
+        const downloadLink = hasFile
+          ? `<a class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" href="${signedUrl}" download="${safeFileName}">${t('common.download')}</a>`
+          : (hasText ? `<a class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300 hover:bg-slate-50" href="${textUrl}" download="${safeTextName}">${t('common.download')}</a>` : '');
         const safeContractId = cleanId(c.id);
         const statusLabel = c.status === 'Signed' ? t('contract.status_signed') : t('contract.status_pending');
         return `
@@ -8270,7 +8306,7 @@
           <div>
             <div class="font-medium flex items-center gap-1">${esc(c.fileName || t('contract.label'))} <span class="text-[10px] px-2 py-0.5 rounded-full ${c.status === 'Signed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${esc(statusLabel)}</span></div>
             <div class="text-[10px] text-slate-500">${t('contract.uploaded_label')} ${esc(c.uploadedAt || '')}</div>
-            ${!hasFile ? `<div class="text-[10px] text-amber-600">${t('contract.signed_missing')}</div>` : ''}
+            ${(!hasFile && !hasText) ? `<div class="text-[10px] text-amber-600">${t('contract.signed_missing')}</div>` : ''}
           </div>
           <div class="flex gap-1">
             ${viewLink}
