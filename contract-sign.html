@@ -310,18 +310,19 @@
       const createPage = () => {
         const page = document.createElement('div');
         page.style.width = `${wrapperWidth}px`;
-        page.style.minHeight = `${pageHeightPx}px`;
+        page.style.height = `${pageHeightPx}px`;
         page.style.boxSizing = 'border-box';
         page.style.padding = '16px';
         page.style.background = '#ffffff';
         page.style.display = 'block';
+        page.style.overflow = 'hidden';
         pagesHost.appendChild(page);
         pages.push(page);
         return page;
       };
 
       let page = createPage();
-      const maxHeight = pageHeightPx - 2;
+      const maxHeight = pageHeightPx;
       nodes.forEach(node => {
         page.appendChild(node);
         if (page.scrollHeight > maxHeight) {
