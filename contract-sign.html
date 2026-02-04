@@ -53,6 +53,12 @@
     .modal-message { font-size: 13px; color: #334155; white-space: pre-wrap; }
     .modal-actions { margin-top: 16px; display: flex; justify-content: flex-end; }
     .modal-actions button { background: #0f172a; color: #fff; border-radius: 10px; padding: 8px 14px; border: none; font-weight: 600; cursor: pointer; }
+    .loading-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.35); display: flex; align-items: center; justify-content: center; z-index: 45; }
+    .loading-overlay.hidden { display: none; }
+    .loading-card { background: #fff; border-radius: 16px; padding: 20px 24px; box-shadow: 0 24px 70px -30px rgba(15, 23, 42, 0.6); display: flex; align-items: center; gap: 12px; }
+    .loading-text { font-size: 13px; color: #0f172a; font-weight: 600; }
+    .spinner { width: 18px; height: 18px; border: 2px solid #cbd5e1; border-top-color: #0f172a; border-radius: 50%; animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -83,6 +89,13 @@
         <div id="contractContent"></div>
       </div>
     </form>
+  </div>
+
+  <div id="loadingOverlay" class="loading-overlay hidden" role="status" aria-live="polite">
+    <div class="loading-card">
+      <div class="spinner"></div>
+      <div class="loading-text" id="loadingText">Preparing contract...</div>
+    </div>
   </div>
 
   <div id="contractModal" class="modal hidden" role="dialog" aria-modal="true">
@@ -119,6 +132,8 @@
     const modalTitle = document.getElementById('contractModalTitle');
     const modalMessage = document.getElementById('contractModalMessage');
     const modalClose = document.getElementById('contractModalClose');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingText = document.getElementById('loadingText');
 
     function getCurrentLang() {
       return typeof getLanguage === 'function' ? getLanguage() : 'en';
@@ -134,6 +149,28 @@
       modalMessage.textContent = message || '';
       modalClose.textContent = t('contract.popup_cta');
       modal.classList.remove('hidden');
+    }
+
+    function showLoading(message) {
+      if (!loadingOverlay || !loadingText) return;
+      loadingText.textContent = message || t('contract.msg_submitting');
+      loadingOverlay.classList.remove('hidden');
+    }
+
+    function setLoadingText(message) {
+      if (loadingText) loadingText.textContent = message || '';
+    }
+
+    function hideLoading() {
+      if (loadingOverlay) loadingOverlay.classList.add('hidden');
+    }
+
+    function clearUnloadWarning() {
+      window.onbeforeunload = null;
+      const blocker = (e) => {
+        e.stopImmediatePropagation();
+      };
+      window.addEventListener('beforeunload', blocker, { capture: true, once: true });
     }
 
     if (modalClose) modalClose.onclick = closeContractModal;
@@ -228,23 +265,7 @@
       setIfEmpty('package_months', '6');
     }
 
-    function buildContractSnapshotFromDom(executionRecord) {
-      const source = document.getElementById('contractContent');
-      if (!source) return executionRecord || '';
-      const clone = source.cloneNode(true);
-      clone.querySelectorAll('#status, #studentName').forEach(el => el.remove());
-      clone.querySelectorAll('button').forEach(el => el.remove());
-      clone.querySelectorAll('input, textarea, select').forEach(input => {
-        const span = document.createElement('span');
-        span.textContent = input.value || '';
-        input.replaceWith(span);
-      });
-      let text = clone.innerText || clone.textContent || '';
-      text = text.replace(/\n{3,}/g, '\n\n').trim();
-      return executionRecord ? `${text}\n${executionRecord}` : text;
-    }
-
-    function buildContractRenderNode() {
+    function createContractClone() {
       const source = document.getElementById('contractContent');
       if (!source) return null;
       const clone = source.cloneNode(true);
@@ -257,15 +278,64 @@
         span.style.whiteSpace = 'pre-wrap';
         input.replaceWith(span);
       });
-      const wrapper = document.createElement('div');
-      wrapper.style.position = 'fixed';
-      wrapper.style.left = '-9999px';
-      wrapper.style.top = '0';
-      wrapper.style.width = '820px';
-      wrapper.style.padding = '16px';
-      wrapper.style.background = '#ffffff';
-      wrapper.appendChild(clone);
-      return wrapper;
+      return clone;
+    }
+
+    function buildContractSnapshotFromDom(executionRecord) {
+      const clone = createContractClone();
+      if (!clone) return executionRecord || '';
+      let text = clone.innerText || clone.textContent || '';
+      text = text.replace(/\n{3,}/g, '\n\n').trim();
+      return executionRecord ? `${text}\n${executionRecord}` : text;
+    }
+
+    function buildPaginatedPages(wrapper, clone, pageHeightPx, wrapperWidth) {
+      if (!wrapper || !clone) return { pages: [] };
+      const pagesHost = document.createElement('div');
+      pagesHost.style.width = '100%';
+      wrapper.appendChild(pagesHost);
+
+      const nodes = Array.from(clone.childNodes).map(node => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent || '';
+          if (!text.trim()) return null;
+          const p = document.createElement('p');
+          p.textContent = text.trim();
+          return p;
+        }
+        return node;
+      }).filter(Boolean);
+
+      const pages = [];
+      const createPage = () => {
+        const page = document.createElement('div');
+        page.style.width = `${wrapperWidth}px`;
+        page.style.minHeight = `${pageHeightPx}px`;
+        page.style.boxSizing = 'border-box';
+        page.style.padding = '16px';
+        page.style.background = '#ffffff';
+        page.style.display = 'block';
+        pagesHost.appendChild(page);
+        pages.push(page);
+        return page;
+      };
+
+      let page = createPage();
+      const maxHeight = pageHeightPx - 2;
+      nodes.forEach(node => {
+        page.appendChild(node);
+        if (page.scrollHeight > maxHeight) {
+          page.removeChild(node);
+          if (!page.childNodes.length) {
+            page.appendChild(node);
+          } else {
+            page = createPage();
+            page.appendChild(node);
+          }
+        }
+      });
+
+      return { pages };
     }
 
     async function renderPdfFromDom(options = {}) {
@@ -273,32 +343,34 @@
       if (!jsPDF || !window.html2canvas) return '';
       const scale = options.scale || 1;
       const quality = typeof options.quality === 'number' ? options.quality : 0.72;
-      const wrapper = buildContractRenderNode();
-      if (!wrapper) return '';
+      const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const wrapperWidth = 820;
+      const pageHeightPx = Math.floor(wrapperWidth * (pageHeight / pageWidth));
+      const clone = createContractClone();
+      if (!clone) return '';
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'fixed';
+      wrapper.style.left = '-9999px';
+      wrapper.style.top = '0';
+      wrapper.style.width = `${wrapperWidth}px`;
+      wrapper.style.padding = '0';
+      wrapper.style.background = '#ffffff';
       document.body.appendChild(wrapper);
       let pdfBase64 = '';
       try {
-        const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const wrapperWidth = wrapper.getBoundingClientRect().width || 820;
-        const totalHeight = wrapper.scrollHeight || wrapper.getBoundingClientRect().height || 0;
-        const pageHeightPx = Math.floor(wrapperWidth * (pageHeight / pageWidth));
-        let offset = 0;
-        while (offset < totalHeight) {
-          const canvas = await window.html2canvas(wrapper, {
+        const { pages } = buildPaginatedPages(wrapper, clone, pageHeightPx, wrapperWidth);
+        if (!pages.length) return '';
+        for (let i = 0; i < pages.length; i += 1) {
+          const canvas = await window.html2canvas(pages[i], {
             scale,
             backgroundColor: '#ffffff',
-            useCORS: true,
-            width: wrapperWidth,
-            height: pageHeightPx,
-            y: offset,
-            scrollY: 0
+            useCORS: true
           });
           const imgData = canvas.toDataURL('image/jpeg', quality);
-          if (offset > 0) pdf.addPage();
+          if (i > 0) pdf.addPage();
           pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, pageHeight);
-          offset += pageHeightPx;
         }
         const dataUri = pdf.output('datauristring');
         pdfBase64 = dataUri.split(',')[1] || '';
@@ -360,6 +432,8 @@
       const name = fields.parent_name;
       const email = fields.parent_email;
       msgEl.textContent = t('contract.msg_preparing');
+      showLoading(t('contract.msg_preparing'));
+      if (signBtn) signBtn.disabled = true;
       try {
         const contractLanguage = getCurrentLang();
         const userAgent = navigator.userAgent || '';
@@ -377,23 +451,25 @@
 
         const contractTextSnapshot = buildContractSnapshotFromDom(executionRecord);
         msgEl.textContent = t('contract.msg_generating_pdf');
+        setLoadingText(t('contract.msg_generating_pdf'));
         let pdfBase64 = '';
         let pdfName = 'signed_contract.pdf';
         const safeName = (fields.student_name || 'student').replace(/[^a-z0-9_-]+/gi, '_');
         const langSuffix = contractLanguage && contractLanguage !== 'en' ? `_${contractLanguage}` : '';
         pdfName = `signed_contract_${safeName}${langSuffix}.pdf`;
         try {
-          pdfBase64 = await renderPdfFromDom({ scale: 1.25, quality: 1 });
-          if (pdfBase64 && pdfBase64.length > 14000000) {
-            pdfBase64 = await renderPdfFromDom({ scale: 1, quality: 0.72 });
+          pdfBase64 = await renderPdfFromDom({ scale: 1.6, quality: 0.95 });
+          if (pdfBase64 && pdfBase64.length > 18000000) {
+            pdfBase64 = await renderPdfFromDom({ scale: 1.45, quality: 0.9 });
           }
-          if (pdfBase64 && pdfBase64.length > 12000000) {
-            pdfBase64 = await renderPdfFromDom({ scale: 0.9, quality: 0.6 });
+          if (pdfBase64 && pdfBase64.length > 14000000) {
+            pdfBase64 = await renderPdfFromDom({ scale: 1.25, quality: 0.85 });
           }
         } catch (err) {
           pdfBase64 = '';
         }
         msgEl.textContent = t('contract.msg_submitting');
+        setLoadingText(t('contract.msg_submitting'));
         const resp = await fetch(`${SUPABASE_URL}/functions/v1/sign-contract`, {
           method: 'POST',
           headers: {
@@ -433,11 +509,15 @@
           statusEl.textContent = t('contract.status_signed');
           statusEl.style.color = '#16a34a';
         }
+        clearUnloadWarning();
         showContractModal({ title: t('contract.popup_title_success'), message: t('contract.msg_success') });
       } catch (err) {
         const message = t('contract.msg_error', { error: err?.message || err });
         msgEl.textContent = message;
         showContractModal({ title: t('contract.popup_title_error'), message });
+      } finally {
+        hideLoading();
+        if (signBtn) signBtn.disabled = false;
       }
     };
 
