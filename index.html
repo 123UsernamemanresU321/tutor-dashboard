@@ -308,6 +308,28 @@
       opacity: 0.8;
     }
 
+    .session-card.pending-review {
+      border-color: rgba(245, 158, 11, 0.55);
+      background: rgba(255, 251, 235, 0.95);
+    }
+
+    .session-card.voided {
+      border-color: rgba(148, 163, 184, 0.55);
+      background: rgba(241, 245, 249, 0.95);
+      opacity: 0.85;
+    }
+
+    .session-card.voided .session-time,
+    .session-card.voided .text-slate-800 {
+      text-decoration: line-through;
+      opacity: 0.7;
+    }
+
+    .session-card.no-show-chargeable {
+      border-color: rgba(99, 102, 241, 0.5);
+      background: rgba(238, 242, 255, 0.95);
+    }
+
     .session-chip {
       font-size: 0.65rem;
       text-transform: uppercase;
@@ -356,6 +378,30 @@
       background: rgba(245, 158, 11, 0.16);
       color: #b45309;
       border-color: rgba(245, 158, 11, 0.35);
+    }
+
+    .session-chip-pending-review {
+      background: rgba(245, 158, 11, 0.12);
+      color: #92400e;
+      border-color: rgba(245, 158, 11, 0.28);
+    }
+
+    .session-chip-voided {
+      background: rgba(148, 163, 184, 0.16);
+      color: #475569;
+      border-color: rgba(148, 163, 184, 0.3);
+    }
+
+    .session-chip-no-show {
+      background: rgba(99, 102, 241, 0.14);
+      color: #4338ca;
+      border-color: rgba(99, 102, 241, 0.28);
+    }
+
+    .session-chip-restored {
+      background: rgba(20, 184, 166, 0.14);
+      color: #0f766e;
+      border-color: rgba(20, 184, 166, 0.28);
     }
 
     .session-time {
@@ -1395,6 +1441,21 @@
                   <input id="settingsDefaultDuration" type="number" step="0.25"
                     class="border border-slate-300 rounded-xl px-2 py-1 text-xs w-24">
                 </div>
+                <div class="flex items-center justify-between gap-2">
+                  <span data-i18n="settings.pending_review_grace">Pending review grace (h)</span>
+                  <input id="settingsPendingReviewGraceHours" type="number" step="1" min="1"
+                    class="border border-slate-300 rounded-xl px-2 py-1 text-xs w-24">
+                </div>
+                <div class="space-y-1">
+                  <label class="flex items-center gap-2 text-[11px]">
+                    <input id="settingsChargeableNoShow" type="checkbox">
+                    <span data-i18n="settings.chargeable_no_show">Chargeable no-show policy</span>
+                  </label>
+                  <label class="flex items-center gap-2 text-[11px]">
+                    <input id="settingsChargeableLateCancel" type="checkbox">
+                    <span data-i18n="settings.chargeable_late_cancel">Chargeable late cancellation policy</span>
+                  </label>
+                </div>
                 <div>
                   <label class="block text-[11px] mb-1" data-i18n="settings.weekly_reflection_note">Weekly reflection note</label>
                   <textarea id="settingsReflection" rows="3"
@@ -2247,6 +2308,82 @@
       return Number(total.toFixed(2));
     }
 
+    const SESSION_STATUS = Object.freeze({
+      SCHEDULED: 'scheduled',
+      COMPLETE: 'complete',
+      PENDING_REVIEW: 'pending_review',
+      VOIDED: 'voided',
+      NO_SHOW_CHARGEABLE: 'no_show_chargeable',
+      RESTORED: 'restored'
+    });
+
+    const SESSION_ABSENCE_REASONS = Object.freeze({
+      STUDENT_NO_SHOW: 'student_no_show',
+      TUTOR_ABSENT: 'tutor_absent',
+      CANCELLED_IN_TIME: 'cancelled_in_time',
+      CANCELLED_LATE: 'cancelled_late',
+      ADMIN_VOID: 'admin_void'
+    });
+
+    function normalizeSessionStatus(raw, fallback = '') {
+      const val = String(raw || '').trim().toLowerCase();
+      const allowed = new Set(Object.values(SESSION_STATUS));
+      if (allowed.has(val)) return val;
+      return fallback;
+    }
+
+    function getSessionStatus(sess) {
+      if (!sess) return SESSION_STATUS.SCHEDULED;
+      if (sess.completed) return SESSION_STATUS.COMPLETE;
+      const raw = sess.status || sess.sessionStatus || sess.session_status || '';
+      return normalizeSessionStatus(raw, SESSION_STATUS.SCHEDULED);
+    }
+
+    function isSessionVoided(sess) {
+      return getSessionStatus(sess) === SESSION_STATUS.VOIDED;
+    }
+
+    function isSessionChargeable(sess) {
+      const status = getSessionStatus(sess);
+      return status !== SESSION_STATUS.VOIDED;
+    }
+
+    function getSessionBillingRate(sess, student) {
+      const raw = Number(sess?.billingRate ?? sess?.billing_rate ?? 0);
+      if (raw > 0) return raw;
+      const fallback = Number(student?.rate ?? 0);
+      return fallback > 0 ? fallback : 0;
+    }
+
+    function getSessionBillableAmount(sess, student) {
+      const rate = getSessionBillingRate(sess, student);
+      const hours = Number(sess?.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1);
+      return Number((rate * hours).toFixed(2));
+    }
+
+    function getSessionEndAt(sess) {
+      if (!sess?.date) return null;
+      const startIso = sess.date + 'T' + (sess.startTime || '00:00');
+      const start = new Date(startIso);
+      if (isNaN(start.getTime())) return null;
+      const durationHours = Number(sess.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1);
+      const durationMs = durationHours * 60 * 60 * 1000;
+      return new Date(start.getTime() + durationMs);
+    }
+
+    function hasSessionEnded(sess, now = new Date()) {
+      const endAt = getSessionEndAt(sess);
+      return !!(endAt && now >= endAt);
+    }
+
+    function isInvoiceLocked(inv) {
+      if (!inv) return false;
+      if (isInvoiceVoid(inv)) return true;
+      if (inv.paid) return true;
+      const status = String(inv.invoiceStatus || inv.invoice_status || '').toLowerCase();
+      return status === 'paid';
+    }
+
     function isInvoiceVoid(inv) {
       const status = String(inv?.invoiceStatus || inv?.invoice_status || '').toLowerCase();
       return status === 'void' || !!inv?.voidedAt || !!inv?.voided_at;
@@ -2275,6 +2412,14 @@
       if (method === 'online') return t('invoice.online_payfast');
       if (method === 'cash') return t('invoice.cash');
       return '';
+    }
+
+    function invoiceRequiresPayment(inv) {
+      if (!inv || isInvoiceVoid(inv)) return false;
+      if (inv.paid) return false;
+      const type = String(inv.invoiceType || inv.invoice_type || '').toLowerCase();
+      if (type === 'refund') return false;
+      return Number(inv.total || 0) > 0.009;
     }
 
     function buildPayfastPayload(inv) {
@@ -2367,6 +2512,9 @@
         monthlyIncomeGoal: 0,
         reflection: '',
         defaultSessionDuration: 1.5,
+        pendingReviewGraceHours: 24,
+        policyChargeableNoShow: true,
+        policyChargeableLateCancel: true,
         showVoidedInvoices: false,
         maintenanceEnabled: false,
         maintenanceStart: '',
@@ -2840,6 +2988,27 @@
         s.startTime = normalizeTimeValue(s.startTime || s.start_time || '');
         s.attended = !!s.attended;
         s.completed = !!s.completed;
+        const rawStatus = s.status || s.sessionStatus || s.session_status || '';
+        s.status = normalizeSessionStatus(rawStatus, s.completed ? SESSION_STATUS.COMPLETE : SESSION_STATUS.SCHEDULED);
+        if (s.status === SESSION_STATUS.COMPLETE) {
+          s.completed = true;
+          s.attended = true;
+        }
+        if (s.status === SESSION_STATUS.VOIDED) {
+          s.completed = false;
+        }
+        if (s.status === SESSION_STATUS.NO_SHOW_CHARGEABLE) {
+          s.completed = false;
+          s.attended = false;
+        }
+        s.absenceReason = String(s.absenceReason || s.absence_reason || '').trim().toLowerCase();
+        s.pendingReviewStartedAt = s.pendingReviewStartedAt || s.pending_review_started_at || '';
+        s.billingRate = Number(s.billingRate ?? s.billing_rate ?? 0) || null;
+        if (!s.billingRate && (s.studentIds || []).length === 1) {
+          const stu = st.students.find(stu => cleanId(stu.id) === cleanId(s.studentIds[0]));
+          const rate = Number(stu?.rate || 0);
+          if (rate > 0) s.billingRate = rate;
+        }
         s.sessionMode = normalizeSessionMode(s.sessionMode || s.session_mode || s.mode || 'in_person');
         s.meetingRoom = (s.meetingRoom || s.meeting_room || '').trim();
         s.meetingProvider = (s.meetingProvider || s.meeting_provider || '').trim();
@@ -3161,6 +3330,10 @@
         notes: sess.notes,
         attended: !!sess.attended,
         completed: !!sess.completed,
+        status: normalizeSessionStatus(sess.status || sess.sessionStatus || sess.session_status || '', sess.completed ? SESSION_STATUS.COMPLETE : SESSION_STATUS.SCHEDULED),
+        absence_reason: (sess.absenceReason || sess.absence_reason || '').trim() || null,
+        pending_review_started_at: sess.pendingReviewStartedAt || sess.pending_review_started_at || null,
+        billing_rate: Number(sess.billingRate ?? sess.billing_rate ?? 0) || null,
         invoice_id: sess.invoiceId ? cleanId(sess.invoiceId) : null,
         session_mode: normalizeSessionMode(sess.sessionMode ?? sess.session_mode ?? sess.mode),
         meeting_room: (sess.meetingRoom || sess.meeting_room || '').trim() || null,
@@ -4000,6 +4173,21 @@
         state.settings.defaultSessionDuration = Number(e.target.value || 1);
         saveState();
       });
+      const graceHoursEl = document.getElementById('settingsPendingReviewGraceHours');
+      if (graceHoursEl) graceHoursEl.addEventListener('input', e => {
+        state.settings.pendingReviewGraceHours = Number(e.target.value || 24) || 24;
+        saveState();
+      });
+      const chargeableNoShowEl = document.getElementById('settingsChargeableNoShow');
+      if (chargeableNoShowEl) chargeableNoShowEl.addEventListener('change', e => {
+        state.settings.policyChargeableNoShow = !!e.target.checked;
+        saveState();
+      });
+      const chargeableLateCancelEl = document.getElementById('settingsChargeableLateCancel');
+      if (chargeableLateCancelEl) chargeableLateCancelEl.addEventListener('change', e => {
+        state.settings.policyChargeableLateCancel = !!e.target.checked;
+        saveState();
+      });
       const ns = document.getElementById('notifySessionsDays');
       const nh = document.getElementById('notifyHomeworkDays');
       const ni = document.getElementById('notifyInvoicesDays');
@@ -4148,12 +4336,19 @@
         const el = document.getElementById(id);
         if (el) el.value = val ?? '';
       };
+      const setChecked = (id, checked) => {
+        const el = document.getElementById(id);
+        if (el) el.checked = !!checked;
+      };
       setVal('settingsThemeSelect', state.settings.theme);
       setVal('settingsDensitySelect', state.settings.density);
       setVal('settingsWeeklyGoal', state.settings.weeklyGoalHours);
       setVal('settingsMonthlyGoal', state.settings.monthlyIncomeGoal);
       setVal('settingsReflection', state.settings.reflection || '');
       setVal('settingsDefaultDuration', state.settings.defaultSessionDuration ?? 1.5);
+      setVal('settingsPendingReviewGraceHours', state.settings.pendingReviewGraceHours ?? 24);
+      setChecked('settingsChargeableNoShow', !!state.settings.policyChargeableNoShow);
+      setChecked('settingsChargeableLateCancel', !!state.settings.policyChargeableLateCancel);
       setVal('notifySessionsDays', state.settings.notifySessionsDays ?? 3);
       setVal('notifyHomeworkDays', state.settings.notifyHomeworkDays ?? 3);
       setVal('notifyInvoicesDays', state.settings.notifyInvoicesDays ?? 3);
@@ -4169,6 +4364,7 @@
       // lock settings for students
       const lockIds = [
         'settingsWeeklyGoal', 'settingsMonthlyGoal', 'settingsDefaultDuration',
+        'settingsPendingReviewGraceHours', 'settingsChargeableNoShow', 'settingsChargeableLateCancel',
         'settingsReflection', 'notifySessionsDays', 'notifyHomeworkDays', 'notifyInvoicesDays'
       ];
       lockIds.forEach(id => {
@@ -4507,8 +4703,9 @@
         }
       }
       const now = new Date();
-      const mySessions = state.sessions.filter(s => s.studentIds.includes(student.id))
-        .filter(s => !s.completed)
+      const mySessions = getScheduleVisibleSessions()
+        .filter(s => s.studentIds.includes(student.id))
+        .filter(s => getSessionStatus(s) !== SESSION_STATUS.COMPLETE && getSessionStatus(s) !== SESSION_STATUS.VOIDED)
         .filter(s => {
           const start = new Date(s.date + 'T' + (s.startTime || '00:00'));
           const durationMs = Number(s.durationHours || 1) * 60 * 60 * 1000;
@@ -4525,7 +4722,7 @@
           return now >= start && now <= end;
         });
         const lateSessions = activeSessions.filter(s => !s.attended);
-        const returnSessions = activeSessions.filter(s => s.attended && !s.completed);
+        const returnSessions = activeSessions.filter(s => s.attended && getSessionStatus(s) !== SESSION_STATUS.COMPLETE);
         if (!lateSessions.length && !returnSessions.length) {
           portalReminder.classList.add('hidden');
           portalReminder.innerHTML = '';
@@ -5134,8 +5331,25 @@
           const names = esc(namesRaw);
           const when = new Date(s.date + 'T' + (s.startTime || '00:00'));
           const isPast = when < now;
-          const status = s.completed ? t('schedule.completed') : (isPast ? t('schedule.past') : t('schedule.upcoming'));
-          const statusClass = s.completed ? 'bg-emerald-100 text-emerald-700' : (isPast ? 'bg-slate-100 text-slate-600' : 'bg-indigo-100 text-indigo-700');
+          const sessStatus = getSessionStatus(s);
+          const status = sessStatus === SESSION_STATUS.COMPLETE
+            ? t('schedule.completed')
+            : sessStatus === SESSION_STATUS.PENDING_REVIEW
+              ? t('schedule.pending_review')
+              : sessStatus === SESSION_STATUS.VOIDED
+                ? t('schedule.voided')
+                : sessStatus === SESSION_STATUS.NO_SHOW_CHARGEABLE
+                  ? t('schedule.no_show_chargeable')
+                  : (isPast ? t('schedule.past') : t('schedule.upcoming'));
+          const statusClass = sessStatus === SESSION_STATUS.COMPLETE
+            ? 'bg-emerald-100 text-emerald-700'
+            : sessStatus === SESSION_STATUS.PENDING_REVIEW
+              ? 'bg-amber-100 text-amber-800'
+              : sessStatus === SESSION_STATUS.VOIDED
+                ? 'bg-slate-100 text-slate-600'
+                : sessStatus === SESSION_STATUS.NO_SHOW_CHARGEABLE
+                  ? 'bg-indigo-100 text-indigo-700'
+                  : (isPast ? 'bg-slate-100 text-slate-600' : 'bg-indigo-100 text-indigo-700');
           const modeLabel = getSessionModeLabel(s.sessionMode ?? s.session_mode ?? s.mode);
           const isOnline = isOnlineSession(s);
           const isBusyDay = isBusyDate(s.date);
@@ -5692,7 +5906,10 @@
       const now = new Date();
       return getScheduleVisibleSessions()
         .filter(s => s.date === todayStr)
-        .filter(s => !s.completed)
+        .filter(s => {
+          const status = getSessionStatus(s);
+          return status === SESSION_STATUS.SCHEDULED || status === SESSION_STATUS.RESTORED;
+        })
         .filter(s => new Date(s.date + 'T' + (s.startTime || '00:00')) >= now)
         .sort((a, b) => (a.date + 'T' + (a.startTime || '00:00')).localeCompare(b.date + 'T' + (b.startTime || '00:00')));
     }
@@ -5771,7 +5988,8 @@
 
     function canJoinMeetingNow(session) {
       if (!isOnlineSession(session)) return false;
-      if (session?.completed) return false;
+      const status = getSessionStatus(session);
+      if (status === SESSION_STATUS.COMPLETE || status === SESSION_STATUS.VOIDED || status === SESSION_STATUS.NO_SHOW_CHARGEABLE) return false;
       if (!session?.date) return false;
       const start = new Date(session.date + 'T' + (session.startTime || '00:00'));
       const durationMs = Number(session.durationHours || 1) * 60 * 60 * 1000;
@@ -6084,6 +6302,10 @@
             notes: sess.notes,
             attended: !!sess.attended,
             completed: sess.completed,
+            status: sess.status || '',
+            absenceReason: sess.absence_reason || '',
+            pendingReviewStartedAt: sess.pending_review_started_at || '',
+            billingRate: sess.billing_rate ?? null,
             invoiceId: sess.invoice_id,
             studentIds,
             sessionMode: normalizeSessionMode(sess.session_mode),
@@ -6453,6 +6675,10 @@
           notes: sess.notes,
           attended: !!sess.attended,
           completed: sess.completed,
+          status: sess.status || '',
+          absenceReason: sess.absence_reason || '',
+          pendingReviewStartedAt: sess.pending_review_started_at || '',
+          billingRate: sess.billing_rate ?? null,
           invoiceId: sess.invoice_id,
           sessionMode: normalizeSessionMode(sess.session_mode),
           meetingRoom: sess.meeting_room || '',
@@ -6779,6 +7005,10 @@
           notes: sess.notes,
           attended: !!sess.attended,
           completed: sess.completed,
+          status: sess.status || '',
+          absenceReason: sess.absence_reason || '',
+          pendingReviewStartedAt: sess.pending_review_started_at || '',
+          billingRate: sess.billing_rate ?? null,
           invoiceId: sess.invoice_id,
           studentIds: studentIdsForSess
         };
@@ -7235,6 +7465,7 @@
       const activeStudentIds = new Set(
         state.sessions
           .filter(s => new Date(s.date) >= cutoff)
+          .filter(s => getSessionStatus(s) !== SESSION_STATUS.VOIDED)
           .flatMap(s => s.studentIds)
       );
       document.getElementById('kpiStudents').textContent = activeStudentIds.size;
@@ -7245,6 +7476,7 @@
 
       let hoursThisWeek = 0;
       state.sessions.forEach(s => {
+        if (getSessionStatus(s) === SESSION_STATUS.VOIDED) return;
         const d = new Date(s.date);
         if (d >= startOfWeek && d < endOfWeek) {
           hoursThisWeek += Number(s.durationHours || 0);
@@ -7267,7 +7499,7 @@
         document.getElementById('kpiExpectedIncome').textContent = 'R ' + expected.toFixed(2);
       }
 
-      const overdueCount = studentMode ? 0 : state.invoices.filter(inv => !inv.paid && !isInvoiceVoid(inv) && inv.dueDate && new Date(inv.dueDate) < today).length;
+      const overdueCount = studentMode ? 0 : state.invoices.filter(inv => invoiceRequiresPayment(inv) && inv.dueDate && new Date(inv.dueDate) < today).length;
       document.getElementById('kpiOverdue').textContent = studentMode ? 'N/A' : overdueCount;
 
       // Goals & focus
@@ -7285,7 +7517,11 @@
       document.getElementById('reflectionText').textContent = reflection || 'Add a short intention in Settings to keep this week focused.';
 
       const upcomingSoon = [...state.sessions]
-        .filter(s => new Date(s.date + 'T' + (s.startTime || '00:00')) >= now)
+        .filter(s => {
+          const status = getSessionStatus(s);
+          if (status !== SESSION_STATUS.SCHEDULED && status !== SESSION_STATUS.RESTORED) return false;
+          return new Date(s.date + 'T' + (s.startTime || '00:00')) >= now;
+        })
         .sort((a, b) => new Date(a.date + 'T' + (a.startTime || '00:00')) - new Date(b.date + 'T' + (b.startTime || '00:00')));
       if (upcomingSoon.length) {
         const next = upcomingSoon[0];
@@ -7309,6 +7545,7 @@
 
       const hours = { Physics: 0, Chemistry: 0, Maths: 0 };
       state.sessions.forEach(s => {
+        if (getSessionStatus(s) === SESSION_STATUS.VOIDED) return;
         if (hours[s.subject] != null) {
           hours[s.subject] += Number(s.durationHours || 0);
         }
@@ -7340,6 +7577,8 @@
       const sevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
       const upcoming = state.sessions
         .filter(s => {
+          const status = getSessionStatus(s);
+          if (status !== SESSION_STATUS.SCHEDULED && status !== SESSION_STATUS.RESTORED) return false;
           const d = new Date(s.date + 'T' + (s.startTime || '00:00'));
           return d >= now && d <= sevenDays;
         })
@@ -7832,6 +8071,7 @@
     function getLastSessionDate(studentId) {
       const sessions = state.sessions
         .filter(sess => sess.studentIds.includes(studentId))
+        .filter(sess => getSessionStatus(sess) !== SESSION_STATUS.VOIDED)
         .map(sess => new Date(sess.date))
         .sort((a, b) => b - a);
       return sessions[0] || null;
@@ -7841,6 +8081,10 @@
       const now = new Date();
       const sessions = state.sessions
         .filter(sess => sess.studentIds.includes(studentId))
+        .filter(sess => {
+          const status = getSessionStatus(sess);
+          return status === SESSION_STATUS.SCHEDULED || status === SESSION_STATUS.RESTORED;
+        })
         .sort((a, b) => new Date(a.date + 'T' + (a.startTime || '00:00')) - new Date(b.date + 'T' + (b.startTime || '00:00')));
       return sessions.find(sess => new Date(sess.date + 'T' + (sess.startTime || '00:00')) >= now) || null;
     }
@@ -8223,7 +8467,15 @@
           <div>
             <div class="font-medium">${esc(sess.subject)} – ${esc(sess.topic || t('common.lesson'))}</div>
             <div class="text-[10px] text-slate-500">${esc(sess.date)} • ${esc(sess.startTime || '')} • ${esc(sess.durationHours || 1)}h</div>
-            ${sess.completed ? `<div class="text-[10px] text-emerald-600">${t('schedule.completed')}</div>` : ''}
+            ${(() => {
+              const st = getSessionStatus(sess);
+              if (st === SESSION_STATUS.COMPLETE) return `<div class="text-[10px] text-emerald-600">${esc(t('schedule.completed'))}</div>`;
+              if (st === SESSION_STATUS.PENDING_REVIEW) return `<div class="text-[10px] text-amber-700">${esc(t('schedule.pending_review'))}</div>`;
+              if (st === SESSION_STATUS.NO_SHOW_CHARGEABLE) return `<div class="text-[10px] text-indigo-700">${esc(t('schedule.no_show_chargeable'))}</div>`;
+              if (st === SESSION_STATUS.VOIDED) return `<div class="text-[10px] text-slate-600">${esc(t('schedule.voided'))}</div>`;
+              if (st === SESSION_STATUS.RESTORED) return `<div class="text-[10px] text-teal-700">${esc(t('schedule.restored'))}</div>`;
+              return '';
+            })()}
           </div>
             <button data-owner-only class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
                     onclick="if(guardEdit()) openSessionModal(getSessionById('${cleanId(sess.id)}'))">
@@ -8261,7 +8513,7 @@
         .sort((a, b) => new Date(b.issueDate) - new Date(a.issueDate));
       let balance = 0;
       invs.forEach(inv => {
-        if (!inv.paid && !isInvoiceVoid(inv)) balance += Number(inv.total || 0);
+        if (invoiceRequiresPayment(inv)) balance += Number(inv.total || 0);
       });
       const balanceLabel = balance > 0 ? t('finance.owed_balance') : t('finance.balance');
       document.getElementById('studentBalance').textContent = `${balanceLabel}: R ${balance.toFixed(2)}`;
@@ -8589,11 +8841,23 @@
         const parent = getParentProfileBySession();
         const students = parent ? getParentLinkedStudents(parent.id) : getChildrenForParent();
         const ids = new Set(students.map(s => s.id));
-        return state.sessions.filter(s => s.studentIds.some(id => ids.has(id)));
+        return state.sessions
+          .filter(s => s.studentIds.some(id => ids.has(id)))
+          .filter(s => {
+            const inv = s.invoiceId ? getInvoiceById(s.invoiceId) : null;
+            return !!(inv && inv.paid && !isInvoiceVoid(inv));
+          });
       }
       if (studentMode) {
         const student = getStudentProfileBySession();
-        if (student) return state.sessions.filter(s => s.studentIds.includes(student.id));
+        if (student) {
+          return state.sessions
+            .filter(s => s.studentIds.includes(student.id))
+            .filter(s => {
+              const inv = s.invoiceId ? getInvoiceById(s.invoiceId) : null;
+              return !!(inv && inv.paid && !isInvoiceVoid(inv));
+            });
+        }
       }
       return state.sessions;
     }
@@ -8711,7 +8975,7 @@
         day.setDate(day.getDate() + i);
         const isoDate = toDateOnly(day);
         const sessions = scheduleSessions.filter(s => s.date === isoDate);
-        const totalHours = sessions.reduce((acc, s) => acc + Number(s.durationHours || 0), 0);
+        const totalHours = sessions.filter(s => !isSessionVoided(s)).reduce((acc, s) => acc + Number(s.durationHours || 0), 0);
         const dayName = getDayShortLabel(i);
         dayLoads.push({ totalHours, dayName });
         const busyEntry = getBusyDay(isoDate);
@@ -8743,14 +9007,27 @@
               ? 'text-emerald-700'
               : 'text-rose-700';
           const names = esc(s.studentIds.map(id => getStudentById(id)?.name || t('common.unknown')).join(', '));
-          const completedClass = s.completed ? 'completed' : '';
+          const status = getSessionStatus(s);
+          const statusClass = status === SESSION_STATUS.COMPLETE
+            ? 'completed'
+            : status === SESSION_STATUS.PENDING_REVIEW
+              ? 'pending-review'
+              : status === SESSION_STATUS.VOIDED
+                ? 'voided'
+                : status === SESSION_STATUS.NO_SHOW_CHARGEABLE
+                  ? 'no-show-chargeable'
+                  : '';
           const modeLabel = isOnlineSession(s) ? t('schedule.online') : t('schedule.in_person');
           const modeClass = isOnlineSession(s) ? 'session-chip-online' : 'session-chip-inperson';
-          const attendedChip = (!s.completed && s.attended) ? `<span class="session-chip session-chip-attended">${esc(t('schedule.attended'))}</span>` : '';
-          const completedChip = s.completed ? `<span class="session-chip session-chip-completed">${esc(t('schedule.completed'))}</span>` : '';
+          const attendedChip = (status !== SESSION_STATUS.COMPLETE && s.attended) ? `<span class="session-chip session-chip-attended">${esc(t('schedule.attended'))}</span>` : '';
+          const completedChip = status === SESSION_STATUS.COMPLETE ? `<span class="session-chip session-chip-completed">${esc(t('schedule.completed'))}</span>` : '';
+          const restoredChip = status === SESSION_STATUS.RESTORED ? `<span class="session-chip session-chip-restored">${esc(t('schedule.restored'))}</span>` : '';
+          const pendingChip = status === SESSION_STATUS.PENDING_REVIEW ? `<span class="session-chip session-chip-pending-review">${esc(t('schedule.pending_review'))}</span>` : '';
+          const voidedChip = status === SESSION_STATUS.VOIDED ? `<span class="session-chip session-chip-voided">${esc(t('schedule.voided'))}</span>` : '';
+          const noShowChip = status === SESSION_STATUS.NO_SHOW_CHARGEABLE ? `<span class="session-chip session-chip-no-show">${esc(t('schedule.no_show_chargeable'))}</span>` : '';
           const busyChip = isBusy ? `<span class="session-chip session-chip-busy">${esc(t('schedule.busy_date'))}</span>` : '';
           const safeSessionId = cleanId(s.id);
-          return `<div class="session-card ${completedClass} cursor-pointer" onclick="openSessionQuickActions('${safeSessionId}')">
+          return `<div class="session-card ${statusClass} cursor-pointer" onclick="openSessionQuickActions('${safeSessionId}')">
                             <div class="flex items-center justify-between">
                               <span class="session-time ${subjectClass}">${esc(s.startTime || '')}</span>
                               <span class="text-[10px] text-slate-500">${esc(s.durationHours ? `${Number(s.durationHours).toFixed(1)}h` : '')}</span>
@@ -8760,6 +9037,10 @@
                             <div class="session-chip-row session-chip-row-center mt-1">
                               ${attendedChip}
                               ${completedChip}
+                              ${restoredChip}
+                              ${pendingChip}
+                              ${voidedChip}
+                              ${noShowChip}
                               ${busyChip}
                               <span class="session-chip ${modeClass}">${esc(modeLabel)}</span>
                               <span class="session-chip ${subjectClass}">${esc(s.subject)}</span>
@@ -8809,14 +9090,27 @@
       } else {
         todayList.innerHTML = todaySessions.map(s => {
           const names = esc(s.studentIds.map(id => getStudentById(id)?.name || t('common.unknown')).join(', '));
-          const completedClass = s.completed ? 'completed' : '';
+          const status = getSessionStatus(s);
+          const statusClass = status === SESSION_STATUS.COMPLETE
+            ? 'completed'
+            : status === SESSION_STATUS.PENDING_REVIEW
+              ? 'pending-review'
+              : status === SESSION_STATUS.VOIDED
+                ? 'voided'
+                : status === SESSION_STATUS.NO_SHOW_CHARGEABLE
+                  ? 'no-show-chargeable'
+                  : '';
           const modeLabel = isOnlineSession(s) ? t('schedule.online') : t('schedule.in_person');
           const modeClass = isOnlineSession(s) ? 'session-chip-online' : 'session-chip-inperson';
-          const attendedChip = (!s.completed && s.attended) ? `<span class="session-chip session-chip-attended">${esc(t('schedule.attended'))}</span>` : '';
-          const completedChip = s.completed ? `<span class="session-chip session-chip-completed">${esc(t('schedule.completed'))}</span>` : '';
+          const attendedChip = (status !== SESSION_STATUS.COMPLETE && s.attended) ? `<span class="session-chip session-chip-attended">${esc(t('schedule.attended'))}</span>` : '';
+          const completedChip = status === SESSION_STATUS.COMPLETE ? `<span class="session-chip session-chip-completed">${esc(t('schedule.completed'))}</span>` : '';
+          const restoredChip = status === SESSION_STATUS.RESTORED ? `<span class="session-chip session-chip-restored">${esc(t('schedule.restored'))}</span>` : '';
+          const pendingChip = status === SESSION_STATUS.PENDING_REVIEW ? `<span class="session-chip session-chip-pending-review">${esc(t('schedule.pending_review'))}</span>` : '';
+          const voidedChip = status === SESSION_STATUS.VOIDED ? `<span class="session-chip session-chip-voided">${esc(t('schedule.voided'))}</span>` : '';
+          const noShowChip = status === SESSION_STATUS.NO_SHOW_CHARGEABLE ? `<span class="session-chip session-chip-no-show">${esc(t('schedule.no_show_chargeable'))}</span>` : '';
           const busyChip = isBusyDate(s.date) ? `<span class="session-chip session-chip-busy">${esc(t('schedule.busy_date'))}</span>` : '';
           const safeSessionId = cleanId(s.id);
-          return `<li class="session-card ${completedClass}">
+          return `<li class="session-card ${statusClass}">
             <div class="flex items-center justify-between">
               <div class="text-[10px] uppercase tracking-wide text-slate-500">${esc(s.subject)}</div>
               <div class="session-time">${esc(s.startTime || '')}</div>
@@ -8826,6 +9120,10 @@
             <div class="session-chip-row mt-1">
               ${attendedChip}
               ${completedChip}
+              ${restoredChip}
+              ${pendingChip}
+              ${voidedChip}
+              ${noShowChip}
               ${busyChip}
               <span class="session-chip ${modeClass}">${esc(modeLabel)}</span>
             </div>
@@ -8972,27 +9270,28 @@
     }
 
     function computeInvoiceBaseFromSessions(sessions, student) {
-      const rate = Number(student?.rate || 0);
       const baseAmount = Number(sessions.reduce((sum, s) => {
-        const hours = Number(s.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1);
-        return sum + rate * hours;
+        return sum + getSessionBillableAmount(s, student);
       }, 0).toFixed(2));
       return { numSessions: sessions.length, baseAmount };
     }
 
     function getMonthlyInvoiceBillables(inv, student) {
-      const prefs = getSchedulePrefs(student);
       const serviceStartStr = inv.servicePeriodStart || inv.service_period_start || '';
       const serviceEndStr = inv.servicePeriodEnd || inv.service_period_end || '';
+      const sessionsInRange = state.sessions
+        .filter(s => (s.studentIds || []).length === 1 && s.studentIds[0] === student.id)
+        .filter(s => !!s.date && isDateWithinRange(s.date, serviceStartStr, serviceEndStr))
+        .filter(s => !s.invoiceId || s.invoiceId === inv.id);
+      const billable = sessionsInRange.filter(s => !isSessionVoided(s));
+      if (billable.length) {
+        return computeInvoiceBaseFromSessions(billable, student);
+      }
+      // Fallback for legacy states where sessions have not been created yet.
+      const prefs = getSchedulePrefs(student);
       const serviceStart = parseDateOnly(serviceStartStr);
       const serviceEnd = parseDateOnly(serviceEndStr);
-      const linkedSessions = getLinkedInvoiceSessions(inv, student.id, serviceStartStr, serviceEndStr);
-      if (linkedSessions.length) {
-        return computeInvoiceBaseFromSessions(linkedSessions, student);
-      }
-      if (!prefs.scheduleSlots.length || !serviceStart || !serviceEnd) {
-        return { numSessions: 0, baseAmount: 0 };
-      }
+      if (!prefs.scheduleSlots.length || !serviceStart || !serviceEnd) return { numSessions: 0, baseAmount: 0 };
       const occurrences = listScheduleOccurrences(prefs.scheduleSlots, serviceStart, serviceEnd);
       const numSessions = occurrences.length;
       const baseAmount = Number(occurrences.reduce((sum, occ) => {
@@ -9003,66 +9302,36 @@
       return { numSessions, baseAmount };
     }
 
-    function linkUnbilledSessionsToMonthlyInvoice(inv, student) {
+    function syncMonthlyInvoiceSessionLinks(inv, student) {
       if ((inv.invoiceType || inv.invoice_type) !== 'monthly' || isInvoiceVoid(inv)) return false;
       const startStr = inv.servicePeriodStart || inv.service_period_start || '';
       const endStr = inv.servicePeriodEnd || inv.service_period_end || '';
+      if (!startStr || !endStr) return false;
+      const locked = isInvoiceLocked(inv);
       let changed = false;
       state.sessions.forEach(s => {
-        if (s.invoiceId) return;
         if (!s.studentIds || s.studentIds.length !== 1) return;
         if (s.studentIds[0] !== student.id) return;
         if (!s.date) return;
-        if (!isDateWithinRange(s.date, startStr, endStr)) return;
-        s.invoiceId = inv.id;
-        changed = true;
+        const inRange = isDateWithinRange(s.date, startStr, endStr);
+        if (inRange) {
+          if (!s.invoiceId) {
+            s.invoiceId = inv.id;
+            changed = true;
+          }
+          return;
+        }
+        if (!locked && s.invoiceId === inv.id) {
+          s.invoiceId = '';
+          changed = true;
+        }
       });
       return changed;
     }
 
     function seedUnpaidInvoiceSessions(inv, student) {
-      if ((inv.invoiceType || inv.invoice_type) !== 'monthly') return false;
-      if (!inv.autoGenerated || inv.paid || isInvoiceVoid(inv)) return false;
-      const serviceStartStr = inv.servicePeriodStart || inv.service_period_start || '';
-      const serviceEndStr = inv.servicePeriodEnd || inv.service_period_end || '';
-      const serviceStart = parseDateOnly(serviceStartStr);
-      const serviceEnd = parseDateOnly(serviceEndStr);
-      if (!serviceStart || !serviceEnd) return false;
-      const linked = getLinkedInvoiceSessions(inv, student.id, serviceStartStr, serviceEndStr);
-      if (linked.length) return false;
-      const prefs = getSchedulePrefs(student);
-      if (!prefs.scheduleSlots.length) return false;
-      const occurrences = listScheduleOccurrences(prefs.scheduleSlots, serviceStart, serviceEnd);
-      if (!occurrences.length) return false;
-      let changed = false;
-      occurrences.forEach(occ => {
-        const slot = occ.slot;
-        const slotTime = normalizeTimeValue(slot.startTime || '');
-        if (!slotTime) return;
-        const durationHours = Number(slot.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1);
-        if (isCancelledOccurrence(student.id, occ.date, slotTime, durationHours)) {
-          return;
-        }
-        state.sessions.push({
-          id: generateId('sess'),
-          studentIds: [student.id],
-          date: occ.date,
-          startTime: slotTime,
-          durationHours,
-          subject: student.subjects?.[0] || 'Tutoring',
-          topic: 'Auto-scheduled session',
-          notes: '',
-          attended: false,
-          completed: false,
-          invoiceId: inv.id,
-          sessionMode: getSlotSessionMode(slot, 'in_person'),
-          meetingProvider: getSlotSessionMode(slot, 'in_person') === 'online' ? 'JaaS' : '',
-          meetingRoom: '',
-          meetingStatus: getSlotSessionMode(slot, 'in_person') === 'online' ? 'scheduled' : ''
-        });
-        changed = true;
-      });
-      return changed;
+      // Deprecated: sessions are scheduled independently of invoices.
+      return false;
     }
 
     function ensureMonthlyInvoiceForPeriod(student, periodStartDate, today) {
@@ -9103,20 +9372,29 @@
           changed = true;
         }
 
-        if (!existing.paid && existing.autoGenerated) {
+        if (!existing.paid) {
           if (recalculateMonthlyInvoice(existing, student, today)) changed = true;
         }
         return changed;
       }
 
-      const occurrences = listScheduleOccurrences(prefs.scheduleSlots, parseDateOnly(serviceStart), parseDateOnly(serviceEnd));
-      const numSessions = occurrences.length;
-      if (!numSessions) return false;
-      const baseAmount = Number(occurrences.reduce((sum, occ) => {
-        const rate = Number(student.rate || 0);
-        const hours = Number(occ.slot.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1);
-        return sum + rate * hours;
-      }, 0).toFixed(2));
+      const sessionsInRange = state.sessions
+        .filter(s => (s.studentIds || []).length === 1 && s.studentIds[0] === student.id)
+        .filter(s => !!s.date && isDateWithinRange(s.date, serviceStart, serviceEnd));
+      const billableSessions = sessionsInRange.filter(s => !isSessionVoided(s));
+      let { numSessions, baseAmount } = billableSessions.length
+        ? computeInvoiceBaseFromSessions(billableSessions, student)
+        : { numSessions: 0, baseAmount: 0 };
+      if (!numSessions) {
+        const occurrences = listScheduleOccurrences(prefs.scheduleSlots, parseDateOnly(serviceStart), parseDateOnly(serviceEnd));
+        numSessions = occurrences.length;
+        if (!numSessions) return false;
+        baseAmount = Number(occurrences.reduce((sum, occ) => {
+          const rate = Number(student.rate || 0);
+          const hours = Number(occ.slot.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1);
+          return sum + rate * hours;
+        }, 0).toFixed(2));
+      }
       const inv = {
         id: generateInvoiceIdForPeriod(student.id, serviceStart),
         studentId: student.id,
@@ -9178,75 +9456,191 @@
     }
 
     function scheduleSessionsForInvoice(inv, student, today) {
-      if ((inv.invoiceType || inv.invoice_type) !== 'monthly' || !inv.paid || isInvoiceVoid(inv)) return false;
+      // Deprecated: sessions are scheduled independently of invoices.
+      return false;
+    }
+
+    function getAutoScheduleWindow(today) {
+      // Schedule from the start of the current month so missed/unpaid sessions can still be rescheduled.
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      start.setHours(0, 0, 0, 0);
+      const nextMonthStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+      const end = endOfMonth(nextMonthStart);
+      end.setHours(0, 0, 0, 0);
+      return { start, end };
+    }
+
+    function ensureScheduledSessionsForStudent(student, windowStart, windowEnd) {
       const prefs = getSchedulePrefs(student);
-      if (!prefs.scheduleSlots.length) return false;
-      const serviceStart = parseDateOnly(inv.servicePeriodStart || inv.service_period_start);
-      const serviceEnd = parseDateOnly(inv.servicePeriodEnd || inv.service_period_end);
-      if (!serviceStart || !serviceEnd) return false;
-      const linked = getLinkedInvoiceSessions(inv, student.id, inv.servicePeriodStart || inv.service_period_start || '', inv.servicePeriodEnd || inv.service_period_end || '');
-      if (linked.length) {
-        return false;
-      }
-      const paidAtDate = parseDateOnly(inv.paidAt) || today;
-      const scheduleStart = maxDate(serviceStart, paidAtDate);
-      const occurrences = listScheduleOccurrences(prefs.scheduleSlots, scheduleStart, serviceEnd);
-      let changed = false;
+      if (!student?.contractSigned || !prefs.scheduleSlots.length) return false;
+      const anchor = getScheduleAnchorDate(student);
+      const start = maxDate(anchor, windowStart);
+      const occurrences = listScheduleOccurrences(prefs.scheduleSlots, start, windowEnd);
+      if (!occurrences.length) return false;
+
+      const existingKeys = new Set();
+      state.sessions.forEach(s => {
+        if (!s?.date) return;
+        if (!s.studentIds || s.studentIds.length !== 1) return;
+        if (s.studentIds[0] !== student.id) return;
+        const key = `${s.date}|${normalizeTimeValue(s.startTime || '')}`;
+        existingKeys.add(key);
+      });
+
+      let added = 0;
       occurrences.forEach(occ => {
-        const dateStr = occ.date;
-        const slot = occ.slot;
+        const slot = occ.slot || {};
         const slotTime = normalizeTimeValue(slot.startTime || '');
+        if (!slotTime) return;
         const durationHours = Number(slot.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1);
+        const key = `${occ.date}|${slotTime}`;
+        if (existingKeys.has(key)) return;
+        if (isBusyDate(occ.date)) return;
+        if (isCancelledOccurrence(student.id, occ.date, slotTime, durationHours)) return;
+
         const sessionMode = getSlotSessionMode(slot, 'in_person');
-        const existing = state.sessions.filter(s =>
-          s.studentIds.includes(student.id) &&
-          s.date === dateStr &&
-          normalizeTimeValue(s.startTime || '') === slotTime
-        );
-        if (existing.length) {
-          existing.forEach(s => {
-            if (!s.invoiceId) {
-              s.invoiceId = inv.id;
-              changed = true;
-            }
-          });
-          return;
-        }
-        if (isCancelledOccurrence(student.id, dateStr, slotTime, durationHours)) {
-          return;
-        }
         state.sessions.push({
           id: generateId('sess'),
           studentIds: [student.id],
-          date: dateStr,
+          date: occ.date,
           startTime: slotTime,
           durationHours,
           subject: student.subjects?.[0] || 'Tutoring',
-          topic: 'Auto-scheduled session',
+          topic: 'Scheduled session',
           notes: '',
           attended: false,
           completed: false,
-          invoiceId: inv.id,
+          status: SESSION_STATUS.SCHEDULED,
+          absenceReason: '',
+          pendingReviewStartedAt: '',
+          billingRate: Number(student.rate || 0) || null,
+          invoiceId: '',
           sessionMode,
           meetingProvider: sessionMode === 'online' ? 'JaaS' : '',
           meetingRoom: '',
-          meetingStatus: sessionMode === 'online' ? 'scheduled' : ''
+          meetingStatus: sessionMode === 'online' ? 'scheduled' : '',
+          meetingStartedAt: '',
+          meetingEndedAt: ''
         });
-        changed = true;
+        existingKeys.add(key);
+        added++;
       });
-      if (inv.paid && !inv.paidAt) {
-        inv.paidAt = new Date().toISOString();
+
+      if (added) {
+        logActivity('Auto-scheduled sessions', `${student.name} (+${added})`);
+      }
+      return added > 0;
+    }
+
+    function refreshAutoSchedule(today) {
+      const { start, end } = getAutoScheduleWindow(today);
+      let changed = false;
+      state.students.forEach(student => {
+        if (ensureScheduledSessionsForStudent(student, start, end)) changed = true;
+      });
+      return changed;
+    }
+
+    function refreshSessionOutcomes(now = new Date()) {
+      const graceHours = Number(state.settings.pendingReviewGraceHours || 24) || 24;
+      const graceMs = graceHours * 60 * 60 * 1000;
+      let changed = false;
+      state.sessions.forEach(sess => {
+        if (!sess?.date) return;
+        if (!hasSessionEnded(sess, now)) return;
+
+        const status = getSessionStatus(sess);
+        const absenceReason = String(sess.absenceReason || sess.absence_reason || '').trim().toLowerCase();
+
+        if (sess.attended) {
+          if (status !== SESSION_STATUS.COMPLETE) {
+            sess.status = SESSION_STATUS.COMPLETE;
+            sess.completed = true;
+            sess.attended = true;
+            sess.pendingReviewStartedAt = '';
+            changed = true;
+            logActivity('Auto-completed session', `${sess.date} ${sess.startTime || ''}`);
+          }
+          return;
+        }
+
+        // If the outcome is already known and always non-billable, void immediately (no grace).
+        const immediateVoid = absenceReason === SESSION_ABSENCE_REASONS.TUTOR_ABSENT ||
+          absenceReason === SESSION_ABSENCE_REASONS.CANCELLED_IN_TIME ||
+          absenceReason === SESSION_ABSENCE_REASONS.ADMIN_VOID;
+        if (immediateVoid && status !== SESSION_STATUS.VOIDED) {
+          sess.status = SESSION_STATUS.VOIDED;
+          sess.completed = false;
+          sess.attended = false;
+          sess.pendingReviewStartedAt = '';
+          changed = true;
+          const inv = sess.invoiceId ? getInvoiceById(sess.invoiceId) : null;
+          if (inv && isInvoiceLocked(inv)) {
+            if ((sess.studentIds || []).length === 1) {
+              const student = getStudentById(sess.studentIds[0]) || getStudentById(inv.studentId);
+              if (student) {
+                if (!(Number(sess.billingRate ?? sess.billing_rate ?? 0) > 0) && Number(student.rate || 0) > 0) {
+                  sess.billingRate = Number(student.rate || 0);
+                }
+                createVoidedSessionCreditNote(sess, student, inv.id);
+              }
+            }
+            logActivity('Voided session after payment', `${sess.date} ${sess.startTime || ''} (credit may be owed)`);
+          } else {
+            logActivity('Voided session', `${sess.date} ${sess.startTime || ''}`);
+          }
+          return;
+        }
+
+        // Not attended: give a grace period before voiding/charging.
+        if (status === SESSION_STATUS.SCHEDULED || status === SESSION_STATUS.RESTORED) {
+          sess.status = SESSION_STATUS.PENDING_REVIEW;
+          sess.completed = false;
+          if (!sess.pendingReviewStartedAt) sess.pendingReviewStartedAt = now.toISOString();
+          changed = true;
+          logActivity('Session pending review', `${sess.date} ${sess.startTime || ''}`);
+          return;
+        }
+
+        if (status !== SESSION_STATUS.PENDING_REVIEW) return;
+
+        const startAt = sess.pendingReviewStartedAt ? new Date(sess.pendingReviewStartedAt) : (getSessionEndAt(sess) || now);
+        const deadline = new Date(startAt.getTime() + graceMs);
+        if (now < deadline) return;
+
+        const chargeableNoShow = absenceReason === SESSION_ABSENCE_REASONS.STUDENT_NO_SHOW && !!state.settings.policyChargeableNoShow;
+        const chargeableLateCancel = absenceReason === SESSION_ABSENCE_REASONS.CANCELLED_LATE && !!state.settings.policyChargeableLateCancel;
+        const forceVoid = absenceReason === SESSION_ABSENCE_REASONS.TUTOR_ABSENT ||
+          absenceReason === SESSION_ABSENCE_REASONS.CANCELLED_IN_TIME ||
+          absenceReason === SESSION_ABSENCE_REASONS.ADMIN_VOID;
+
+        const nextStatus = (chargeableNoShow || chargeableLateCancel) && !forceVoid
+          ? SESSION_STATUS.NO_SHOW_CHARGEABLE
+          : SESSION_STATUS.VOIDED;
+
+        if (nextStatus === status) return;
+
+        sess.status = nextStatus;
+        sess.completed = false;
+        sess.attended = false;
         changed = true;
-      }
-      if (inv.paid && !inv.paymentMethod) {
-        const providerLower = String(inv.paymentProvider || '').toLowerCase();
-        if (providerLower === 'cash') inv.paymentMethod = 'cash';
-        else if (providerLower === 'payfast' || inv.paymentProviderId) inv.paymentMethod = 'online';
-      }
-      if (inv.paid && !inv.paymentProvider && inv.paymentMethod === 'online') {
-        inv.paymentProvider = PAYFAST_PROVIDER;
-        changed = true;
-      }
+
+        const inv = sess.invoiceId ? getInvoiceById(sess.invoiceId) : null;
+        if (nextStatus === SESSION_STATUS.VOIDED && inv && isInvoiceLocked(inv)) {
+          if ((sess.studentIds || []).length === 1) {
+            const student = getStudentById(sess.studentIds[0]) || getStudentById(inv.studentId);
+            if (student) {
+              if (!(Number(sess.billingRate ?? sess.billing_rate ?? 0) > 0) && Number(student.rate || 0) > 0) {
+                sess.billingRate = Number(student.rate || 0);
+              }
+              createVoidedSessionCreditNote(sess, student, inv.id);
+            }
+          }
+          logActivity('Voided session after payment', `${sess.date} ${sess.startTime || ''} (credit may be owed)`);
+        } else {
+          logActivity(nextStatus === SESSION_STATUS.VOIDED ? 'Auto-voided session' : 'Auto-charged no-show', `${sess.date} ${sess.startTime || ''}`);
+        }
+      });
       return changed;
     }
 
@@ -9255,6 +9649,8 @@
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       let changed = false;
+      if (refreshAutoSchedule(today)) changed = true;
+      if (refreshSessionOutcomes(new Date())) changed = true;
       state.students.forEach(student => {
         if (ensureMonthlyInvoiceForStudent(student, today)) changed = true;
       });
@@ -9262,14 +9658,10 @@
         const student = getStudentById(inv.studentId);
         if (!student) return;
         if ((inv.invoiceType || inv.invoice_type) === 'monthly' && !isInvoiceVoid(inv)) {
-          if (linkUnbilledSessionsToMonthlyInvoice(inv, student)) changed = true;
+          if (syncMonthlyInvoiceSessionLinks(inv, student)) changed = true;
         }
-        if ((inv.invoiceType || inv.invoice_type) === 'monthly' && inv.autoGenerated && !inv.paid && !isInvoiceVoid(inv)) {
-          if (seedUnpaidInvoiceSessions(inv, student)) changed = true;
+        if ((inv.invoiceType || inv.invoice_type) === 'monthly' && !inv.paid && !isInvoiceVoid(inv)) {
           if (recalculateMonthlyInvoice(inv, student, today)) changed = true;
-        }
-        if ((inv.invoiceType || inv.invoice_type) === 'monthly' && inv.paid && !isInvoiceVoid(inv)) {
-          if (scheduleSessionsForInvoice(inv, student, today)) changed = true;
         }
       });
       if (applyPaidMoveInvoices()) changed = true;
@@ -9351,6 +9743,67 @@
           cancelledAt: nowIso
         });
       });
+    }
+
+    function findVoidedSessionCreditNote(studentId, sessionId) {
+      if (!studentId || !sessionId) return null;
+      return state.invoices.find(inv => {
+        if (inv.studentId !== studentId) return false;
+        if ((inv.invoiceType || inv.invoice_type) !== 'refund') return false;
+        if (isInvoiceVoid(inv)) return false;
+        const reason = inv.adjustmentReason || inv.adjustment_reason || '';
+        if (reason !== 'voided_credit') return false;
+        const related = inv.relatedSessionId || inv.related_session_id || '';
+        return related === sessionId;
+      }) || null;
+    }
+
+    function createVoidedSessionCreditNote(sess, student, paidInvoiceId = '') {
+      if (!sess || !student?.id) return null;
+      const existing = findVoidedSessionCreditNote(student.id, sess.id);
+      if (existing) return existing;
+      const nowStr = toDateOnly(new Date());
+      const amount = getSessionBillableAmount(sess, student);
+      if (!(amount > 0.009)) return null;
+      const baseAmount = Number((-Math.abs(amount)).toFixed(2));
+      const noteBits = [
+        `Credit note for voided session on ${sess.date} ${sess.startTime || ''}.`,
+        paidInvoiceId ? `Original invoice: ${paidInvoiceId}.` : ''
+      ].filter(Boolean).join(' ');
+      const inv = {
+        id: generateId('inv'),
+        studentId: student.id,
+        issueDate: nowStr,
+        dueDate: nowStr,
+        baseAmount,
+        total: baseAmount,
+        lateFeePercent: 0,
+        shortNoticePercent: 0,
+        lateApplied: false,
+        shortApplied: false,
+        paid: false,
+        notes: noteBits,
+        servicePeriodStart: sess.date,
+        servicePeriodEnd: sess.date,
+        numSessions: 1,
+        invoiceType: 'refund',
+        autoGenerated: true,
+        paidAt: '',
+        paymentProvider: '',
+        paymentMethod: '',
+        invoiceStatus: 'issued',
+        voidedAt: '',
+        adjustmentReason: 'voided_credit',
+        relatedSessionId: sess.id,
+        moveToDate: '',
+        moveToTime: '',
+        moveToDurationHours: 0,
+        moveRequestedAt: '',
+        moveAppliedAt: ''
+      };
+      state.invoices.push(inv);
+      logActivity('Created credit note', inv.id);
+      return inv;
     }
 
     function createLateChangeInvoices(sess, actionLabel, movePayload = null) {
@@ -9617,7 +10070,6 @@
     }
 
     function guardSessionCreation(studentIds, dateStr, opts = {}) {
-      const allowUnpaidInvoice = !!opts.allowUnpaidInvoice;
       if (!studentIds.length) {
         alert(t('alert.select_student_at_least_one'));
         return false;
@@ -9628,18 +10080,12 @@
           alert(t('alert.contract_must_signed'));
           return false;
         }
-        if (!allowUnpaidInvoice && !hasPaidInvoiceForDate(sid, dateStr)) {
-          alert(t('alert.no_paid_invoice_for_session'));
-          return false;
-        }
       }
       return true;
     }
 
     function guardSessionCompletion(sess) {
-      if (!sess.invoiceId) return false;
-      const inv = state.invoices.find(i => i.id === sess.invoiceId);
-      return !!(inv && inv.paid);
+      return true;
     }
 
     function downloadIcsFile() {
@@ -9681,18 +10127,30 @@
       if (!sess) return;
       const names = esc(sess.studentIds.map(id => getStudentById(id)?.name || 'Unknown').join(', '));
       const modeLabel = esc(getSessionModeLabel(sess.sessionMode ?? sess.session_mode ?? sess.mode));
+      const status = getSessionStatus(sess);
+      const statusLabel = status === SESSION_STATUS.COMPLETE
+        ? t('schedule.completed')
+        : status === SESSION_STATUS.PENDING_REVIEW
+          ? t('schedule.pending_review')
+          : status === SESSION_STATUS.VOIDED
+            ? t('schedule.voided')
+            : status === SESSION_STATUS.NO_SHOW_CHARGEABLE
+              ? t('schedule.no_show_chargeable')
+              : status === SESSION_STATUS.RESTORED
+                ? t('schedule.restored')
+                : t('schedule.scheduled');
       const safeSessionId = cleanId(sess.id);
       const joinBtn = (!parentMode && canJoinMeetingNow(sess))
         ? `<button id="sessionJoinBtn" class="w-full px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium">${esc(t('meeting.join_online_session'))}</button>`
         : '';
       const attended = !!sess.attended;
-      const completed = !!sess.completed;
-      const attendedLabel = attended || completed ? t('sessions.attended') : t('sessions.mark_attended');
-      const completedLabel = completed ? t('sessions.completed') : t('sessions.mark_complete');
-      const attendedDisabled = attended || completed;
+      const isComplete = status === SESSION_STATUS.COMPLETE;
+      const attendedLabel = attended || isComplete ? t('sessions.attended') : t('sessions.mark_attended');
+      const completedLabel = isComplete ? t('sessions.completed') : t('sessions.mark_complete');
+      const attendedDisabled = attended || isComplete || status === SESSION_STATUS.VOIDED;
       openModal(`
         <h2 class="text-sm font-semibold mb-2">${esc(t('sessions.quick_title', { names }))}</h2>
-        <p class="text-[11px] mb-2">${esc(sess.subject)} • ${esc(sess.date)} • ${esc(sess.startTime || '')} (${esc(sess.durationHours || 1)}h) • ${modeLabel}</p>
+        <p class="text-[11px] mb-2">${esc(sess.subject)} • ${esc(sess.date)} • ${esc(sess.startTime || '')} (${esc(sess.durationHours || 1)}h) • ${modeLabel} • ${esc(statusLabel)}</p>
         <p class="text-[11px] mb-3">${esc(sess.topic || '')}</p>
 
         <div class="space-y-2">
@@ -9700,7 +10158,7 @@
           <button id="sessionMarkAttendedBtn" class="w-full px-3 py-1.5 rounded-xl border border-amber-300 text-amber-800 text-xs font-medium ${attendedDisabled ? 'opacity-60 cursor-not-allowed' : ''}" data-owner-only ${attendedDisabled ? 'disabled' : ''}>
             ${esc(attendedLabel)}
           </button>
-          <button id="sessionMarkCompletedBtn" class="w-full px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-medium ${completed ? 'opacity-60 cursor-not-allowed' : ''}" data-owner-only ${completed ? 'disabled' : ''}>
+          <button id="sessionMarkCompletedBtn" class="w-full px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-medium ${isComplete || status === SESSION_STATUS.VOIDED ? 'opacity-60 cursor-not-allowed' : ''}" data-owner-only ${isComplete || status === SESSION_STATUS.VOIDED ? 'disabled' : ''}>
             ${esc(completedLabel)}
           </button>
           <button id="sessionEditBtn" class="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs" data-owner-only>
@@ -9715,6 +10173,11 @@
           markAttendedBtn.onclick = () => {
             if (!guardEdit()) return;
             sess.attended = true;
+            if (hasSessionEnded(sess) || getSessionStatus(sess) === SESSION_STATUS.PENDING_REVIEW) {
+              sess.status = SESSION_STATUS.COMPLETE;
+              sess.completed = true;
+              sess.pendingReviewStartedAt = '';
+            }
             saveState();
             closeModal();
             renderAllViews();
@@ -9722,12 +10185,10 @@
         }
         document.getElementById('sessionMarkCompletedBtn').onclick = () => {
           if (!guardEdit()) return;
-          if (!guardSessionCompletion(sess)) {
-            alert(t('alert.cannot_complete_unpaid_invoice'));
-            return;
-          }
           sess.attended = true;
           sess.completed = true;
+          sess.status = SESSION_STATUS.COMPLETE;
+          sess.pendingReviewStartedAt = '';
           saveState();
           closeModal();
           renderAllViews();
@@ -10223,7 +10684,7 @@
           let balance = 0;
           let unpaidCount = 0;
           invs.forEach(inv => {
-            if (!inv.paid && !isInvoiceVoid(inv)) {
+            if (invoiceRequiresPayment(inv)) {
               balance += Number(inv.total || 0);
               unpaidCount++;
             }
@@ -10240,7 +10701,7 @@
 
       const overdueList = document.getElementById('overdueInvoicesList');
       const today = new Date();
-      const overdue = state.invoices.filter(inv => !inv.paid && !isInvoiceVoid(inv) && inv.dueDate && new Date(inv.dueDate) < today)
+      const overdue = state.invoices.filter(inv => invoiceRequiresPayment(inv) && inv.dueDate && new Date(inv.dueDate) < today)
         .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
 
       if (!overdue.length) {
@@ -10283,7 +10744,7 @@
 
       const unbilledList = document.getElementById('unbilledList');
       if (unbilledList) {
-        const unbilledSessions = state.sessions.filter(sess => !sess.invoiceId);
+        const unbilledSessions = state.sessions.filter(sess => !sess.invoiceId && !isSessionVoided(sess));
         const grouped = {};
         unbilledSessions.forEach(sess => {
           (sess.studentIds || []).forEach(sid => {
@@ -10294,7 +10755,7 @@
         const unbilled = Object.entries(grouped).map(([sid, sessList]) => {
           const student = getStudentById(sid);
           const hours = sessList.reduce((acc, s) => acc + Number(s.durationHours || 0), 0);
-          const amount = hours * (Number(student?.rate) || 0);
+          const amount = sessList.reduce((sum, s) => sum + getSessionBillableAmount(s, student), 0);
           const lastDate = sessList.length ? sessList.sort((a, b) => new Date(b.date) - new Date(a.date))[0].date : 'n/a';
           return { student, hours, amount, lastDate };
         }).filter(item => item.student)
@@ -10320,9 +10781,9 @@
       if (forecastList && forecastSummary) {
         const soonCutoff = new Date();
         soonCutoff.setDate(soonCutoff.getDate() + 14);
-        const overdueInvoices = state.invoices.filter(inv => !inv.paid && !isInvoiceVoid(inv) && inv.dueDate && new Date(inv.dueDate) < today);
+        const overdueInvoices = state.invoices.filter(inv => invoiceRequiresPayment(inv) && inv.dueDate && new Date(inv.dueDate) < today);
         const dueSoon = state.invoices
-          .filter(inv => !inv.paid && !isInvoiceVoid(inv) && inv.dueDate && new Date(inv.dueDate) >= today && new Date(inv.dueDate) <= soonCutoff)
+          .filter(inv => invoiceRequiresPayment(inv) && inv.dueDate && new Date(inv.dueDate) >= today && new Date(inv.dueDate) <= soonCutoff)
           .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
         const overdueTotal = overdueInvoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
         const dueSoonTotal = dueSoon.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
@@ -10356,8 +10817,8 @@
       const earnings = invs.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
 
       // Attendance
-      const totalSessions = state.sessions.length;
-      const completedSessions = state.sessions.filter(s => s.completed).length;
+      const totalSessions = state.sessions.filter(s => getSessionStatus(s) !== SESSION_STATUS.VOIDED).length;
+      const completedSessions = state.sessions.filter(s => getSessionStatus(s) === SESSION_STATUS.COMPLETE).length;
       const attendancePct = totalSessions ? Math.round((completedSessions / totalSessions) * 100) : 0;
 
       // Homework completion
@@ -10373,11 +10834,12 @@
       };
       const subjectHours = { Physics: 0, Chemistry: 0, Maths: 0 };
       state.sessions.forEach(s => {
+        if (getSessionStatus(s) === SESSION_STATUS.VOIDED) return;
         if (subjectHours[s.subject] != null) subjectHours[s.subject] += Number(s.durationHours || 0);
       });
 
       // Unpaid invoices
-      const unpaid = state.invoices.filter(inv => !inv.paid && !isInvoiceVoid(inv))
+      const unpaid = state.invoices.filter(inv => invoiceRequiresPayment(inv))
         .sort((a, b) => new Date(a.dueDate || 0) - new Date(b.dueDate || 0));
 
       const reportEarnings = document.getElementById('repEarningsMonth');
@@ -10436,7 +10898,6 @@
         inv.paymentProvider = 'Cash';
         inv.paymentMethod = 'cash';
         inv.invoiceStatus = 'paid';
-        if (student) scheduleSessionsForInvoice(inv, student, new Date());
         applyPaidMoveInvoices();
       }
       saveState();
@@ -10883,6 +11344,40 @@
             <label class="block text-[11px] mb-1">${esc(t('common.notes'))}</label>
             <textarea name="notes" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${esc(session?.notes || '')}</textarea>
           </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] mb-1">${esc(t('sessions.status_label'))}</label>
+              <select name="sessionStatus" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+                <option value="${SESSION_STATUS.SCHEDULED}">${esc(t('sessions.status_scheduled'))}</option>
+                <option value="${SESSION_STATUS.RESTORED}">${esc(t('sessions.status_restored'))}</option>
+                <option value="${SESSION_STATUS.COMPLETE}">${esc(t('sessions.status_complete'))}</option>
+                <option value="${SESSION_STATUS.PENDING_REVIEW}">${esc(t('sessions.status_pending_review'))}</option>
+                <option value="${SESSION_STATUS.NO_SHOW_CHARGEABLE}">${esc(t('sessions.status_no_show_chargeable'))}</option>
+                <option value="${SESSION_STATUS.VOIDED}">${esc(t('sessions.status_voided'))}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] mb-1">${esc(t('sessions.absence_reason_label'))}</label>
+              <select name="absenceReason" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+                <option value="">${esc(t('common.none'))}</option>
+                <option value="${SESSION_ABSENCE_REASONS.STUDENT_NO_SHOW}">${esc(t('sessions.absence_student_no_show'))}</option>
+                <option value="${SESSION_ABSENCE_REASONS.TUTOR_ABSENT}">${esc(t('sessions.absence_tutor_absent'))}</option>
+                <option value="${SESSION_ABSENCE_REASONS.CANCELLED_IN_TIME}">${esc(t('sessions.absence_cancelled_in_time'))}</option>
+                <option value="${SESSION_ABSENCE_REASONS.CANCELLED_LATE}">${esc(t('sessions.absence_cancelled_late'))}</option>
+                <option value="${SESSION_ABSENCE_REASONS.ADMIN_VOID}">${esc(t('sessions.absence_admin_void'))}</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] mb-1">${esc(t('sessions.billing_rate_label'))}</label>
+              <input type="number" step="1" min="0" name="billingRate" value="${esc(session?.billingRate ?? session?.billing_rate ?? '')}"
+                     class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="0">
+            </div>
+            <div class="text-[10px] text-slate-500 flex items-end pb-1">
+              ${esc(t('sessions.billing_rate_hint'))}
+            </div>
+          </div>
           ${isEdit ? `
             <div class="rounded-lg border border-amber-200 bg-amber-50/70 p-2">
               <label class="flex items-center gap-2 text-[11px]">
@@ -10901,7 +11396,7 @@
             ${isEdit ? `
               <button type="button" id="deleteSessionBtn"
                 class="px-3 py-1.5 rounded-xl border border-rose-300 text-rose-700 text-xs">
-                ${esc(t('common.delete'))}
+                ${esc(t('sessions.void'))}
               </button>` : ''}
           </div>
           <div id="sessionClashWarning" class="mt-2 text-[10px] text-amber-600"></div>
@@ -10912,6 +11407,30 @@
         if (form?.sessionMode) {
           form.sessionMode.value = normalizeSessionMode(session?.sessionMode ?? session?.session_mode ?? 'in_person');
         }
+        if (form?.sessionStatus) {
+          form.sessionStatus.value = getSessionStatus(session || {});
+        }
+        if (form?.absenceReason) {
+          form.absenceReason.value = String(session?.absenceReason || session?.absence_reason || '').trim().toLowerCase();
+        }
+
+        function updateBillingRateUI() {
+          if (!form?.billingRate) return;
+          const ids = [...form.querySelectorAll('input[name="studentIds"]:checked')].map(i => i.value);
+          if (ids.length !== 1) {
+            form.billingRate.value = '';
+            form.billingRate.disabled = true;
+            return;
+          }
+          form.billingRate.disabled = false;
+          if (form.billingRate.value) return;
+          const stu = getStudentById(ids[0]);
+          const existingRate = Number(session?.billingRate ?? session?.billing_rate ?? 0);
+          const fallbackRate = Number(stu?.rate || 0);
+          const rate = existingRate > 0 ? existingRate : (fallbackRate > 0 ? fallbackRate : 0);
+          if (rate > 0) form.billingRate.value = String(rate);
+        }
+        updateBillingRateUI();
 
         function updateClashWarning() {
           const date = form.date.value;
@@ -10937,11 +11456,51 @@
           }
         }
 
+        const originalSnapshot = (isEdit && session)
+          ? {
+            date: session.date || '',
+            startTime: normalizeTimeValue(session.startTime || ''),
+            durationHours: Number(session.durationHours || 1)
+          }
+          : null;
+        const originalStatus = getSessionStatus(session || {});
+
+        function maybeAutoUpdateStatusForFuture() {
+          if (!form?.sessionStatus) return;
+          const date = form.date.value;
+          if (!date) return;
+          const startTime = normalizeTimeValue(form.startTime.value || '00:00');
+          const durationHours = Number(form.durationHours.value || 1);
+          const probe = { date, startTime, durationHours };
+          // If it's in the future, pending_review should not stick around; treat date edits as rescheduling.
+          if (hasSessionEnded(probe, new Date())) return;
+          const statusVal = normalizeSessionStatus(form.sessionStatus.value, originalStatus || SESSION_STATUS.SCHEDULED);
+          if (!originalSnapshot) {
+            if (statusVal === SESSION_STATUS.PENDING_REVIEW) form.sessionStatus.value = SESSION_STATUS.SCHEDULED;
+            return;
+          }
+          const changed = originalSnapshot.date !== date ||
+            originalSnapshot.startTime !== startTime ||
+            Number(originalSnapshot.durationHours || 0) !== Number(durationHours || 0);
+          if (!changed) return;
+          if (originalStatus === SESSION_STATUS.VOIDED && statusVal === SESSION_STATUS.VOIDED) {
+            form.sessionStatus.value = SESSION_STATUS.RESTORED;
+            return;
+          }
+          if (statusVal === SESSION_STATUS.PENDING_REVIEW) {
+            form.sessionStatus.value = SESSION_STATUS.SCHEDULED;
+            return;
+          }
+        }
+
         ['change', 'input'].forEach(ev => {
-          form.date.addEventListener(ev, updateClashWarning);
-          form.startTime.addEventListener(ev, updateClashWarning);
-          form.durationHours.addEventListener(ev, updateClashWarning);
-          form.querySelectorAll('input[name="studentIds"]').forEach(cb => cb.addEventListener(ev, updateClashWarning));
+          form.date.addEventListener(ev, () => { updateClashWarning(); maybeAutoUpdateStatusForFuture(); });
+          form.startTime.addEventListener(ev, () => { updateClashWarning(); maybeAutoUpdateStatusForFuture(); });
+          form.durationHours.addEventListener(ev, () => { updateClashWarning(); maybeAutoUpdateStatusForFuture(); });
+          form.querySelectorAll('input[name="studentIds"]').forEach(cb => cb.addEventListener(ev, () => {
+            updateClashWarning();
+            updateBillingRateUI();
+          }));
         });
         updateClashWarning();
 
@@ -10963,6 +11522,12 @@
             notes: form.notes.value.trim(),
             attended: session?.attended || false,
             completed: session?.completed || false,
+            status: normalizeSessionStatus(form.sessionStatus?.value || session?.status || '', getSessionStatus(session || {})),
+            absenceReason: String(form.absenceReason?.value || session?.absenceReason || '').trim().toLowerCase(),
+            pendingReviewStartedAt: session?.pendingReviewStartedAt || session?.pending_review_started_at || '',
+            billingRate: selectedIds.length === 1
+              ? (Number(form.billingRate?.value || session?.billingRate || session?.billing_rate || getStudentById(selectedIds[0])?.rate || 0) || null)
+              : null,
             invoiceId: session?.invoiceId || '',
             sessionMode: normalizeSessionMode(form.sessionMode?.value || session?.sessionMode || 'in_person'),
             meetingProvider: session?.meetingProvider || session?.meeting_provider || '',
@@ -10978,6 +11543,36 @@
             newSession.meetingProvider = '';
             newSession.meetingRoom = '';
             newSession.meetingStatus = '';
+          }
+
+          // Normalize status -> legacy booleans for backward compatibility.
+          const prevStatus = isEdit && session ? getSessionStatus(session) : SESSION_STATUS.SCHEDULED;
+          const nextStatus = normalizeSessionStatus(newSession.status, prevStatus || SESSION_STATUS.SCHEDULED);
+          newSession.status = nextStatus;
+          if (nextStatus === SESSION_STATUS.COMPLETE) {
+            newSession.attended = true;
+            newSession.completed = true;
+            newSession.pendingReviewStartedAt = '';
+          } else if (nextStatus === SESSION_STATUS.PENDING_REVIEW) {
+            newSession.attended = false;
+            newSession.completed = false;
+            if (!newSession.pendingReviewStartedAt) newSession.pendingReviewStartedAt = new Date().toISOString();
+          } else if (nextStatus === SESSION_STATUS.VOIDED) {
+            newSession.attended = false;
+            newSession.completed = false;
+            newSession.pendingReviewStartedAt = '';
+          } else if (nextStatus === SESSION_STATUS.NO_SHOW_CHARGEABLE) {
+            newSession.attended = false;
+            newSession.completed = false;
+            newSession.pendingReviewStartedAt = '';
+          } else {
+            newSession.completed = false;
+            if (!newSession.pendingReviewStartedAt) newSession.pendingReviewStartedAt = '';
+          }
+          // If the session is being rescheduled into the future, clear any pending-review timestamp.
+          if (!hasSessionEnded(newSession, new Date()) &&
+            (nextStatus === SESSION_STATUS.SCHEDULED || nextStatus === SESSION_STATUS.RESTORED)) {
+            newSession.pendingReviewStartedAt = '';
           }
           const existingInvoice = session?.invoiceId ? state.invoices.find(i => i.id === session.invoiceId) : null;
           const allowUnpaidReschedule = isEdit &&
@@ -11040,6 +11635,10 @@
                 subject: newSession.subject,
                 topic: newSession.topic,
                 notes: newSession.notes,
+                status: newSession.status,
+                absenceReason: newSession.absenceReason,
+                pendingReviewStartedAt: newSession.pendingReviewStartedAt,
+                billingRate: newSession.billingRate,
                 sessionMode: newSession.sessionMode,
                 meetingProvider: newSession.meetingProvider,
                 meetingRoom: newSession.meetingRoom,
@@ -11055,6 +11654,106 @@
             renderStudentsView();
             alert(t('alert.move_requested_pending_payment'));
             return;
+          }
+
+          if (isEdit && session) {
+            const next = newSession.status;
+            if (prevStatus !== next) {
+              logActivity('Session status changed', `${prevStatus} → ${next} (${newSession.date} ${newSession.startTime || ''})`);
+            }
+            // Restore rule: a restored session on a paid/locked invoice must be re-invoiced.
+            if (prevStatus === SESSION_STATUS.VOIDED && next !== SESSION_STATUS.VOIDED) {
+              const inv = session.invoiceId ? getInvoiceById(session.invoiceId) : null;
+              const canRebillHere = inv && !isInvoiceLocked(inv);
+              if (!canRebillHere && (newSession.studentIds || []).length === 1) {
+                const sid = newSession.studentIds[0];
+                const student = getStudentById(sid);
+                // If a credit note was created when the session was voided, restore by voiding the credit note
+                // instead of generating a new invoice (keeps paid invoice immutable without double-charging).
+                let restoredByCredit = false;
+                if (student && inv && isInvoiceLocked(inv)) {
+                  const credit = findVoidedSessionCreditNote(sid, session.id);
+                  if (credit && !isInvoiceVoid(credit)) {
+                    credit.invoiceStatus = 'void';
+                    credit.voidedAt = new Date().toISOString();
+                    logActivity('Voided credit note', credit.id);
+                    // Keep the session linked to the original paid invoice.
+                    newSession.invoiceId = session.invoiceId || newSession.invoiceId;
+                    restoredByCredit = true;
+                  }
+                }
+                if (!restoredByCredit) {
+                  const already = student && hasLateChangeInvoice(sid, session.id, 'restore_session');
+                  if (student && already) {
+                    const existingRestore = state.invoices.find(i =>
+                      i.studentId === sid &&
+                      (i.invoiceType || i.invoice_type) === 'adjustment' &&
+                      (i.adjustmentReason || i.adjustment_reason) === 'restore_session' &&
+                      (i.relatedSessionId || i.related_session_id) === session.id &&
+                      !isInvoiceVoid(i)
+                    );
+                    if (existingRestore) {
+                      newSession.invoiceId = existingRestore.id;
+                      logActivity('Restored session invoice reused', existingRestore.id);
+                    }
+                  } else if (student) {
+                    const nowStr = toDateOnly(new Date());
+                    const baseAmount = getSessionBillableAmount(newSession, student);
+                    const restoreInv = {
+                      id: generateId('inv'),
+                      studentId: sid,
+                      issueDate: nowStr,
+                      dueDate: nowStr,
+                      baseAmount,
+                      total: baseAmount,
+                      lateFeePercent: 0,
+                      shortNoticePercent: 0,
+                      lateApplied: false,
+                      shortApplied: false,
+                      paid: false,
+                      notes: `Restored session charge for ${newSession.date} ${newSession.startTime || ''}.`,
+                      servicePeriodStart: newSession.date,
+                      servicePeriodEnd: newSession.date,
+                      numSessions: 1,
+                      invoiceType: 'adjustment',
+                      autoGenerated: true,
+                      paidAt: '',
+                      paymentProvider: PAYFAST_PROVIDER,
+                      paymentMethod: '',
+                      invoiceStatus: 'issued',
+                      voidedAt: '',
+                      adjustmentReason: 'restore_session',
+                      relatedSessionId: session.id,
+                      moveToDate: '',
+                      moveToTime: '',
+                      moveToDurationHours: 0,
+                      moveRequestedAt: '',
+                      moveAppliedAt: ''
+                    };
+                    state.invoices.push(restoreInv);
+                    newSession.invoiceId = restoreInv.id;
+                    logActivity('Restored session invoiced', restoreInv.id);
+                  }
+                }
+              }
+            }
+            // Voiding after payment should not mutate the paid invoice; log for admin.
+            if (prevStatus !== SESSION_STATUS.VOIDED && next === SESSION_STATUS.VOIDED) {
+              const inv = newSession.invoiceId ? getInvoiceById(newSession.invoiceId) : null;
+              if (inv && isInvoiceLocked(inv)) {
+                if ((newSession.studentIds || []).length === 1) {
+                  const sid = newSession.studentIds[0];
+                  const student = getStudentById(sid) || getStudentById(inv.studentId);
+                  if (student) {
+                    if (!(Number(newSession.billingRate ?? newSession.billing_rate ?? 0) > 0) && Number(student.rate || 0) > 0) {
+                      newSession.billingRate = Number(student.rate || 0);
+                    }
+                    createVoidedSessionCreditNote(newSession, student, inv.id);
+                  }
+                }
+                logActivity('Voided session on paid invoice', `${newSession.date} ${newSession.startTime || ''}`);
+              }
+            }
           }
 
           if (isEdit) {
@@ -11074,15 +11773,36 @@
 
         if (isEdit) {
           document.getElementById('deleteSessionBtn').onclick = () => {
-            if (!confirm(t('confirm.delete_session'))) return;
-            deleteSessionAndLinks(session.id).then(() => {
+            if (!confirm(t('confirm.void_session'))) return;
+            const idx = state.sessions.findIndex(s => s.id === session.id);
+            if (idx >= 0) {
+              const sess = state.sessions[idx];
+              state.sessions[idx] = {
+                ...sess,
+                status: SESSION_STATUS.VOIDED,
+                absenceReason: sess.absenceReason || SESSION_ABSENCE_REASONS.ADMIN_VOID,
+                attended: false,
+                completed: false,
+                pendingReviewStartedAt: ''
+              };
+              const invoice = sess.invoiceId ? getInvoiceById(sess.invoiceId) : null;
+              if (invoice && isInvoiceLocked(invoice) && (sess.studentIds || []).length === 1) {
+                const student = getStudentById(sess.studentIds[0]) || getStudentById(invoice.studentId);
+                if (student) {
+                  const updatedSess = state.sessions[idx];
+                  if (!(Number(updatedSess.billingRate ?? updatedSess.billing_rate ?? 0) > 0) && Number(student.rate || 0) > 0) {
+                    updatedSess.billingRate = Number(student.rate || 0);
+                  }
+                  createVoidedSessionCreditNote(updatedSess, student, invoice.id);
+                }
+              }
+              logActivity('Voided session', `${sess.date} ${sess.startTime || ''}`);
+              refreshAutoBilling();
+              saveState();
               closeModal();
               renderScheduleView();
               renderStudentsView();
-            }).catch(err => {
-              console.error(err);
-              alert(t('alert.delete_failed_console'));
-            });
+            }
           };
         }
 
@@ -11732,7 +12452,17 @@
             const safeSessionId = cleanId(s.id);
             const billedElsewhere = !!s.invoiceId && s.invoiceId !== (inv?.id || '');
             const checked = selectedExisting.has(safeSessionId) || s.invoiceId === inv?.id;
-            const detail = esc(`${s.date} ${s.startTime || ''} • ${s.subject} • ${s.durationHours || 1}h`);
+            const status = getSessionStatus(s);
+            const statusLabel = status === SESSION_STATUS.COMPLETE
+              ? t('schedule.completed')
+              : status === SESSION_STATUS.PENDING_REVIEW
+                ? t('schedule.pending_review')
+                : status === SESSION_STATUS.VOIDED
+                  ? t('schedule.voided')
+                  : status === SESSION_STATUS.NO_SHOW_CHARGEABLE
+                    ? t('schedule.no_show_chargeable')
+                    : t('schedule.scheduled');
+            const detail = esc(`${s.date} ${s.startTime || ''} • ${s.subject} • ${s.durationHours || 1}h • ${statusLabel}`);
             return `<label class="flex items-center gap-2 text-[11px] ${billedElsewhere ? 'opacity-50' : ''}">
               <input type="checkbox" name="sessionIds" value="${safeSessionId}" ${checked && !billedElsewhere ? 'checked' : ''} ${billedElsewhere ? 'disabled' : ''}>
               <span>${detail}</span>
@@ -11860,10 +12590,6 @@
               else state.invoices.push(newInv);
               logActivity('Created invoice', newInv.id);
             }
-            if (newInv.paid) {
-              const student = getStudentById(newInv.studentId);
-              if (student) scheduleSessionsForInvoice(newInv, student, new Date());
-            }
             saveState();
             closeModal();
             renderFinanceView();
@@ -11922,7 +12648,9 @@
             const confirmMsg = t('invoice.rebuild_confirm', { id: inv.id, count: removeCount });
             if (!confirm(confirmMsg)) return;
 
+            const locked = isInvoiceLocked(inv);
             let changed = false;
+            let missingCount = 0;
             const existingByKey = new Map();
             state.sessions.forEach(s => {
               if (!s.studentIds.includes(student.id)) return;
@@ -11958,58 +12686,34 @@
                 }
                 return;
               }
-              state.sessions.push({
-                id: generateId('sess'),
-                studentIds: [student.id],
-                date: occ.date,
-                startTime: slotTime,
-                durationHours,
-                subject: student.subjects?.[0] || 'Tutoring',
-                topic: 'Auto-scheduled session',
-                notes: '',
-                attended: false,
-                completed: false,
-                invoiceId: inv.id,
-                sessionMode,
-                meetingProvider: sessionMode === 'online' ? 'JaaS' : '',
-                meetingRoom: '',
-                meetingStatus: sessionMode === 'online' ? 'scheduled' : ''
-              });
-              changed = true;
+              missingCount++;
             });
 
-            const toRemove = state.sessions.filter(s => {
+            const toUnlink = state.sessions.filter(s => {
               if (s.invoiceId !== inv.id) return false;
               if (!s.studentIds.includes(student.id)) return false;
               const key = `${student.id}|${s.date}|${normalizeTimeValue(s.startTime || '')}`;
               return !expectedKeys.has(key);
             });
-
-            try {
-              for (const sess of toRemove) {
-                await deleteSessionAndLinks(sess.id, { skipCancellation: true });
+            if (!locked && toUnlink.length) {
+              toUnlink.forEach(s => {
+                s.invoiceId = '';
                 changed = true;
-              }
-              if (changed) {
-                const idx = state.invoices.findIndex(i => i.id === inv.id);
-                if (idx >= 0) {
-                  state.invoices[idx] = { ...state.invoices[idx], numSessions: occurrences.length };
-                  if (isSupabaseReady()) {
-                    await upsertInvoiceRemote(state.invoices[idx]);
-                  }
-                }
-                saveState();
-                renderFinanceView();
-                renderScheduleView();
-                renderStudentsView();
-                if (selectedStudentId) renderStudentFinance(selectedStudentId);
-                alert(t('alert.invoice_sessions_rebuilt'));
-              } else {
-                alert(t('alert.invoice_no_changes'));
-              }
-            } catch (err) {
-              console.error('Rebuild sessions failed', err);
-              alert(t('alert.invoice_rebuild_failed', { error: err?.message || err }));
+              });
+            }
+
+            if (changed) refreshAutoBilling();
+            if (changed) saveState();
+            renderFinanceView();
+            renderScheduleView();
+            renderStudentsView();
+            if (selectedStudentId) renderStudentFinance(selectedStudentId);
+            if (missingCount) {
+              alert(t('alert.invoice_rebuild_missing_sessions', { count: missingCount }));
+            } else if (changed) {
+              alert(t('alert.invoice_sessions_rebuilt'));
+            } else {
+              alert(t('alert.invoice_no_changes'));
             }
           };
         }
@@ -12039,13 +12743,18 @@
             };
             try {
               await upsertInvoiceRemote(updated);
-              for (const sess of linked) {
-                await deleteSessionRemote(sess.id);
+              // Unlink sessions instead of deleting them.
+              try {
+                await supabaseClient.from('lesson_sessions').update({ invoice_id: null }).eq('invoice_id', inv.id);
+              } catch (err) {
+                console.warn('Session unlink failed during invoice void', err);
               }
+              state.sessions.forEach(s => { if (s.invoiceId === inv.id) s.invoiceId = ''; });
+              saveState();
               await tryLoadRemoteThenLocal();
               renderAllViews();
               closeModal();
-              alert(t('alert.invoice_voided_sessions_removed'));
+              alert(t('alert.invoice_voided_sessions_unlinked'));
             } catch (err) {
               console.error('Fix scheduling error failed', err);
               setSupabaseStatusBanner('Supabase action failed. Please retry in a moment.');
