@@ -1637,7 +1637,7 @@
             </div>
 
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
-              <div id="portalAiCard" class="card p-4 space-y-2">
+              <div class="card p-4 space-y-2">
                 <div class="flex items-center justify-between">
                   <h3 class="text-sm font-semibold" data-i18n="portal.upcoming_sessions">Upcoming sessions</h3>
                   <span class="hint" data-i18n="portal.all_upcoming">All upcoming</span>
@@ -1674,7 +1674,7 @@
                 </div>
                 <ul id="portalMessages" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
               </div>
-              <div class="card p-4 space-y-2">
+              <div id="portalAiCard" class="card p-4 space-y-2">
                 <div class="flex items-center justify-between">
                   <h3 class="text-sm font-semibold" data-i18n="portal.ai_helper">AI Study Helper</h3>
                   <span class="hint" data-i18n="portal.ai_helper_hint">Uses recent lessons/resources</span>
@@ -8845,7 +8845,10 @@
           .filter(s => s.studentIds.some(id => ids.has(id)))
           .filter(s => {
             const inv = s.invoiceId ? getInvoiceById(s.invoiceId) : null;
-            return !!(inv && inv.paid && !isInvoiceVoid(inv));
+            if (inv && inv.paid && !isInvoiceVoid(inv)) return true;
+            // If the session isn't linked yet, still show it once a paid invoice covers that date
+            // (prevents missing Join buttons when invoice was paid but the session didn't store invoice_id).
+            return (s.studentIds || []).some(id => ids.has(id) && hasPaidInvoiceForDate(id, s.date));
           });
       }
       if (studentMode) {
@@ -8855,7 +8858,8 @@
             .filter(s => s.studentIds.includes(student.id))
             .filter(s => {
               const inv = s.invoiceId ? getInvoiceById(s.invoiceId) : null;
-              return !!(inv && inv.paid && !isInvoiceVoid(inv));
+              if (inv && inv.paid && !isInvoiceVoid(inv)) return true;
+              return hasPaidInvoiceForDate(student.id, s.date);
             });
         }
       }
@@ -10056,16 +10060,20 @@
     }
 
     function hasPaidInvoiceForDate(studentId, dateStr) {
-      const target = new Date(dateStr);
+      const targetDate = String(dateStr || '').slice(0, 10);
+      if (!studentId || !targetDate) return false;
       return state.invoices.some(inv => {
         if (inv.studentId !== studentId || !inv.paid || isInvoiceVoid(inv)) return false;
-        const type = inv.invoiceType || inv.invoice_type;
+        const type = String(inv.invoiceType || inv.invoice_type || '').toLowerCase();
         if (type === 'adjustment' || type === 'refund') return false;
-        const startVal = inv.servicePeriodStart || inv.service_period_start || '';
-        const endVal = inv.servicePeriodEnd || inv.service_period_end || '';
-        const startOk = !startVal || new Date(startVal) <= target;
-        const endOk = !endVal || new Date(endVal) >= target;
-        return startOk && endOk;
+        // Only treat invoices with an explicit service period as covering sessions.
+        const start = String(inv.servicePeriodStart || inv.service_period_start || '').slice(0, 10);
+        const end = String(inv.servicePeriodEnd || inv.service_period_end || '').slice(0, 10);
+        if (start && end) return start <= targetDate && end >= targetDate;
+        // Fallback for legacy invoices missing service_period_* fields: treat monthly invoices as covering the invoice month.
+        if (type !== 'monthly') return false;
+        const invMonth = String(inv.servicePeriodEnd || inv.servicePeriodStart || inv.issueDate || inv.dueDate || '').slice(0, 7);
+        return !!invMonth && invMonth === targetDate.slice(0, 7);
       });
     }
 
