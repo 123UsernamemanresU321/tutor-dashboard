@@ -5999,11 +5999,11 @@
       return now >= joinFrom && now <= end;
     }
 
-    async function fetchMeetingJoinUrl(sessionId) {
-      if (!supabaseAvailable || !supabaseSession) throw new Error(t('alert.sign_in_join_meetings'));
-      const body = { session_id: sessionId };
-      if (studentMode) {
-        const student = getStudentProfileBySession();
+	    async function fetchMeetingJoinUrl(sessionId) {
+	      if (!supabaseAvailable || !supabaseSession) throw new Error(t('alert.sign_in_join_meetings'));
+	      const body = { session_id: sessionId };
+	      if (studentMode) {
+	        const student = getStudentProfileBySession();
         const loginCode = normalizeCode(student?.loginCode || student?.login_code || '');
         if (student?.id && loginCode) {
           body.student_id = student.id;
@@ -6014,36 +6014,106 @@
         body
       });
       if (error) throw error;
-      if (!data?.join_url) throw new Error(t('alert.meeting_link_not_available'));
-      return data.join_url;
-    }
+	      if (!data?.join_url) throw new Error(t('alert.meeting_link_not_available'));
+	      return data.join_url;
+	    }
 
-    async function openMeetingForSession(sessionId) {
-      try {
-        if (parentMode) {
-          alert(t('alert.meeting_links_students_only'));
-          return;
-        }
-        const joinUrl = await fetchMeetingJoinUrl(sessionId);
-        openPopupWithConfirm(joinUrl, t('meeting.label_online_session'));
-      } catch (err) {
-        console.error('Meeting launch failed', err);
-        alert(err?.message || t('alert.unable_open_meeting'));
-      }
-    }
+	    function showPopupBlockedModal(url, label = '') {
+	      if (!url) return;
+	      const safeLabel = label || t('common.link');
+	      openModal(`
+	        <h2 class="text-sm font-semibold mb-2">${esc(safeLabel)}</h2>
+	        <p class="text-[11px] text-slate-600 mb-3">${esc(t('alert.popup_blocked_copy'))}</p>
+	        <div class="flex flex-wrap gap-2">
+	          <a class="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium"
+	             href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(t('common.open'))}</a>
+	          <button type="button" id="popupBlockedCopyBtn"
+	            class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs">${esc(t('common.copy'))}</button>
+	        </div>
+	        <div class="mt-2 p-2 rounded-lg border border-slate-200 bg-slate-50 text-[10px] text-slate-700 break-all">${esc(url)}</div>
+	      `, () => {
+	        const btn = document.getElementById('popupBlockedCopyBtn');
+	        if (!btn) return;
+	        btn.onclick = () => {
+	          navigator.clipboard?.writeText(url).then(() => {
+	            btn.textContent = t('common.copied_exclaim');
+	            setTimeout(() => { btn.textContent = t('common.copy'); }, 1500);
+	          }).catch(() => {
+	            prompt(t('prompt.copy_link'), url);
+	          });
+	        };
+	      });
+	    }
 
-    function openPopupWithConfirm(url, label, features = 'noopener,noreferrer') {
-      if (!url) return false;
-      const safeLabel = label || t('common.link');
-      const ok = confirm(t('confirm.open_new_tab', { label: safeLabel }));
-      if (!ok) return false;
-      const win = window.open(url, '_blank', features);
-      if (!win) {
-        prompt(t('alert.popup_blocked_copy'), url);
-        return false;
-      }
-      return true;
-    }
+	    // Important: must be called synchronously from a user gesture (e.g. click) or the browser will block it.
+	    function openPopupPlaceholder(label = '') {
+	      const win = window.open('about:blank', '_blank');
+	      if (!win) return null;
+	      // Equivalent to "noopener" but keeps a usable handle so we can navigate after async work.
+	      try { win.opener = null; } catch {}
+	      try {
+	        const title = label || t('common.link');
+	        win.document.title = title;
+	        win.document.body.innerHTML = `
+	          <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; padding: 18px; color: #0f172a;">
+	            <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">${esc(title)}</div>
+	            <div style="font-size: 12px; color: #475569;">Opening...</div>
+	          </div>`;
+	      } catch {}
+	      return win;
+	    }
+
+	    async function openMeetingForSession(sessionId) {
+	      let popup = null;
+	      try {
+	        if (parentMode) {
+	          alert(t('alert.meeting_links_students_only'));
+	          return;
+	        }
+	        // Open a placeholder tab immediately so pop-up blockers don't block the final join URL.
+	        popup = openPopupPlaceholder(t('meeting.label_online_session'));
+	        const joinUrl = await fetchMeetingJoinUrl(sessionId);
+	        if (popup) {
+	          try {
+	            popup.location.replace(joinUrl);
+	            popup.focus();
+	          } catch {
+	            try { popup.close(); } catch {}
+	            window.location.href = joinUrl;
+	          }
+	        } else {
+	          // Pop-up blocked: fall back to opening in the current tab (avoids confusing copy/paste flows).
+	          window.location.href = joinUrl;
+	        }
+	      } catch (err) {
+	        if (popup && !popup.closed) {
+	          try { popup.close(); } catch {}
+	        }
+	        console.error('Meeting launch failed', err);
+	        alert(err?.message || t('alert.unable_open_meeting'));
+	      }
+	    }
+
+	    function openPopupWithConfirm(url, label, _features = '') {
+	      if (!url) return false;
+	      const safeLabel = label || t('common.link');
+	      const ok = confirm(t('confirm.open_new_tab', { label: safeLabel }));
+	      if (!ok) return false;
+	      const popup = openPopupPlaceholder(safeLabel);
+	      if (!popup) {
+	        showPopupBlockedModal(url, safeLabel);
+	        return false;
+	      }
+	      try {
+	        popup.location.href = url;
+	        popup.focus();
+	        return true;
+	      } catch {
+	        try { popup.close(); } catch {}
+	        showPopupBlockedModal(url, safeLabel);
+	        return false;
+	      }
+	    }
 
     function applyTourUI() {
       const tourBanner = document.getElementById('tourBanner');
@@ -7326,19 +7396,34 @@
       }
     }
 
-    async function openContractLink(studentId) {
-      try {
-        const link = await buildContractSigningLink(studentId);
-        const opened = openPopupWithConfirm(link, t('contract.signing_page'), 'noopener');
-        if (opened) {
-          navigator.clipboard?.writeText(link).catch(() => {});
-          startContractStatusWatch([studentId], { maxMs: 180000 });
-        }
-      } catch (err) {
-        console.warn('issue-contract-sign-token failed', err);
-        alert(err?.message || t('alert.contract_link_failed'));
-      }
-    }
+	    async function openContractLink(studentId) {
+	      let popup = null;
+	      try {
+	        // Open a placeholder tab immediately so pop-up blockers don't block the tokenized link.
+	        popup = openPopupPlaceholder(t('contract.signing_page'));
+	        const link = await buildContractSigningLink(studentId);
+	        if (popup) {
+	          try {
+	            popup.location.replace(link);
+	            popup.focus();
+	          } catch {
+	            try { popup.close(); } catch {}
+	            window.location.href = link;
+	          }
+	        } else {
+	          window.location.href = link;
+	        }
+	        navigator.clipboard?.writeText(link).catch(() => {});
+	        // If we stayed on this page, watch for the contract to be signed.
+	        if (popup) startContractStatusWatch([studentId], { maxMs: 180000 });
+	      } catch (err) {
+	        if (popup && !popup.closed) {
+	          try { popup.close(); } catch {}
+	        }
+	        console.warn('issue-contract-sign-token failed', err);
+	        alert(err?.message || t('alert.contract_link_failed'));
+	      }
+	    }
 
     function scrollToParentInvoices() {
       const target = document.getElementById('parentInvoicesCard');
