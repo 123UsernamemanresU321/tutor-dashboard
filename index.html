@@ -7870,9 +7870,46 @@
       }
     }
 
+    function isTransientSignedStorageUrl(rawUrl) {
+      if (!rawUrl) return false;
+      try {
+        const parsed = new URL(rawUrl, window.location.origin);
+        return /\/storage\/v1\/object\/sign\//i.test(parsed.pathname);
+      } catch (_err) {
+        return false;
+      }
+    }
+
+    async function requestFreshContractUrlFromServer(contractId, studentId = '') {
+      if (!supabaseClient?.functions || !supabaseSession?.access_token) return '';
+      try {
+        const body = { contract_id: contractId };
+        if (studentId) body.student_id = studentId;
+        const { data, error } = await supabaseClient.functions.invoke('get-contract-file-url', {
+          body,
+          headers: { Authorization: `Bearer ${supabaseSession.access_token}` }
+        });
+        if (error) throw error;
+        return data?.url || data?.signed_url || '';
+      } catch (err) {
+        console.warn('get-contract-file-url failed', err);
+        return '';
+      }
+    }
+
     async function getFreshContractUrl(contractId) {
       const contract = state.contracts.find(c => c.id === contractId) || null;
       const signature = getSignatureById(contractId);
+      const freshFromServer = await requestFreshContractUrlFromServer(contractId, contract?.studentId || signature?.studentId || '');
+      if (freshFromServer) {
+        if (contract) contract.signedUrl = freshFromServer;
+        if (signature) {
+          signature.renderedPdfUrl = freshFromServer;
+          signature.rendered_pdf_url = freshFromServer;
+        }
+        return freshFromServer;
+      }
+
       const refs = [];
       const seen = new Set();
       const addRef = (bucket, pathRaw) => {
@@ -7916,7 +7953,8 @@
         }
       }
 
-      return contract?.signedUrl || signature?.renderedPdfUrl || signature?.rendered_pdf_url || '';
+      const fallback = contract?.signedUrl || signature?.renderedPdfUrl || signature?.rendered_pdf_url || '';
+      return isTransientSignedStorageUrl(fallback) ? '' : fallback;
     }
 
     function triggerDownloadFromUrl(url, fileName) {
