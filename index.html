@@ -6415,31 +6415,8 @@
         });
         const sessionsWithStudents = sessions.filter(s => (s.studentIds || []).length > 0);
 
-        // Fetch signed URLs for contracts if storage_path exists (ignore missing/forbidden)
-        const getSignedUrlWithFallback = async (pathRaw) => {
-          const tryBuckets = ['contracts', 'signed_contracts'];
-          for (const bucket of tryBuckets) {
-            const path = stripBucketPrefix(pathRaw, bucket);
-            if (!path || !supabaseClient.storage) continue;
-            const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 60 * 60);
-            if (!error && data?.signedUrl) {
-              const reachable = await isSignedUrlReachable(data.signedUrl);
-              if (reachable) return data.signedUrl;
-            }
-          }
-          return '';
-        };
-
         const contracts = await Promise.all(
           (contractsRes.data || []).map(async c => {
-            let signedUrl = '';
-            try {
-              if (c.storage_path) {
-                signedUrl = await getSignedUrlWithFallback(c.storage_path);
-              }
-            } catch (err) {
-              console.warn('Contract signed URL fetch failed', err);
-            }
             return {
               id: c.id,
               studentId: c.student_id,
@@ -6448,7 +6425,7 @@
               status: c.status,
               notes: c.notes,
               uploadedAt: c.uploaded_at,
-              signedUrl
+              signedUrl: ''
             };
           })
         );
@@ -6871,7 +6848,7 @@
           status: c.status,
           notes: c.notes,
           uploadedAt: c.uploaded_at,
-          signedUrl: c.signed_url || ''
+          signedUrl: ''
         }));
         out.messages = (snap.messages || []).map(m => ({
           id: m.id,
@@ -7202,30 +7179,8 @@
         signatureMethod: cs.signature_method,
         parentIp: cs.parent_ip
       }));
-      const getSignedUrlWithFallback = async (pathRaw) => {
-        const tryBuckets = ['contracts', 'signed_contracts'];
-        for (const bucket of tryBuckets) {
-          const path = stripBucketPrefix(pathRaw, bucket);
-          if (!path || !supabaseClient.storage) continue;
-          const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 60 * 60);
-          if (!error && data?.signedUrl) {
-            const reachable = await isSignedUrlReachable(data.signedUrl);
-            if (reachable) return data.signedUrl;
-          }
-        }
-        return '';
-      };
-
       merged.contracts = await Promise.all(
         (contractsRes.data || []).map(async c => {
-          let signedUrl = '';
-          try {
-            if (c.storage_path) {
-              signedUrl = await getSignedUrlWithFallback(c.storage_path);
-            }
-          } catch (err) {
-            console.warn('Contract signed URL fetch failed (student/parent)', err);
-          }
           return {
             id: c.id,
             studentId: c.student_id,
@@ -7234,7 +7189,7 @@
             status: c.status,
             notes: c.notes,
             uploadedAt: c.uploaded_at,
-            signedUrl
+            signedUrl: ''
           };
         })
       );
@@ -7888,37 +7843,6 @@
       return `data:text/plain;charset=utf-8,${encodeURIComponent(text || '')}`;
     }
 
-    async function isSignedUrlReachable(url) {
-      if (!url) return false;
-      try {
-        let resp = await fetch(url, { method: 'HEAD' });
-        if (resp.status === 405) {
-          resp = await fetch(url, { method: 'GET', headers: { Range: 'bytes=0-0' } });
-        }
-        if (resp.ok || resp.status === 206) return true;
-        if (resp.status === 400 || resp.status === 403 || resp.status === 404) return false;
-        return true;
-      } catch (_err) {
-        // If CORS/network blocks validation we keep the URL and let navigation try.
-        return true;
-      }
-    }
-
-    function extractStorageRefFromUrl(rawUrl) {
-      if (!rawUrl) return null;
-      try {
-        const parsed = new URL(rawUrl, window.location.origin);
-        const match = parsed.pathname.match(/\/storage\/v1\/object\/(?:sign|public)\/([^/]+)\/(.+)$/i);
-        if (!match) return null;
-        const bucket = decodeURIComponent(match[1] || '').trim();
-        const path = decodeURIComponent(match[2] || '').trim();
-        if (!bucket || !path) return null;
-        return { bucket, path };
-      } catch (_err) {
-        return null;
-      }
-    }
-
     function isTransientSignedStorageUrl(rawUrl) {
       if (!rawUrl) return false;
       try {
@@ -7949,6 +7873,9 @@
     async function getFreshContractUrl(contractId) {
       const contract = state.contracts.find(c => c.id === contractId) || null;
       const signature = getSignatureById(contractId);
+      const fallback = contract?.signedUrl || signature?.renderedPdfUrl || signature?.rendered_pdf_url || '';
+
+      // Primary path: ask backend to issue a fresh, validated URL.
       const freshFromServer = await requestFreshContractUrlFromServer(contractId, contract?.studentId || signature?.studentId || '');
       if (freshFromServer) {
         if (contract) contract.signedUrl = freshFromServer;
@@ -7959,56 +7886,10 @@
         return freshFromServer;
       }
 
-      const refs = [];
-      const seen = new Set();
-      const addRef = (bucket, pathRaw) => {
-        const cleanBucket = String(bucket || '').trim();
-        const cleanPath = String(pathRaw || '').trim();
-        if (!cleanBucket || !cleanPath) return;
-        const key = `${cleanBucket}/${cleanPath}`;
-        if (seen.has(key)) return;
-        seen.add(key);
-        refs.push({ bucket: cleanBucket, path: cleanPath });
-      };
-
-      if (contract?.storage_path) {
-        const raw = contract.storage_path;
-        ['contracts', 'signed_contracts'].forEach(bucket => {
-          const path = stripBucketPrefix(raw, bucket);
-          if (path) addRef(bucket, path);
-        });
-      }
-
-      [contract?.signedUrl, signature?.renderedPdfUrl, signature?.rendered_pdf_url].forEach(url => {
-        const ref = extractStorageRefFromUrl(url);
-        if (ref) addRef(ref.bucket, ref.path);
-      });
-
-      if (supabaseClient?.storage) {
-        for (const ref of refs) {
-          try {
-            const { data, error } = await supabaseClient.storage.from(ref.bucket).createSignedUrl(ref.path, 60 * 60);
-            if (!error && data?.signedUrl) {
-              const reachable = await isSignedUrlReachable(data.signedUrl);
-              if (!reachable) continue;
-              if (contract) contract.signedUrl = data.signedUrl;
-              if (signature) {
-                signature.renderedPdfUrl = data.signedUrl;
-                signature.rendered_pdf_url = data.signedUrl;
-              }
-              return data.signedUrl;
-            }
-          } catch (_err) {
-            // continue fallback chain
-          }
-        }
-      }
-
-      const fallback = contract?.signedUrl || signature?.renderedPdfUrl || signature?.rendered_pdf_url || '';
       if (!fallback) return '';
       if (isTransientSignedStorageUrl(fallback)) {
-        const reachable = await isSignedUrlReachable(fallback);
-        return reachable ? fallback : '';
+        // Never trust cached/expired signed URLs from DB if backend refresh failed.
+        return '';
       }
       return fallback;
     }
