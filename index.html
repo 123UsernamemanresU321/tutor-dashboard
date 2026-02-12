@@ -6683,6 +6683,68 @@
       const sessionStudentId = getSessionStudentId();
       const sessionParentId = getSessionParentId();
       const sessionLoginCode = getSessionLoginCode();
+      const localFallbackState = loadState();
+
+      function buildRoleScopedLocalFallback() {
+        const local = deepClone(localFallbackState || defaultState);
+        const out = deepClone(defaultState);
+        out.settings = deepClone(localSettings || defaultState.settings);
+
+        const filterStudentScoped = (studentIds) => {
+          const idSet = new Set((studentIds || []).map(cleanId).filter(Boolean));
+          if (!idSet.size) return out;
+          out.students = (local.students || []).filter(s => idSet.has(cleanId(s.id)));
+          out.parentLinks = (local.parentLinks || []).filter(pl => idSet.has(cleanId(pl.studentId || pl.student_id)));
+          const parentIdSet = new Set(out.parentLinks.map(pl => cleanId(pl.parentId || pl.parent_id)));
+          out.parents = (local.parents || []).filter(p => parentIdSet.has(cleanId(p.id)));
+          out.sessions = (local.sessions || []).filter(sess => (sess.studentIds || []).some(id => idSet.has(cleanId(id))));
+          out.sessionCancellations = (local.sessionCancellations || []).filter(c => idSet.has(cleanId(c.studentId || c.student_id)));
+          out.homework = (local.homework || []).filter(h => idSet.has(cleanId(h.studentId || h.student_id)));
+          out.documents = (local.documents || []).filter(d => idSet.has(cleanId(d.studentId || d.student_id)));
+          out.contracts = (local.contracts || []).filter(c => idSet.has(cleanId(c.studentId || c.student_id)));
+          out.invoices = (local.invoices || []).filter(inv => idSet.has(cleanId(inv.studentId || inv.student_id)));
+          out.studentTodos = (local.studentTodos || []).filter(td => idSet.has(cleanId(td.studentId || td.student_id)));
+          out.studentCheckins = (local.studentCheckins || []).filter(ch => idSet.has(cleanId(ch.studentId || ch.student_id)));
+          out.messages = (local.messages || []).filter(m => idSet.has(cleanId(m.studentId || m.student_id)));
+          out.contractSignatures = (local.contractSignatures || []).filter(cs => idSet.has(cleanId(cs.studentId || cs.student_id)));
+          const resIds = new Set(out.homework.map(h => cleanId(h.resourceId || h.resource_id)).filter(Boolean));
+          out.resources = (local.resources || []).filter(r => resIds.has(cleanId(r.id)));
+          sanitizeState(out);
+          return out;
+        };
+
+        if (sessionRole === 'student' || sessionStudentId || sessionLoginCode) {
+          const sid = cleanId(sessionStudentId);
+          let student = sid ? (local.students || []).find(s => cleanId(s.id) === sid) : null;
+          if (!student && sessionLoginCode) {
+            const code = normalizeCode(sessionLoginCode);
+            student = (local.students || []).find(s => normalizeCode(s.loginCode || s.login_code || '') === code) || null;
+          }
+          if (student) return filterStudentScoped([student.id]);
+        }
+
+        if (sessionRole === 'parent' || sessionParentId || sessionLoginCode) {
+          const pid = cleanId(sessionParentId);
+          let parent = pid ? (local.parents || []).find(p => cleanId(p.id) === pid) : null;
+          if (!parent && sessionLoginCode) {
+            const code = normalizeCode(sessionLoginCode);
+            parent = (local.parents || []).find(p => normalizeCode(p.loginCode || p.login_code || '') === code) || null;
+          }
+          if (parent) {
+            const linked = (local.parentLinks || [])
+              .filter(pl => cleanId(pl.parentId || pl.parent_id) === cleanId(parent.id))
+              .map(pl => cleanId(pl.studentId || pl.student_id))
+              .filter(Boolean);
+            const filtered = filterStudentScoped(linked);
+            filtered.parents = [parent];
+            filtered.parentLinks = (local.parentLinks || []).filter(pl => cleanId(pl.parentId || pl.parent_id) === cleanId(parent.id));
+            sanitizeState(filtered);
+            return filtered;
+          }
+        }
+
+        return out;
+      }
 
       async function mapSnapshotToState(snapshot) {
         const snap = snapshot || {};
@@ -6895,7 +6957,17 @@
         } catch (err) {
           console.warn('Portal snapshot fetch failed; snapshot is required for this role.', err);
         }
-        return merged;
+        const fallback = buildRoleScopedLocalFallback();
+        const hasCachedData = (fallback.students?.length || 0) > 0 ||
+          (fallback.parents?.length || 0) > 0 ||
+          (fallback.sessions?.length || 0) > 0 ||
+          (fallback.invoices?.length || 0) > 0 ||
+          (fallback.homework?.length || 0) > 0;
+        if (hasCachedData) {
+          console.warn('Using local cached portal state after snapshot failure');
+          return fallback;
+        }
+        console.warn('No cached portal data available; attempting direct scoped table queries.');
       }
 
       let studentsRes = { data: [] };
