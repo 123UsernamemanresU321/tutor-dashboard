@@ -6390,12 +6390,15 @@
 
         // Fetch signed URLs for contracts if storage_path exists (ignore missing/forbidden)
         const getSignedUrlWithFallback = async (pathRaw) => {
-          const tryBuckets = ['signed_contracts', 'contracts'];
+          const tryBuckets = ['contracts', 'signed_contracts'];
           for (const bucket of tryBuckets) {
             const path = stripBucketPrefix(pathRaw, bucket);
             if (!path || !supabaseClient.storage) continue;
             const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 60 * 60);
-            if (!error && data?.signedUrl) return data.signedUrl;
+            if (!error && data?.signedUrl) {
+              const reachable = await isSignedUrlReachable(data.signedUrl);
+              if (reachable) return data.signedUrl;
+            }
           }
           return '';
         };
@@ -7173,12 +7176,15 @@
         parentIp: cs.parent_ip
       }));
       const getSignedUrlWithFallback = async (pathRaw) => {
-        const tryBuckets = ['signed_contracts', 'contracts'];
+        const tryBuckets = ['contracts', 'signed_contracts'];
         for (const bucket of tryBuckets) {
           const path = stripBucketPrefix(pathRaw, bucket);
           if (!path || !supabaseClient.storage) continue;
           const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 60 * 60);
-          if (!error && data?.signedUrl) return data.signedUrl;
+          if (!error && data?.signedUrl) {
+            const reachable = await isSignedUrlReachable(data.signedUrl);
+            if (reachable) return data.signedUrl;
+          }
         }
         return '';
       };
@@ -7855,6 +7861,22 @@
       return `data:text/plain;charset=utf-8,${encodeURIComponent(text || '')}`;
     }
 
+    async function isSignedUrlReachable(url) {
+      if (!url) return false;
+      try {
+        let resp = await fetch(url, { method: 'HEAD' });
+        if (resp.status === 405) {
+          resp = await fetch(url, { method: 'GET', headers: { Range: 'bytes=0-0' } });
+        }
+        if (resp.ok || resp.status === 206) return true;
+        if (resp.status === 400 || resp.status === 403 || resp.status === 404) return false;
+        return true;
+      } catch (_err) {
+        // If CORS/network blocks validation we keep the URL and let navigation try.
+        return true;
+      }
+    }
+
     function extractStorageRefFromUrl(rawUrl) {
       if (!rawUrl) return null;
       try {
@@ -7940,6 +7962,8 @@
           try {
             const { data, error } = await supabaseClient.storage.from(ref.bucket).createSignedUrl(ref.path, 60 * 60);
             if (!error && data?.signedUrl) {
+              const reachable = await isSignedUrlReachable(data.signedUrl);
+              if (!reachable) continue;
               if (contract) contract.signedUrl = data.signedUrl;
               if (signature) {
                 signature.renderedPdfUrl = data.signedUrl;
@@ -7954,7 +7978,12 @@
       }
 
       const fallback = contract?.signedUrl || signature?.renderedPdfUrl || signature?.rendered_pdf_url || '';
-      return isTransientSignedStorageUrl(fallback) ? '' : fallback;
+      if (!fallback) return '';
+      if (isTransientSignedStorageUrl(fallback)) {
+        const reachable = await isSignedUrlReachable(fallback);
+        return reachable ? fallback : '';
+      }
+      return fallback;
     }
 
     function triggerDownloadFromUrl(url, fileName) {
