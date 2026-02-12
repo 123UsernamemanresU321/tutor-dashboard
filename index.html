@@ -3235,8 +3235,18 @@
       enforceUuidFields();
       localStorage.setItem(getStorageKey(), JSON.stringify(state));
       updateKPIsAndCharts();
-      if (!tourMode && isSupabaseReady()) {
-        syncStateToSupabase().catch(err => console.error('Supabase sync failed', err));
+      if (shouldAttemptFullSync()) {
+        syncStateToSupabase()
+          .then(() => {
+            supabaseSyncBackoffUntil = 0;
+          })
+          .catch(err => {
+            console.error('Supabase sync failed', err);
+            if (isNetworkLoadFailure(err)) {
+              supabaseSyncBackoffUntil = Date.now() + 60 * 1000;
+              setSupabaseStatusBanner('Supabase sync is temporarily blocked by network/CORS settings. Changes are saved locally and sync will retry in about 1 minute.');
+            }
+          });
       }
     }
 
@@ -3244,8 +3254,25 @@
       return !!(supabaseClient && supabaseSession);
     }
 
+    let supabaseSyncBackoffUntil = 0;
+
+    function isNetworkLoadFailure(err) {
+      const msg = String(err?.message || err || '').toLowerCase();
+      return msg.includes('load failed') || msg.includes('failed to fetch') || msg.includes('networkerror');
+    }
+
+    function shouldAttemptFullSync() {
+      if (tourMode || readOnlyMode) return false;
+      if (!isSupabaseReady()) return false;
+      if (!isOwner()) return false;
+      if (Date.now() < supabaseSyncBackoffUntil) return false;
+      return true;
+    }
+
     async function syncStateToSupabase() {
       if (readOnlyMode) return;
+      if (!isOwner()) return;
+      if (Date.now() < supabaseSyncBackoffUntil) return;
       normalizeIdsToUuid();
       enforceUuidFields();
       const uid = supabaseSession?.user?.id;
