@@ -7843,16 +7843,6 @@
       return `data:text/plain;charset=utf-8,${encodeURIComponent(text || '')}`;
     }
 
-    function isTransientSignedStorageUrl(rawUrl) {
-      if (!rawUrl) return false;
-      try {
-        const parsed = new URL(rawUrl, window.location.origin);
-        return /\/storage\/v1\/object\/sign\//i.test(parsed.pathname);
-      } catch (_err) {
-        return false;
-      }
-    }
-
     async function requestFreshContractUrlFromServer(contractId, studentId = '') {
       if (!supabaseClient?.functions || !supabaseSession?.access_token) return '';
       try {
@@ -7873,7 +7863,6 @@
     async function getFreshContractUrl(contractId) {
       const contract = state.contracts.find(c => c.id === contractId) || null;
       const signature = getSignatureById(contractId);
-      const fallback = contract?.signedUrl || signature?.renderedPdfUrl || signature?.rendered_pdf_url || '';
 
       // Primary path: ask backend to issue a fresh, validated URL.
       const freshFromServer = await requestFreshContractUrlFromServer(contractId, contract?.studentId || signature?.studentId || '');
@@ -7886,12 +7875,8 @@
         return freshFromServer;
       }
 
-      if (!fallback) return '';
-      if (isTransientSignedStorageUrl(fallback)) {
-        // Never trust cached/expired signed URLs from DB if backend refresh failed.
-        return '';
-      }
-      return fallback;
+      // Never trust cached URLs from DB/local state. Use backend-issued URL only.
+      return '';
     }
 
     function triggerDownloadFromUrl(url, fileName) {
@@ -8810,7 +8795,7 @@
           fileName: 'signed_contract.pdf',
           status: 'Signed',
           uploadedAt: sig.signedAt || '',
-          signedUrl: sig.renderedPdfUrl || sig.rendered_pdf_url || ''
+          signedUrl: ''
         });
       }
       if (!contracts.length) {
