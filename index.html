@@ -5889,6 +5889,7 @@
     }
 
     async function deleteStudentAndDependencies(studentId) {
+      const previousState = deepClone(state);
       // Local cleanup
       state.students = state.students.filter(s => s.id !== studentId);
       state.documents = state.documents.filter(d => d.studentId !== studentId);
@@ -5912,44 +5913,84 @@
 
       // Remote cleanup if signed in
       if (isSupabaseReady()) {
-        // Fetch login_code before deleting to also remove auth user
-        let loginCodeToDelete = '';
-        try {
-          const { data } = await supabaseClient.from('students').select('login_code').eq('id', studentId).single();
-          loginCodeToDelete = data?.login_code || '';
-        } catch { }
+        const isIgnorableDbError = (err) => {
+          const msg = String(err?.message || err || '').toLowerCase();
+          return msg.includes('does not exist') || (msg.includes('column') && msg.includes('does not exist'));
+        };
+        const throwIfError = (error, label) => {
+          if (!error) return;
+          if (isIgnorableDbError(error)) return;
+          throw new Error(`${label}: ${error.message || error}`);
+        };
+        const deleteBy = async (table, column, value) => {
+          const { error } = await supabaseClient.from(table).delete().eq(column, value);
+          throwIfError(error, `Delete failed for ${table}`);
+        };
 
-        // Remove join rows
-        await supabaseClient.from('session_students').delete().eq('student_id', studentId);
-        // Delete dependents
-        const tables = [
-          'documents', 'contracts', 'invoices', 'homework',
-          'student_todos', 'student_checkins', 'session_students', 'parent_contract_signatures'
-        ];
-        for (const t of tables) {
-          await supabaseClient.from(t).delete().eq('student_id', studentId);
-        }
         try {
-          await supabaseClient.from('parent_students').delete().eq('student_id', studentId);
-        } catch (err) {
-          console.warn('Remote parent_students delete failed', err);
-        }
-        if (sessionsToRemove.length) {
-          await supabaseClient.from('lesson_sessions').delete().in('id', sessionsToRemove);
-        }
-        // Finally delete student
-        await supabaseClient.from('students').delete().eq('id', studentId);
+          // Fetch login_code before deleting to also remove auth user.
+          let loginCodeToDelete = '';
+          const { data: studentMeta, error: studentMetaErr } = await supabaseClient
+            .from('students')
+            .select('login_code')
+            .eq('id', studentId)
+            .maybeSingle();
+          throwIfError(studentMetaErr, 'Student lookup failed');
+          loginCodeToDelete = normalizeCode(studentMeta?.login_code || '');
 
-        // Delete auth user by code if present
-        if (loginCodeToDelete) {
-          try {
-            await supabaseClient.functions.invoke('delete-account', {
+          // Remove dependents first to avoid FK failures.
+          await deleteBy('session_students', 'student_id', studentId);
+          await deleteBy('parent_students', 'student_id', studentId);
+          await deleteBy('session_cancellations', 'student_id', studentId);
+          const dependentStudentTables = [
+            'documents',
+            'contracts',
+            'invoices',
+            'homework',
+            'student_todos',
+            'student_checkins',
+            'parent_contract_signatures',
+            'messages',
+            'contract_sign_tokens',
+            'presence'
+          ];
+          for (const table of dependentStudentTables) {
+            await deleteBy(table, 'student_id', studentId);
+          }
+
+          if (sessionsToRemove.length) {
+            const { error: lessonDeleteErr } = await supabaseClient
+              .from('lesson_sessions')
+              .delete()
+              .in('id', sessionsToRemove);
+            throwIfError(lessonDeleteErr, 'Delete failed for lesson_sessions');
+          }
+
+          // Finally delete student row itself.
+          const { error: studentDeleteErr } = await supabaseClient.from('students').delete().eq('id', studentId);
+          throwIfError(studentDeleteErr, 'Delete failed for students');
+
+          // Delete auth user by login code (best effort once row is removed).
+          if (loginCodeToDelete) {
+            const { data, error } = await supabaseClient.functions.invoke('delete-account', {
               body: { login_code: loginCodeToDelete },
               headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
             });
-          } catch (err) {
-            console.warn('Auth user delete by code failed', err);
+            if (error) {
+              console.warn('Auth user delete by code failed', error);
+            } else if (data?.success === false) {
+              const msg = String(data?.error || '').toLowerCase();
+              if (!msg.includes('auth user not found')) {
+                console.warn('Auth user delete by code returned error', data);
+              }
+            }
           }
+        } catch (err) {
+          // Roll back local state when remote delete fails, so UI and DB don't diverge.
+          state = previousState;
+          saveState();
+          renderAllViews();
+          throw err;
         }
       }
     }
@@ -11929,7 +11970,7 @@
               logActivity('Deleted student', student.name);
             }).catch(err => {
               console.error(err);
-              alert(t('alert.delete_failed'));
+              alert(err?.message || t('alert.delete_failed'));
             });
           };
         }
