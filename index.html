@@ -3661,6 +3661,52 @@
       // Prune skipped to avoid accidental deletions; Supabase is source of truth.
     }
 
+    function collectOrphanInvoiceIds() {
+      const studentIds = new Set((state.students || []).map(s => cleanId(s.id)).filter(Boolean));
+      const sessionIds = new Set((state.sessions || []).map(s => cleanId(s.id)).filter(Boolean));
+      const sessionInvoiceRefs = new Set(
+        (state.sessions || [])
+          .filter(s => (s.studentIds || []).some(id => studentIds.has(cleanId(id))))
+          .map(s => cleanId(s.invoiceId || s.invoice_id || ''))
+          .filter(Boolean)
+      );
+      const orphanIds = [];
+      (state.invoices || []).forEach(inv => {
+        const invoiceId = cleanId(inv.id || '');
+        if (!invoiceId) return;
+        const studentId = cleanId(inv.studentId || inv.student_id || '');
+        const relatedSessionId = cleanId(inv.relatedSessionId || inv.related_session_id || '');
+        const studentMissing = !studentId || !studentIds.has(studentId);
+        const relatedSessionMissing = !!relatedSessionId && !sessionIds.has(relatedSessionId);
+        if (studentMissing || relatedSessionMissing) {
+          if (!sessionInvoiceRefs.has(invoiceId)) orphanIds.push(invoiceId);
+        }
+      });
+      return [...new Set(orphanIds)];
+    }
+
+    async function pruneOrphanInvoices(opts = {}) {
+      const persistRemote = !!opts.persistRemote;
+      const skipSave = !!opts.skipSave;
+      const orphanIds = collectOrphanInvoiceIds();
+      if (!orphanIds.length) return 0;
+      const orphanSet = new Set(orphanIds);
+      state.invoices = state.invoices.filter(inv => !orphanSet.has(cleanId(inv.id || '')));
+      if (!skipSave) saveState();
+      if (persistRemote && isSupabaseReady() && isOwner()) {
+        const batchSize = 100;
+        for (let i = 0; i < orphanIds.length; i += batchSize) {
+          const chunk = orphanIds.slice(i, i + batchSize);
+          const { error } = await supabaseClient.from('invoices').delete().in('id', chunk);
+          if (error) {
+            console.warn('Orphan invoice remote delete failed', error);
+            break;
+          }
+        }
+      }
+      return orphanIds.length;
+    }
+
     async function removeStorageByPrefix(bucket, prefix) {
       if (!supabaseClient || !prefix) return;
       let offset = 0;
@@ -6037,6 +6083,8 @@
           throw err;
         }
       }
+      await pruneOrphanInvoices({ persistRemote: isSupabaseReady() && isOwner(), skipSave: true });
+      saveState();
     }
 
     async function deleteAccountFlow() {
@@ -6678,6 +6726,9 @@
       if (isSupabaseReady()) {
         try {
           state = await loadStateFromSupabase();
+          if (isOwner()) {
+            await pruneOrphanInvoices({ persistRemote: true, skipSave: true });
+          }
           if (!readOnlyMode) saveState(); // persist locally as cache
           if (isSupabaseReady()) {
             await refreshPresence().catch(() => { });
@@ -8092,6 +8143,10 @@
       const now = new Date();
       const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       const today = new Date();
+      const knownStudentIds = new Set((state.students || []).map(s => cleanId(s.id)).filter(Boolean));
+      const financeInvoices = (state.invoices || []).filter(inv =>
+        knownStudentIds.has(cleanId(inv.studentId || inv.student_id || ''))
+      );
 
       const activeStudentIds = new Set(
         state.sessions
@@ -8118,7 +8173,7 @@
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       let expected = 0;
-      state.invoices.forEach(inv => {
+      financeInvoices.forEach(inv => {
         const d = new Date(inv.issueDate);
         if (d >= startOfMonth && d < endOfMonth && !isInvoiceVoid(inv)) {
           expected += Number(inv.total || 0);
@@ -8130,7 +8185,7 @@
         document.getElementById('kpiExpectedIncome').textContent = 'R ' + expected.toFixed(2);
       }
 
-      const overdueCount = studentMode ? 0 : state.invoices.filter(inv => invoiceRequiresPayment(inv) && inv.dueDate && new Date(inv.dueDate) < today).length;
+      const overdueCount = studentMode ? 0 : financeInvoices.filter(inv => invoiceRequiresPayment(inv) && inv.dueDate && new Date(inv.dueDate) < today).length;
       document.getElementById('kpiOverdue').textContent = studentMode ? 'N/A' : overdueCount;
 
       // Goals & focus
@@ -11419,6 +11474,10 @@
 
     function renderFinanceView() {
       const showVoided = !!state.settings.showVoidedInvoices;
+      const knownStudentIds = new Set((state.students || []).map(s => cleanId(s.id)).filter(Boolean));
+      const financeInvoices = (state.invoices || []).filter(inv =>
+        knownStudentIds.has(cleanId(inv.studentId || inv.student_id || ''))
+      );
       const toggleBtn = document.getElementById('toggleVoidedInvoicesBtn');
       if (toggleBtn) {
         toggleBtn.classList.toggle('hidden', studentMode || parentMode);
@@ -11456,7 +11515,7 @@
 
       const overdueList = document.getElementById('overdueInvoicesList');
       const today = new Date();
-      const overdue = state.invoices.filter(inv => invoiceRequiresPayment(inv) && inv.dueDate && new Date(inv.dueDate) < today)
+      const overdue = financeInvoices.filter(inv => invoiceRequiresPayment(inv) && inv.dueDate && new Date(inv.dueDate) < today)
         .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
 
       if (!overdue.length) {
@@ -11536,8 +11595,8 @@
       if (forecastList && forecastSummary) {
         const soonCutoff = new Date();
         soonCutoff.setDate(soonCutoff.getDate() + 14);
-        const overdueInvoices = state.invoices.filter(inv => invoiceRequiresPayment(inv) && inv.dueDate && new Date(inv.dueDate) < today);
-        const dueSoon = state.invoices
+        const overdueInvoices = financeInvoices.filter(inv => invoiceRequiresPayment(inv) && inv.dueDate && new Date(inv.dueDate) < today);
+        const dueSoon = financeInvoices
           .filter(inv => invoiceRequiresPayment(inv) && inv.dueDate && new Date(inv.dueDate) >= today && new Date(inv.dueDate) <= soonCutoff)
           .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
         const overdueTotal = overdueInvoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
@@ -12657,6 +12716,8 @@
           throwIfError(invByIdErr, 'Delete failed for invoices by id');
         }
       }
+      await pruneOrphanInvoices({ persistRemote: isSupabaseReady() && isOwner(), skipSave: true });
+      saveState();
     }
 
     /***********************
