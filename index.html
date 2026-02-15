@@ -2944,6 +2944,7 @@
       if (!Array.isArray(st.activityLog)) st.activityLog = [];
       st.students.forEach(s => {
         s.id = cleanId(s.id);
+        s.authUserId = cleanId(s.authUserId || s.auth_user_id || '');
         s.studentEmail = (s.studentEmail || s.student_email || '').trim().toLowerCase();
         s.contractSigned = !!s.contractSigned;
         s.contractSignedAt = s.contractSignedAt || s.contract_signed_at || '';
@@ -2976,6 +2977,7 @@
       });
       st.parents.forEach(p => {
         p.id = cleanId(p.id);
+        p.authUserId = cleanId(p.authUserId || p.auth_user_id || '');
         p.email = (p.email || '').trim().toLowerCase();
         p.phone = normalizePhoneValue(p.phone || '');
         p.loginCode = normalizeCode(p.loginCode || p.login_code || '');
@@ -5849,6 +5851,13 @@
       if (metaRole) return metaRole;
       const email = getSessionEmail();
       if (email && email === OWNER_EMAIL.toLowerCase()) return 'owner';
+      const uid = cleanId(supabaseSession?.user?.id || '');
+      if (uid) {
+        const hasParent = state.parents.some(p => cleanId(p.authUserId || p.auth_user_id || '') === uid);
+        if (hasParent) return 'parent';
+        const hasStudent = state.students.some(s => cleanId(s.authUserId || s.auth_user_id || '') === uid);
+        if (hasStudent) return 'student';
+      }
       return '';
     }
 
@@ -5877,8 +5886,13 @@
         const byId = state.parents.find(p => p.id === parentId);
         if (byId) return byId;
       }
+      const uid = cleanId(supabaseSession?.user?.id || '');
+      if (uid) {
+        const byAuthUser = state.parents.find(p => cleanId(p.authUserId || p.auth_user_id || '') === uid);
+        if (byAuthUser) return byAuthUser;
+      }
       const email = getSessionEmail();
-      return state.parents.find(p => p.email === email);
+      return state.parents.find(p => (p.email || '').toLowerCase() === email);
     }
 
     function getStudentProfileBySession() {
@@ -5886,6 +5900,12 @@
       const studentId = getSessionStudentId();
       if (studentId) {
         candidate = state.students.find(s => s.id === studentId) || null;
+      }
+      if (!candidate) {
+        const uid = cleanId(supabaseSession?.user?.id || '');
+        if (uid) {
+          candidate = state.students.find(s => cleanId(s.authUserId || s.auth_user_id || '') === uid) || null;
+        }
       }
       if (!candidate) {
         const loginCode = getSessionLoginCode();
@@ -6447,6 +6467,7 @@
           contractSignerEmail: s.contract_signer_email,
           lastContractId: s.last_contract_id,
           loginCode: normalizeCode(s.login_code),
+          authUserId: cleanId(s.auth_user_id || ''),
           scheduleSlots: normalizeScheduleSlots(s.schedule_slots || [], s.schedule_timezone || DEFAULT_TIMEZONE),
           scheduleDays: normalizeScheduleDays(s.schedule_days || []),
           preferredTime: normalizeTimeValue(s.preferred_time || ''),
@@ -6462,7 +6483,8 @@
           phone: p.phone,
           notes: p.notes,
           verified: p.verified,
-          loginCode: normalizeCode(p.login_code)
+          loginCode: normalizeCode(p.login_code),
+          authUserId: cleanId(p.auth_user_id || '')
         }));
         merged.parentLinks = (parentLinksRes?.data || []).map(pl => ({
           id: pl.id,
@@ -6743,6 +6765,25 @@
           }
         }
 
+        const authUid = cleanId(supabaseSession?.user?.id || '');
+        if (authUid) {
+          const byStudentAuth = (local.students || []).find(s => cleanId(s.authUserId || s.auth_user_id || '') === authUid);
+          if (byStudentAuth) return filterStudentScoped([byStudentAuth.id]);
+
+          const byParentAuth = (local.parents || []).find(p => cleanId(p.authUserId || p.auth_user_id || '') === authUid);
+          if (byParentAuth) {
+            const linked = (local.parentLinks || [])
+              .filter(pl => cleanId(pl.parentId || pl.parent_id) === cleanId(byParentAuth.id))
+              .map(pl => cleanId(pl.studentId || pl.student_id))
+              .filter(Boolean);
+            const filtered = filterStudentScoped(linked);
+            filtered.parents = [byParentAuth];
+            filtered.parentLinks = (local.parentLinks || []).filter(pl => cleanId(pl.parentId || pl.parent_id) === cleanId(byParentAuth.id));
+            sanitizeState(filtered);
+            return filtered;
+          }
+        }
+
         return out;
       }
 
@@ -6775,6 +6816,7 @@
           contractSignerEmail: s.contract_signer_email,
           lastContractId: s.last_contract_id,
           loginCode: normalizeCode(s.login_code),
+          authUserId: cleanId(s.auth_user_id || ''),
           scheduleSlots: normalizeScheduleSlots(s.schedule_slots || [], s.schedule_timezone || DEFAULT_TIMEZONE),
           scheduleDays: normalizeScheduleDays(s.schedule_days || []),
           preferredTime: normalizeTimeValue(s.preferred_time || ''),
@@ -6790,7 +6832,8 @@
           phone: p.phone,
           notes: p.notes,
           verified: p.verified,
-          loginCode: normalizeCode(p.login_code)
+          loginCode: normalizeCode(p.login_code),
+          authUserId: cleanId(p.auth_user_id || '')
         }));
         out.parentLinks = (snap.parentLinks || []).map(pl => ({
           id: pl.id,
@@ -6933,7 +6976,7 @@
         return out;
       }
 
-      const shouldUseSnapshot = !!sessionLoginCode || sessionRole === 'student' || sessionRole === 'parent';
+      const shouldUseSnapshot = !isOwnerUser;
       if (shouldUseSnapshot) {
         try {
           const accessToken = supabaseSession?.access_token;
@@ -6987,19 +7030,43 @@
           studentsRes = await supabaseClient.from('students').select('*').eq('id', sessionStudentId);
         } else if (sessionLoginCode) {
           studentsRes = await supabaseClient.from('students').select('*').eq('login_code', sessionLoginCode);
+        } else if (uid) {
+          studentsRes = await supabaseClient.from('students').select('*').eq('auth_user_id', uid);
         } else {
-          studentsRes = await supabaseClient.from('students').select('*').eq('student_email', email);
+          studentsRes = await supabaseClient.from('students').select('*').ilike('student_email', email);
         }
       } catch { }
+      if (!(studentsRes.data || []).length && uid) {
+        try {
+          studentsRes = await supabaseClient.from('students').select('*').eq('auth_user_id', uid);
+        } catch { }
+      }
+      if (!(studentsRes.data || []).length && email) {
+        try {
+          studentsRes = await supabaseClient.from('students').select('*').ilike('student_email', email);
+        } catch { }
+      }
       try {
         if (sessionRole === 'parent' && sessionParentId) {
           parentsRes = await supabaseClient.from('parents').select('*').eq('id', sessionParentId);
         } else if (sessionLoginCode) {
           parentsRes = await supabaseClient.from('parents').select('*').eq('login_code', sessionLoginCode);
+        } else if (uid) {
+          parentsRes = await supabaseClient.from('parents').select('*').eq('auth_user_id', uid);
         } else if (email) {
-          parentsRes = await supabaseClient.from('parents').select('*').eq('email', email);
+          parentsRes = await supabaseClient.from('parents').select('*').ilike('email', email);
         }
       } catch { }
+      if (!(parentsRes.data || []).length && uid) {
+        try {
+          parentsRes = await supabaseClient.from('parents').select('*').eq('auth_user_id', uid);
+        } catch { }
+      }
+      if (!(parentsRes.data || []).length && email) {
+        try {
+          parentsRes = await supabaseClient.from('parents').select('*').ilike('email', email);
+        } catch { }
+      }
 
       let parentIds = (parentsRes.data || []).map(p => p.id);
       if (!parentIds.length && sessionRole === 'parent' && sessionParentId) {
@@ -7100,6 +7167,7 @@
         contractSignerEmail: s.contract_signer_email,
         lastContractId: s.last_contract_id,
         loginCode: normalizeCode(s.login_code),
+        authUserId: cleanId(s.auth_user_id || ''),
         scheduleSlots: normalizeScheduleSlots(s.schedule_slots || [], s.schedule_timezone || DEFAULT_TIMEZONE),
         scheduleDays: normalizeScheduleDays(s.schedule_days || []),
         preferredTime: normalizeTimeValue(s.preferred_time || ''),
@@ -7115,7 +7183,8 @@
         phone: p.phone,
         notes: p.notes,
         verified: p.verified,
-        loginCode: normalizeCode(p.login_code)
+        loginCode: normalizeCode(p.login_code),
+        authUserId: cleanId(p.auth_user_id || '')
       }));
       merged.parentLinks = (parentLinksRes.data || []).map(pl => ({
         id: pl.id,
