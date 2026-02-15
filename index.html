@@ -3346,7 +3346,7 @@
           contract_version: s.contractVersion || 'v1',
           contract_signer_name: s.contractSignerName || null,
           contract_signer_email: s.contractSignerEmail || null,
-          last_contract_id: s.lastContractId || null,
+          last_contract_id: isUuid(s.lastContractId) ? cleanId(s.lastContractId) : null,
           login_code: normalizeCode(s.loginCode) || null,
           schedule_slots: serializeScheduleSlots(slots, scheduleTimezone),
           schedule_days: legacyDays,
@@ -3972,10 +3972,11 @@
         }
 
         const nowIso = new Date().toISOString();
-        const studentId = generateId('stu');
-        const parentId = generateId('par');
-        const signatureId = generateId('sig');
-        const contractId = generateId('ctr');
+        const makeUuid = () => (crypto?.randomUUID ? crypto.randomUUID() : forceUuid(generateId('id')));
+        const studentId = makeUuid();
+        const parentId = makeUuid();
+        const signatureId = makeUuid();
+        const contractId = makeUuid();
         const studentCode = generateUniqueLoginCode();
         let parentCode = generateUniqueLoginCode();
         while (parentCode === studentCode) {
@@ -4023,7 +4024,7 @@
         state.students.push(testStudent);
         state.parents.push(testParent);
         state.parentLinks.push({
-          id: generateId('plink'),
+          id: makeUuid(),
           parentId,
           studentId,
           relationship: 'Parent'
