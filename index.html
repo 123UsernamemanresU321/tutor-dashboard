@@ -4087,9 +4087,17 @@
       if (!guardEdit() || !isOwner()) return;
       const safeTag = String(tag || '').trim();
       if (!safeTag) return;
-      const marker = buildDebugPairMarker(safeTag);
-      const targetStudents = state.students.filter(s => extractDebugPairTag(s.notes) === safeTag);
-      const targetParents = state.parents.filter(p => extractDebugPairTag(p.notes) === safeTag);
+      const normalizedTag = safeTag.toLowerCase();
+      const targetParents = state.parents.filter(p => extractDebugPairTag(p.notes).toLowerCase() === normalizedTag);
+      const parentIdSet = new Set(targetParents.map(p => cleanId(p.id)).filter(Boolean));
+      const linkedStudentIds = state.parentLinks
+        .filter(pl => parentIdSet.has(cleanId(pl.parentId || pl.parent_id)))
+        .map(pl => cleanId(pl.studentId || pl.student_id))
+        .filter(Boolean);
+      const targetStudents = [
+        ...state.students.filter(s => extractDebugPairTag(s.notes).toLowerCase() === normalizedTag),
+        ...state.students.filter(s => linkedStudentIds.includes(cleanId(s.id)))
+      ].filter((s, idx, arr) => arr.findIndex(other => cleanId(other.id) === cleanId(s.id)) === idx);
       if (!targetStudents.length && !targetParents.length) {
         renderDebugTestPairs();
         return;
@@ -4110,12 +4118,10 @@
           const stillLinked = state.parentLinks.some(pl => pl.parentId === parent.id);
           if (!stillLinked) {
             await deleteParentAndLinks(parent.id);
-          } else {
-            parent.notes = String(parent.notes || '').replace(marker, '').trim();
           }
         }
-        state.contractSignatures = state.contractSignatures.filter(cs => extractDebugPairTag(cs.contractTextSnapshot || '') !== safeTag);
-        state.contracts = state.contracts.filter(c => extractDebugPairTag(c.notes) !== safeTag);
+        state.contractSignatures = state.contractSignatures.filter(cs => extractDebugPairTag(cs.contractTextSnapshot || '').toLowerCase() !== normalizedTag);
+        state.contracts = state.contracts.filter(c => extractDebugPairTag(c.notes).toLowerCase() !== normalizedTag);
         saveState();
         renderAllViews();
         renderDebugTestPairs();
@@ -5938,24 +5944,42 @@
           throwIfError(studentMetaErr, 'Student lookup failed');
           loginCodeToDelete = normalizeCode(studentMeta?.login_code || '');
 
-          // Remove dependents first to avoid FK failures.
-          await deleteBy('session_students', 'student_id', studentId);
-          await deleteBy('parent_students', 'student_id', studentId);
-          await deleteBy('session_cancellations', 'student_id', studentId);
-          const dependentStudentTables = [
-            'documents',
-            'contracts',
-            'invoices',
-            'homework',
-            'student_todos',
-            'student_checkins',
-            'parent_contract_signatures',
-            'messages',
-            'contract_sign_tokens',
-            'presence'
-          ];
-          for (const table of dependentStudentTables) {
-            await deleteBy(table, 'student_id', studentId);
+          let removedViaCode = false;
+          if (loginCodeToDelete) {
+            const { data: deleteByCodeData, error: deleteByCodeErr } = await supabaseClient.functions.invoke('delete-account', {
+              body: { login_code: loginCodeToDelete },
+              headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
+            });
+            if (deleteByCodeErr) {
+              console.warn('Delete by login code failed; falling back to row-based deletion.', deleteByCodeErr);
+            } else if (deleteByCodeData?.success) {
+              removedViaCode = true;
+              if (Array.isArray(deleteByCodeData?.warnings) && deleteByCodeData.warnings.length) {
+                console.warn('Delete by login code warnings', deleteByCodeData.warnings);
+              }
+            }
+          }
+
+          if (!removedViaCode) {
+            // Remove dependents first to avoid FK failures.
+            await deleteBy('session_students', 'student_id', studentId);
+            await deleteBy('parent_students', 'student_id', studentId);
+            await deleteBy('session_cancellations', 'student_id', studentId);
+            const dependentStudentTables = [
+              'documents',
+              'contracts',
+              'invoices',
+              'homework',
+              'student_todos',
+              'student_checkins',
+              'parent_contract_signatures',
+              'messages',
+              'contract_sign_tokens',
+              'presence'
+            ];
+            for (const table of dependentStudentTables) {
+              await deleteBy(table, 'student_id', studentId);
+            }
           }
 
           if (sessionsToRemove.length) {
@@ -5966,24 +5990,10 @@
             throwIfError(lessonDeleteErr, 'Delete failed for lesson_sessions');
           }
 
-          // Finally delete student row itself.
-          const { error: studentDeleteErr } = await supabaseClient.from('students').delete().eq('id', studentId);
-          throwIfError(studentDeleteErr, 'Delete failed for students');
-
-          // Delete auth user by login code (best effort once row is removed).
-          if (loginCodeToDelete) {
-            const { data, error } = await supabaseClient.functions.invoke('delete-account', {
-              body: { login_code: loginCodeToDelete },
-              headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
-            });
-            if (error) {
-              console.warn('Auth user delete by code failed', error);
-            } else if (data?.success === false) {
-              const msg = String(data?.error || '').toLowerCase();
-              if (!msg.includes('auth user not found')) {
-                console.warn('Auth user delete by code returned error', data);
-              }
-            }
+          // Finally delete student row itself (if not already removed by delete-account login_code flow).
+          if (!removedViaCode) {
+            const { error: studentDeleteErr } = await supabaseClient.from('students').delete().eq('id', studentId);
+            throwIfError(studentDeleteErr, 'Delete failed for students');
           }
         } catch (err) {
           // Roll back local state when remote delete fails, so UI and DB don't diverge.
