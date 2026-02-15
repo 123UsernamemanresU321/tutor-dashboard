@@ -5901,20 +5901,39 @@
       state.documents = state.documents.filter(d => d.studentId !== studentId);
       state.contracts = state.contracts.filter(c => c.studentId !== studentId);
       state.contractSignatures = state.contractSignatures.filter(c => c.studentId !== studentId);
-      state.invoices = state.invoices.filter(i => i.studentId !== studentId);
       state.homework = state.homework.filter(h => h.studentId !== studentId);
       state.studentTodos = state.studentTodos.filter(t => t.studentId !== studentId);
       state.studentCheckins = state.studentCheckins.filter(c => c.studentId !== studentId);
       state.parentLinks = state.parentLinks.filter(pl => pl.studentId !== studentId);
       // sessions: remove student from studentIds; drop sessions with no students left
       const sessionsToRemove = [];
+      const removedSessionInvoiceIds = new Set();
       state.sessions.forEach(sess => {
         sess.studentIds = (sess.studentIds || []).filter(id => id !== studentId);
-        if (!sess.studentIds.length) sessionsToRemove.push(sess.id);
+        if (!sess.studentIds.length) {
+          sessionsToRemove.push(sess.id);
+          const invId = cleanId(sess.invoiceId || '');
+          if (invId) removedSessionInvoiceIds.add(invId);
+        }
       });
       if (sessionsToRemove.length) {
         state.sessions = state.sessions.filter(s => !sessionsToRemove.includes(s.id));
       }
+      const removedSessionIdSet = new Set(sessionsToRemove.map(cleanId).filter(Boolean));
+      const invoiceStillReferenced = new Set(
+        state.sessions
+          .map(s => cleanId(s.invoiceId || ''))
+          .filter(Boolean)
+      );
+      state.invoices = state.invoices.filter(inv => {
+        const invStudentId = cleanId(inv.studentId || inv.student_id || '');
+        const invId = cleanId(inv.id || '');
+        const relatedSessionId = cleanId(inv.relatedSessionId || inv.related_session_id || '');
+        if (invStudentId === cleanId(studentId)) return false;
+        if (relatedSessionId && removedSessionIdSet.has(relatedSessionId)) return false;
+        if (removedSessionInvoiceIds.has(invId) && !invoiceStillReferenced.has(invId)) return false;
+        return true;
+      });
       saveState();
 
       // Remote cleanup if signed in
@@ -5988,6 +6007,21 @@
               .delete()
               .in('id', sessionsToRemove);
             throwIfError(lessonDeleteErr, 'Delete failed for lesson_sessions');
+          }
+          if (sessionsToRemove.length) {
+            const { error: invByRelatedErr } = await supabaseClient
+              .from('invoices')
+              .delete()
+              .in('related_session_id', sessionsToRemove);
+            throwIfError(invByRelatedErr, 'Delete failed for invoices by related_session_id');
+          }
+          const invoiceIdsToDelete = [...removedSessionInvoiceIds].filter(id => !invoiceStillReferenced.has(id));
+          if (invoiceIdsToDelete.length) {
+            const { error: invByIdErr } = await supabaseClient
+              .from('invoices')
+              .delete()
+              .in('id', invoiceIdsToDelete);
+            throwIfError(invByIdErr, 'Delete failed for invoices by id');
           }
 
           // Finally delete student row itself (if not already removed by delete-account login_code flow).
@@ -12577,21 +12611,51 @@
       const skipCancellation = !!opts.skipCancellation;
       // remove locally
       const sess = getSessionById(sessionId);
+      const linkedInvoiceId = cleanId(sess?.invoiceId || '');
       if (sess && !skipCancellation) {
         const start = new Date(sess.date + 'T' + (sess.startTime || '00:00'));
         recordSessionCancellation(sess, 'cancelled');
       }
       state.sessions = state.sessions.filter(s => s.id !== sessionId);
+      const deletedSessionId = cleanId(sessionId);
+      const invoiceStillReferenced = new Set(
+        state.sessions
+          .map(s => cleanId(s.invoiceId || ''))
+          .filter(Boolean)
+      );
+      const shouldDeleteLinkedInvoice = !!linkedInvoiceId && !invoiceStillReferenced.has(linkedInvoiceId);
+      state.invoices = state.invoices.filter(inv => {
+        const invId = cleanId(inv.id || '');
+        const relatedSessionId = cleanId(inv.relatedSessionId || inv.related_session_id || '');
+        if (relatedSessionId && relatedSessionId === deletedSessionId) return false;
+        if (shouldDeleteLinkedInvoice && invId === linkedInvoiceId) return false;
+        return true;
+      });
       saveState();
       if (!studentMode && !parentMode) {
         renderFinanceView();
       }
       // remove remotely if connected
       if (isSupabaseReady()) {
+        const isIgnorableDbError = (err) => {
+          const msg = String(err?.message || err || '').toLowerCase();
+          return msg.includes('does not exist') || (msg.includes('column') && msg.includes('does not exist'));
+        };
+        const throwIfError = (error, label) => {
+          if (!error) return;
+          if (isIgnorableDbError(error)) return;
+          throw new Error(`${label}: ${error.message || error}`);
+        };
         const { error: linkErr } = await supabaseClient.from('session_students').delete().eq('session_id', sessionId);
-        if (linkErr) throw linkErr;
+        throwIfError(linkErr, 'Delete failed for session_students');
         const { error: sessErr } = await supabaseClient.from('lesson_sessions').delete().eq('id', sessionId);
-        if (sessErr) throw sessErr;
+        throwIfError(sessErr, 'Delete failed for lesson_sessions');
+        const { error: invByRelatedErr } = await supabaseClient.from('invoices').delete().eq('related_session_id', sessionId);
+        throwIfError(invByRelatedErr, 'Delete failed for invoices by related_session_id');
+        if (shouldDeleteLinkedInvoice) {
+          const { error: invByIdErr } = await supabaseClient.from('invoices').delete().eq('id', linkedInvoiceId);
+          throwIfError(invByIdErr, 'Delete failed for invoices by id');
+        }
       }
     }
 
