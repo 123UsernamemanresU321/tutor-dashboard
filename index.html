@@ -1505,6 +1505,25 @@
                 <div id="maintenanceStatusText" class="text-[11px] text-slate-500"></div>
               </div>
 
+              <div class="card p-5 text-xs space-y-3" data-owner-only>
+                <h3 class="text-sm font-semibold mb-1">Debug test accounts</h3>
+                <p class="text-[11px] text-slate-500">
+                  Instantly create a linked test parent + student with contract status already signed.
+                </p>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button id="createDebugTestPairBtn"
+                    class="px-3 py-1.5 rounded-2xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700">
+                    Create test parent + student
+                  </button>
+                  <button id="refreshDebugTestPairsBtn"
+                    class="px-3 py-1.5 rounded-2xl border border-slate-300 text-xs">
+                    Refresh list
+                  </button>
+                </div>
+                <div id="debugTestPairStatus" class="text-[11px] text-slate-600 hidden"></div>
+                <ul id="debugTestPairsList" class="space-y-2 max-h-56 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+
               <div class="card p-5 text-xs space-y-3">
                 <h3 class="text-sm font-semibold mb-1" data-i18n="settings.data_backup">Data backup</h3>
                 <p data-i18n="settings.data_backup_hint">Export your dashboard data as JSON and paste it somewhere safe. You can import it later.</p>
@@ -3813,6 +3832,306 @@
       }
     }
 
+    const DEBUG_TEST_MARKER_PREFIX = '[debug-test-pair:';
+    const LOGIN_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+    function buildDebugPairMarker(tag) {
+      return `${DEBUG_TEST_MARKER_PREFIX}${String(tag || '').trim()}]`;
+    }
+
+    function extractDebugPairTag(text) {
+      const raw = String(text || '');
+      const match = raw.match(/\[debug-test-pair:([a-z0-9_-]+)\]/i);
+      return match?.[1] ? match[1].trim() : '';
+    }
+
+    function appendDebugPairMarker(text, tag) {
+      const marker = buildDebugPairMarker(tag);
+      const existing = String(text || '').trim();
+      if (!existing) return marker;
+      if (extractDebugPairTag(existing)) return existing;
+      return `${existing}\n${marker}`;
+    }
+
+    function randomLoginCode(length = 8) {
+      let code = '';
+      for (let i = 0; i < length; i++) {
+        code += LOGIN_CODE_ALPHABET[Math.floor(Math.random() * LOGIN_CODE_ALPHABET.length)];
+      }
+      return code;
+    }
+
+    function generateUniqueLoginCode() {
+      const used = new Set([
+        ...state.students.map(s => normalizeCode(s.loginCode || s.login_code || '')),
+        ...state.parents.map(p => normalizeCode(p.loginCode || p.login_code || ''))
+      ].filter(Boolean));
+      for (let i = 0; i < 50; i++) {
+        const candidate = randomLoginCode(8);
+        if (!used.has(candidate)) return candidate;
+      }
+      throw new Error('Unable to generate a unique login code. Please retry.');
+    }
+
+    function getDebugTestPairs() {
+      const pairs = new Map();
+      state.students.forEach(student => {
+        const tag = extractDebugPairTag(student.notes);
+        if (!tag) return;
+        if (!pairs.has(tag)) pairs.set(tag, { tag, student: null, parent: null });
+        pairs.get(tag).student = student;
+      });
+      state.parents.forEach(parent => {
+        const tag = extractDebugPairTag(parent.notes);
+        if (!tag) return;
+        if (!pairs.has(tag)) pairs.set(tag, { tag, student: null, parent: null });
+        pairs.get(tag).parent = parent;
+      });
+      state.parentLinks.forEach(link => {
+        const student = state.students.find(s => s.id === link.studentId);
+        const parent = state.parents.find(p => p.id === link.parentId);
+        const studentTag = extractDebugPairTag(student?.notes);
+        const parentTag = extractDebugPairTag(parent?.notes);
+        const tag = studentTag || parentTag;
+        if (!tag) return;
+        if (!pairs.has(tag)) pairs.set(tag, { tag, student: null, parent: null });
+        const entry = pairs.get(tag);
+        if (!entry.student && student) entry.student = student;
+        if (!entry.parent && parent) entry.parent = parent;
+      });
+      return [...pairs.values()].sort((a, b) => String(a.tag).localeCompare(String(b.tag)));
+    }
+
+    function renderDebugTestPairs() {
+      const listEl = document.getElementById('debugTestPairsList');
+      const statusEl = document.getElementById('debugTestPairStatus');
+      if (!listEl) return;
+      if (!isOwner()) {
+        listEl.innerHTML = '';
+        if (statusEl) statusEl.classList.add('hidden');
+        return;
+      }
+      const pairs = getDebugTestPairs();
+      if (!pairs.length) {
+        listEl.innerHTML = `<li class="text-slate-500 text-[11px]">No debug test accounts created yet.</li>`;
+      } else {
+        listEl.innerHTML = pairs.map(pair => {
+          const student = pair.student;
+          const parent = pair.parent;
+          const studentCode = normalizeCode(student?.loginCode || student?.login_code || '');
+          const parentCode = normalizeCode(parent?.loginCode || parent?.login_code || '');
+          return `
+            <li class="border border-slate-200 rounded-lg p-2 bg-white/80 space-y-1" data-debug-tag="${esc(pair.tag)}">
+              <div class="text-[11px] font-semibold">Pair ${esc(pair.tag)}</div>
+              <div class="text-[10px] text-slate-600">
+                Student: ${esc(student?.name || 'Missing')} ${studentCode ? `• <code class="font-mono">${esc(studentCode)}</code>` : ''}
+              </div>
+              <div class="text-[10px] text-slate-600">
+                Parent: ${esc(parent?.name || 'Missing')} ${parentCode ? `• <code class="font-mono">${esc(parentCode)}</code>` : ''}
+              </div>
+              <div class="flex flex-wrap gap-2 text-[10px]">
+                ${studentCode ? `<button type="button" class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50" data-copy-debug-code="${esc(studentCode)}">Copy student code</button>` : ''}
+                ${parentCode ? `<button type="button" class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50" data-copy-debug-code="${esc(parentCode)}">Copy parent code</button>` : ''}
+                <button type="button" class="px-2 py-1 rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50" data-delete-debug-tag="${esc(pair.tag)}">Delete pair</button>
+              </div>
+            </li>
+          `;
+        }).join('');
+      }
+      listEl.querySelectorAll('[data-copy-debug-code]').forEach(btn => {
+        btn.onclick = () => {
+          const code = String(btn.dataset.copyDebugCode || '');
+          if (!code) return;
+          navigator.clipboard?.writeText(code).then(() => {
+            if (statusEl) {
+              statusEl.textContent = `Copied code: ${code}`;
+              statusEl.classList.remove('hidden');
+            }
+          }).catch(() => prompt(t('prompt.copy_link'), code));
+        };
+      });
+      listEl.querySelectorAll('[data-delete-debug-tag]').forEach(btn => {
+        btn.onclick = async () => {
+          const tag = String(btn.dataset.deleteDebugTag || '').trim();
+          if (!tag) return;
+          await deleteDebugTestPair(tag);
+        };
+      });
+    }
+
+    async function createDebugTestPair() {
+      if (!guardEdit() || !isOwner()) return;
+      const statusEl = document.getElementById('debugTestPairStatus');
+      const createBtn = document.getElementById('createDebugTestPairBtn');
+      const pairTag = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`.toUpperCase();
+      try {
+        if (createBtn) createBtn.disabled = true;
+        if (statusEl) {
+          statusEl.textContent = 'Creating debug test parent/student...';
+          statusEl.classList.remove('hidden');
+        }
+
+        const nowIso = new Date().toISOString();
+        const studentId = generateId('stu');
+        const parentId = generateId('par');
+        const signatureId = generateId('sig');
+        const contractId = generateId('ctr');
+        const studentCode = generateUniqueLoginCode();
+        let parentCode = generateUniqueLoginCode();
+        while (parentCode === studentCode) {
+          parentCode = generateUniqueLoginCode();
+        }
+        const marker = buildDebugPairMarker(pairTag);
+
+        const testStudent = {
+          id: studentId,
+          name: `Test Student ${pairTag}`,
+          gradeLevel: 'Test',
+          rate: 350,
+          subjects: ['Maths'],
+          notes: appendDebugPairMarker('Auto-generated debug student.', pairTag),
+          studentEmail: '',
+          loginCode: studentCode,
+          contractSigned: true,
+          contractSignedAt: nowIso,
+          contractVersion: 'v1',
+          contractSignerName: `Test Parent ${pairTag}`,
+          contractSignerEmail: '',
+          lastContractId: signatureId,
+          scheduleSlots: [
+            { dayOfWeek: 1, startTime: '16:00', durationHours: Number(state.settings.defaultSessionDuration || 1), timezone: DEFAULT_TIMEZONE, sessionMode: 'online' }
+          ],
+          scheduleDays: [1],
+          preferredTime: '16:00',
+          scheduleStartDate: toDateOnly(new Date()),
+          sessionLengthHours: Number(state.settings.defaultSessionDuration || 1),
+          scheduleTimezone: DEFAULT_TIMEZONE,
+          scheduleNotes: marker,
+          authUserId: ''
+        };
+        const testParent = {
+          id: parentId,
+          name: `Test Parent ${pairTag}`,
+          email: '',
+          phone: '',
+          notes: appendDebugPairMarker('Auto-generated debug parent.', pairTag),
+          verified: true,
+          loginCode: parentCode,
+          authUserId: ''
+        };
+
+        state.students.push(testStudent);
+        state.parents.push(testParent);
+        state.parentLinks.push({
+          id: generateId('plink'),
+          parentId,
+          studentId,
+          relationship: 'Parent'
+        });
+        state.contractSignatures.push({
+          id: signatureId,
+          studentId,
+          parentName: testParent.name,
+          parentEmail: '',
+          signedAt: nowIso,
+          contractVersion: 'v1',
+          contractTextSnapshot: `Debug contract signature placeholder for ${testStudent.name}. ${marker}`,
+          renderedPdfUrl: '',
+          signatureMethod: 'debug_seed',
+          parentIp: ''
+        });
+        state.contracts.push({
+          id: contractId,
+          studentId,
+          fileName: `debug_contract_${pairTag}.pdf`,
+          storage_path: '',
+          status: 'Signed',
+          notes: appendDebugPairMarker('Debug signed contract placeholder.', pairTag),
+          uploadedAt: nowIso,
+          signedUrl: ''
+        });
+
+        refreshAutoBilling();
+        saveState();
+        renderAllViews();
+        renderDebugTestPairs();
+
+        if (isSupabaseReady()) {
+          try {
+            await syncStateToSupabase();
+          } catch (syncErr) {
+            console.warn('Debug pair sync before provisioning failed', syncErr);
+          }
+          await provisionLoginCode('student', studentCode, { studentId, fullName: testStudent.name });
+          await provisionLoginCode('parent', parentCode, { parentId, fullName: testParent.name });
+        }
+
+        logActivity('Created debug test pair', `${testStudent.name} / ${testParent.name}`);
+        if (statusEl) {
+          statusEl.textContent = `Created ${testStudent.name}. Student code: ${studentCode} | Parent code: ${parentCode}`;
+          statusEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        console.error('Debug test pair create failed', err);
+        if (statusEl) {
+          statusEl.textContent = err?.message || 'Failed to create debug test accounts.';
+          statusEl.classList.remove('hidden');
+        }
+      } finally {
+        if (createBtn) createBtn.disabled = false;
+      }
+    }
+
+    async function deleteDebugTestPair(tag) {
+      if (!guardEdit() || !isOwner()) return;
+      const safeTag = String(tag || '').trim();
+      if (!safeTag) return;
+      const marker = buildDebugPairMarker(safeTag);
+      const targetStudents = state.students.filter(s => extractDebugPairTag(s.notes) === safeTag);
+      const targetParents = state.parents.filter(p => extractDebugPairTag(p.notes) === safeTag);
+      if (!targetStudents.length && !targetParents.length) {
+        renderDebugTestPairs();
+        return;
+      }
+      if (!confirm(`Delete debug pair ${safeTag}? This removes linked sessions, invoices, homework, and contract records for that test student.`)) {
+        return;
+      }
+      const statusEl = document.getElementById('debugTestPairStatus');
+      if (statusEl) {
+        statusEl.textContent = `Deleting debug pair ${safeTag}...`;
+        statusEl.classList.remove('hidden');
+      }
+      try {
+        for (const student of targetStudents) {
+          await deleteStudentAndDependencies(student.id);
+        }
+        for (const parent of targetParents) {
+          const stillLinked = state.parentLinks.some(pl => pl.parentId === parent.id);
+          if (!stillLinked) {
+            await deleteParentAndLinks(parent.id);
+          } else {
+            parent.notes = String(parent.notes || '').replace(marker, '').trim();
+          }
+        }
+        state.contractSignatures = state.contractSignatures.filter(cs => extractDebugPairTag(cs.contractTextSnapshot || '') !== safeTag);
+        state.contracts = state.contracts.filter(c => extractDebugPairTag(c.notes) !== safeTag);
+        saveState();
+        renderAllViews();
+        renderDebugTestPairs();
+        logActivity('Deleted debug test pair', safeTag);
+        if (statusEl) {
+          statusEl.textContent = `Deleted debug pair ${safeTag}.`;
+          statusEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        console.error('Debug test pair delete failed', err);
+        if (statusEl) {
+          statusEl.textContent = err?.message || `Failed to delete debug pair ${safeTag}.`;
+          statusEl.classList.remove('hidden');
+        }
+      }
+    }
+
     function generateId(prefix) {
       return prefix + '_' + Math.random().toString(36).slice(2, 10);
     }
@@ -4297,6 +4616,16 @@
           renderMaintenanceUI();
         });
       }
+      const createDebugPairBtn = document.getElementById('createDebugTestPairBtn');
+      if (createDebugPairBtn) {
+        createDebugPairBtn.addEventListener('click', () => {
+          createDebugTestPair();
+        });
+      }
+      const refreshDebugPairsBtn = document.getElementById('refreshDebugTestPairsBtn');
+      if (refreshDebugPairsBtn) {
+        refreshDebugPairsBtn.addEventListener('click', () => renderDebugTestPairs());
+      }
       document.getElementById('exportDataBtn').addEventListener('click', () => {
         document.getElementById('backupTextarea').value = JSON.stringify(state, null, 2);
       });
@@ -4423,6 +4752,7 @@
       }
       applyTheme();
       applyDensity();
+      renderDebugTestPairs();
     }
 
     function pad2(n) {
@@ -5562,6 +5892,7 @@
       state.students = state.students.filter(s => s.id !== studentId);
       state.documents = state.documents.filter(d => d.studentId !== studentId);
       state.contracts = state.contracts.filter(c => c.studentId !== studentId);
+      state.contractSignatures = state.contractSignatures.filter(c => c.studentId !== studentId);
       state.invoices = state.invoices.filter(i => i.studentId !== studentId);
       state.homework = state.homework.filter(h => h.studentId !== studentId);
       state.studentTodos = state.studentTodos.filter(t => t.studentId !== studentId);
@@ -5592,7 +5923,7 @@
         // Delete dependents
         const tables = [
           'documents', 'contracts', 'invoices', 'homework',
-          'student_todos', 'student_checkins', 'session_students'
+          'student_todos', 'student_checkins', 'session_students', 'parent_contract_signatures'
         ];
         for (const t of tables) {
           await supabaseClient.from(t).delete().eq('student_id', studentId);
