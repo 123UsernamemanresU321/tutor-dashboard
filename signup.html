@@ -232,6 +232,24 @@
   </div>
 
   <script>
+    const CANONICAL_ORIGIN = 'https://tutor-mcp.com';
+    const LEGACY_BASE_PATH = '/tutor-dashboard';
+    const isLocalDevHost = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|::1)$/i.test(window.location.hostname);
+    const APP_ORIGIN = isLocalDevHost ? window.location.origin : CANONICAL_ORIGIN;
+    const appUrl = (path = '/') => new URL(path, `${APP_ORIGIN}/`).href;
+
+    if (!isLocalDevHost && window.location.origin !== CANONICAL_ORIGIN) {
+      const target = new URL(window.location.href);
+      target.protocol = 'https:';
+      target.host = new URL(CANONICAL_ORIGIN).host;
+      if (target.pathname === LEGACY_BASE_PATH) {
+        target.pathname = '/';
+      } else if (target.pathname.startsWith(`${LEGACY_BASE_PATH}/`)) {
+        target.pathname = target.pathname.slice(LEGACY_BASE_PATH.length) || '/';
+      }
+      window.location.replace(target.toString());
+    }
+
     const SUPABASE_URL = 'https://wdsqnbebutuhwckjpwqf.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkc3FuYmVidXR1aHdja2pwd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxMDE1NzcsImV4cCI6MjA3OTY3NzU3N30.pJglpTaZouSQFUVCbQONHK1UsB9CgWewKQCIV13NOEM';
     const HCAPTCHA_SITEKEY = '3ff631fc-4c9c-43ee-a486-3232939eedb2';
@@ -250,7 +268,7 @@
             <a href="./login.html" class="primary mt-4" style="display:block;text-align:center;text-decoration:none;">${t('signup.disabled_cta')}</a>
           `;
         }
-        setTimeout(() => { window.location.href = './login.html'; }, 2600);
+        setTimeout(() => { window.location.href = appUrl('/login.html'); }, 2600);
       });
     } else {
     let hcaptchaWidgetId = null;
@@ -362,7 +380,7 @@
           options: {
             captchaToken: hcaptchaToken,
             data: { full_name: inviteData.full_name, account_type: inviteData.role },
-            emailRedirectTo: new URL('./confirm-signup.html', window.location.href).href
+            emailRedirectTo: appUrl('/confirm-signup.html')
           }
         });
         if (error) throw error;
@@ -432,7 +450,7 @@
           // OR we just swallow the error if it's purely cleanup.
         }
 
-        window.location.href = './confirm-signup.html';
+        window.location.href = appUrl('/confirm-signup.html');
       } catch (err) {
         console.error(err);
         msg2.textContent = err?.message || t('signup.error_failed');

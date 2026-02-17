@@ -2041,6 +2041,24 @@
       window.location.href = url.toString();
     }
 
+    const CANONICAL_ORIGIN = 'https://tutor-mcp.com';
+    const LEGACY_BASE_PATH = '/tutor-dashboard';
+    const isLocalDevHost = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|::1)$/i.test(window.location.hostname);
+    const APP_ORIGIN = isLocalDevHost ? window.location.origin : CANONICAL_ORIGIN;
+    const appUrl = (path = '/') => new URL(path, `${APP_ORIGIN}/`).href;
+
+    if (!isLocalDevHost && window.location.origin !== CANONICAL_ORIGIN) {
+      const target = new URL(window.location.href);
+      target.protocol = 'https:';
+      target.host = new URL(CANONICAL_ORIGIN).host;
+      if (target.pathname === LEGACY_BASE_PATH) {
+        target.pathname = '/';
+      } else if (target.pathname.startsWith(`${LEGACY_BASE_PATH}/`)) {
+        target.pathname = target.pathname.slice(LEGACY_BASE_PATH.length) || '/';
+      }
+      window.location.replace(target.toString());
+    }
+
     /***********************
      * SUPABASE CONFIG      *
      ***********************/
@@ -2057,8 +2075,8 @@
     const MEETING_JOIN_LEAD_MINUTES = 10;
     const MAINTENANCE_MIN_DAYS = 1;
     const PAYFAST_PROVIDER = 'PayFast';
-    const PAYFAST_RETURN_URL = `${window.location.origin}${window.location.pathname}?payfast=success`;
-    const PAYFAST_CANCEL_URL = `${window.location.origin}${window.location.pathname}?payfast=cancel`;
+    const PAYFAST_RETURN_URL = new URL('/?payfast=success', `${APP_ORIGIN}/`).href;
+    const PAYFAST_CANCEL_URL = new URL('/?payfast=cancel', `${APP_ORIGIN}/`).href;
     const PAYFAST_NOTIFY_URL = `${SUPABASE_URL}/functions/v1/payfast-ipn`;
     const supabaseAvailable =
       !tourMode &&
@@ -6259,7 +6277,7 @@
                 password,
                 options: {
                   ...(HCAPTCHA_ENABLED ? { captchaToken } : {}),
-                  emailRedirectTo: new URL('./confirmation.html', window.location.href).href
+                  emailRedirectTo: appUrl('/confirmation.html')
                 }
               });
               if (error) throw error;
@@ -7959,7 +7977,6 @@
     }
 
     async function buildContractSigningLink(studentId) {
-      const basePath = window.location.pathname.replace(/[^/]*$/, '');
       const student = getStudentById(studentId);
       if (student?.contractSigned) {
         throw new Error(t('contract.already_signed'));
@@ -7976,7 +7993,7 @@
       if (error || !data?.token) {
         throw new Error(data?.error || error?.message || t('alert.contract_link_failed'));
       }
-      return `${window.location.origin}${basePath}contract-sign.html?student_id=${encodeURIComponent(studentId)}&v=v1&token=${encodeURIComponent(data.token)}${studentName}`;
+      return `${appUrl('/contract-sign.html')}?student_id=${encodeURIComponent(studentId)}&v=v1&token=${encodeURIComponent(data.token)}${studentName}`;
     }
 
     async function copyContractLink(studentId) {
