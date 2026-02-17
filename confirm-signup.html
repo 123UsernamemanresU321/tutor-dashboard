@@ -131,6 +131,21 @@
   </div>
 
   <script>
+    const CANONICAL_ORIGIN = 'https://tutor-mcp.com';
+    const LEGACY_BASE_PATH = '/tutor-dashboard';
+    const isLocalDevHost = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|::1)$/i.test(window.location.hostname);
+    if (!isLocalDevHost && window.location.origin !== CANONICAL_ORIGIN) {
+      const target = new URL(window.location.href);
+      target.protocol = 'https:';
+      target.host = new URL(CANONICAL_ORIGIN).host;
+      if (target.pathname === LEGACY_BASE_PATH) {
+        target.pathname = '/';
+      } else if (target.pathname.startsWith(`${LEGACY_BASE_PATH}/`)) {
+        target.pathname = target.pathname.slice(LEGACY_BASE_PATH.length) || '/';
+      }
+      window.location.replace(target.toString());
+    }
+
     // If arriving from the confirmation link (hash contains access_token), show "Email confirmed"
     (function() {
       if (window.initLanguageUI) initLanguageUI();
