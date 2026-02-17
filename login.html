@@ -241,6 +241,24 @@
   </div>
 
   <script>
+    const CANONICAL_ORIGIN = 'https://tutor-mcp.com';
+    const LEGACY_BASE_PATH = '/tutor-dashboard';
+    const isLocalDevHost = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|::1)$/i.test(window.location.hostname);
+    const APP_ORIGIN = isLocalDevHost ? window.location.origin : CANONICAL_ORIGIN;
+    const appUrl = (path = '/') => new URL(path, `${APP_ORIGIN}/`).href;
+
+    if (!isLocalDevHost && window.location.origin !== CANONICAL_ORIGIN) {
+      const target = new URL(window.location.href);
+      target.protocol = 'https:';
+      target.host = new URL(CANONICAL_ORIGIN).host;
+      if (target.pathname === LEGACY_BASE_PATH) {
+        target.pathname = '/';
+      } else if (target.pathname.startsWith(`${LEGACY_BASE_PATH}/`)) {
+        target.pathname = target.pathname.slice(LEGACY_BASE_PATH.length) || '/';
+      }
+      window.location.replace(target.toString());
+    }
+
     const SUPABASE_URL = 'https://wdsqnbebutuhwckjpwqf.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkc3FuYmVidXR1aHdja2pwd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxMDE1NzcsImV4cCI6MjA3OTY3NzU3N30.pJglpTaZouSQFUVCbQONHK1UsB9CgWewKQCIV13NOEM';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -303,7 +321,7 @@
           refresh_token: data.refresh_token
         });
         if (setErr) throw setErr;
-        window.location.href = './index.html';
+        window.location.href = appUrl('/index.html');
       } catch (err) {
         msg.textContent = err.message || t('auth.error_login_failed');
       }
@@ -355,7 +373,7 @@
         });
         if (setErr) throw setErr;
 
-        window.location.href = './index.html';
+        window.location.href = appUrl('/index.html');
       } catch (err) {
         console.error(err);
         const message = err?.message || err?.error || t('auth.error_access_failed');
