@@ -303,15 +303,29 @@
       e.preventDefault();
       msg.textContent = '';
       const email = ownerForm.email.value.trim();
-      const password = ownerForm.password.value.trim();
+      const password = ownerForm.password.value;
 
       try {
         const { data, error } = await supabaseClient.functions.invoke('owner-password-login', {
           body: { email, password }
         });
         if (error) {
-          const details = error?.context?.error || error?.message || t('auth.error_login_failed');
-          throw new Error(details);
+          const ctx = error?.context || {};
+          let details = ctx.error || ctx.message || error?.message || '';
+          if (!details && ctx.body) {
+            try {
+              const parsed = typeof ctx.body === 'string' ? JSON.parse(ctx.body) : ctx.body;
+              details = parsed?.error || '';
+            } catch (_) { }
+          }
+
+          // Fallback: try direct auth sign-in if edge function path fails.
+          const direct = await supabaseClient.auth.signInWithPassword({ email, password });
+          if (direct?.error || !direct?.data?.session) {
+            throw new Error(details || direct?.error?.message || t('auth.error_login_failed'));
+          }
+          window.location.href = appUrl('/index.html');
+          return;
         }
         if (!data?.access_token || !data?.refresh_token) {
           throw new Error(data?.error || t('auth.error_login_failed'));
