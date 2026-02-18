@@ -2109,6 +2109,50 @@
       return token;
     }
 
+    const ACTION_NONCE_ACTIONS = Object.freeze({
+      deleteContract: 'delete_contract',
+      refund: 'payfast_refund',
+      deleteAccountByCode: 'delete_account_by_code'
+    });
+
+    function buildActionRequestFingerprint(action, context = {}) {
+      const entries = Object.entries(context || {})
+        .map(([key, value]) => [String(key), String(value ?? '')])
+        .sort((a, b) => a[0].localeCompare(b[0]));
+      const serialized = entries.map(([key, value]) => `${key}=${value}`).join('|');
+      return `${action}|${serialized}`.slice(0, 512);
+    }
+
+    async function issueActionNonce(action, context = {}, accessTokenOverride = '') {
+      if (!isSupabaseReady()) {
+        throw new Error(t('alert.sign_in_first'));
+      }
+      const accessToken = accessTokenOverride || requireAccessToken(t('alert.sign_in_first'));
+      const requestFingerprint = buildActionRequestFingerprint(action, context);
+      const { data, error } = await supabaseClient.functions.invoke('issue-action-nonce', {
+        body: {
+          action,
+          request_fingerprint: requestFingerprint
+        },
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (error || !data?.success || !data?.nonce) {
+        const ctx = error?.context || {};
+        let message = data?.error || ctx.error || ctx.message || error?.message || 'Step-up verification required.';
+        if (ctx.body) {
+          try {
+            const parsed = typeof ctx.body === 'string' ? JSON.parse(ctx.body) : ctx.body;
+            message = parsed?.error || message;
+          } catch (_) { }
+        }
+        throw new Error(message);
+      }
+      return {
+        nonce: data.nonce,
+        requestFingerprint
+      };
+    }
+
     // SAFE deep clone helper
     function deepClone(obj) {
       return JSON.parse(JSON.stringify(obj));
@@ -3745,42 +3789,28 @@
       return orphanIds.length;
     }
 
-    async function removeStorageByPrefix(bucket, prefix) {
-      if (!supabaseClient || !prefix) return;
-      let offset = 0;
-      const limit = 100;
-      while (true) {
-        const { data, error } = await supabaseClient.storage.from(bucket).list(prefix, { limit, offset });
-        if (error) {
-          console.warn('Storage list failed', bucket, prefix, error);
-          break;
-        }
-        const items = data || [];
-        if (!items.length) break;
-        await supabaseClient.storage.from(bucket).remove(items.map(item => `${prefix}/${item.name}`));
-        if (items.length < limit) break;
-        offset += items.length;
-      }
-    }
-
     async function deleteContractForStudent(signatureId, studentId) {
-      // identify storage objects to remove
-      const targets = signatureId
-        ? state.contracts.filter(c => c.id === signatureId || c.studentId === studentId)
-        : state.contracts.filter(c => c.studentId === studentId);
-      // Try deleting from both buckets because storage_path may be stored without bucket prefix
-      const storageObjects = targets
-        .flatMap(c => {
-          const raw = c.storage_path || '';
-          const possible = ['signed_contracts', 'contracts'].map(bucket => {
-            const path = stripBucketPrefix(raw, bucket);
-            return path ? { bucket, path } : null;
-          }).filter(Boolean);
-          return possible;
-        })
-        .filter(Boolean);
+      if (isSupabaseReady()) {
+        const accessToken = requireAccessToken(t('alert.sign_in_first'));
+        const stepUp = await issueActionNonce(
+          ACTION_NONCE_ACTIONS.deleteContract,
+          { contract_id: signatureId || '', student_id: studentId },
+          accessToken
+        );
+        const { data, error } = await supabaseClient.functions.invoke('delete-contract', {
+          body: {
+            contract_id: signatureId || undefined,
+            student_id: studentId,
+            action_nonce: stepUp.nonce,
+            request_fingerprint: stepUp.requestFingerprint
+          },
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (error || !data?.success) {
+          throw error || new Error(data?.error || 'Contract delete failed.');
+        }
+      }
 
-      // local cleanup
       if (signatureId) {
         state.contractSignatures = state.contractSignatures.filter(cs => cs.id !== signatureId);
         state.contracts = state.contracts.filter(c => c.id !== signatureId);
@@ -3801,52 +3831,6 @@
       renderStudentFinance(studentId);
       renderStudentTimeline(studentId);
       renderStudentsView();
-      // remote cleanup
-	      if (isSupabaseReady()) {
-	        try {
-	          const accessToken = requireAccessToken(t('alert.sign_in_first'));
-	          // Call backend function to ensure storage + rows are removed
-	          try {
-	            await supabaseClient.functions.invoke('delete-contract', {
-	              body: { contract_id: signatureId || undefined, student_id: studentId },
-	              headers: { Authorization: `Bearer ${accessToken}` }
-	            });
-	          } catch (err) {
-            console.warn('delete-contract function failed; falling back to direct deletes', err);
-          }
-          if (signatureId) {
-            await supabaseClient.from('parent_contract_signatures').delete().eq('id', signatureId);
-            await supabaseClient.from('contracts').delete().eq('id', signatureId);
-          } else {
-            await supabaseClient.from('parent_contract_signatures').delete().eq('student_id', studentId);
-            await supabaseClient.from('contracts').delete().eq('student_id', studentId);
-          }
-          // remove storage objects if paths exist
-          for (const obj of storageObjects) {
-            try {
-              await supabaseClient.storage.from(obj.bucket).remove([obj.path]);
-            } catch (err) {
-              console.warn('Storage delete failed', err);
-            }
-          }
-          const ownerPrefix = supabaseSession?.user?.id ? `${supabaseSession.user.id}/${studentId}` : '';
-          const prefixes = [ownerPrefix, studentId].filter(Boolean);
-          for (const prefix of prefixes) {
-            for (const bucket of ['signed_contracts', 'contracts']) {
-              await removeStorageByPrefix(bucket, prefix);
-            }
-          }
-          await supabaseClient.from('students').update({
-            contract_signed: false,
-            contract_signed_at: null,
-            contract_signer_name: null,
-            contract_signer_email: null,
-            last_contract_id: null
-          }).eq('id', studentId);
-        } catch (err) {
-          console.error('Contract delete failed', err);
-        }
-      }
     }
 
     async function upsertInvoiceRemote(inv) {
@@ -6052,17 +6036,25 @@
           let removedViaCode = false;
           if (loginCodeToDelete) {
             const accessToken = requireAccessToken(t('alert.sign_in_first'));
+            const stepUp = await issueActionNonce(
+              ACTION_NONCE_ACTIONS.deleteAccountByCode,
+              { login_code: loginCodeToDelete },
+              accessToken
+            );
             const { data: deleteByCodeData, error: deleteByCodeErr } = await supabaseClient.functions.invoke('delete-account', {
-              body: { login_code: loginCodeToDelete },
+              body: {
+                login_code: loginCodeToDelete,
+                action_nonce: stepUp.nonce,
+                request_fingerprint: stepUp.requestFingerprint
+              },
               headers: { Authorization: `Bearer ${accessToken}` }
             });
-            if (deleteByCodeErr) {
-              console.warn('Delete by login code failed; falling back to row-based deletion.', deleteByCodeErr);
-            } else if (deleteByCodeData?.success) {
-              removedViaCode = true;
-              if (Array.isArray(deleteByCodeData?.warnings) && deleteByCodeData.warnings.length) {
-                console.warn('Delete by login code warnings', deleteByCodeData.warnings);
-              }
+            if (deleteByCodeErr || !deleteByCodeData?.success) {
+              throw new Error(deleteByCodeErr?.message || deleteByCodeData?.error || 'Delete by login code failed.');
+            }
+            removedViaCode = true;
+            if (Array.isArray(deleteByCodeData?.warnings) && deleteByCodeData.warnings.length) {
+              console.warn('Delete by login code warnings', deleteByCodeData.warnings);
             }
           }
 
@@ -7933,7 +7925,10 @@
         return;
       }
       try {
-        const { data, error } = await supabaseClient.functions.invoke('list-account-emails');
+        const accessToken = requireAccessToken(t('alert.sign_in_first'));
+        const { data, error } = await supabaseClient.functions.invoke('list-account-emails', {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
         if (error) throw error;
         accountEmails = Array.isArray(data?.emails) ? data.emails.filter(Boolean) : [];
       } catch (err) {
@@ -8679,8 +8674,17 @@
         if (loginCodeToDelete) {
           try {
             const accessToken = requireAccessToken(t('alert.sign_in_first'));
+            const stepUp = await issueActionNonce(
+              ACTION_NONCE_ACTIONS.deleteAccountByCode,
+              { login_code: loginCodeToDelete },
+              accessToken
+            );
             await supabaseClient.functions.invoke('delete-account', {
-              body: { login_code: loginCodeToDelete },
+              body: {
+                login_code: loginCodeToDelete,
+                action_nonce: stepUp.nonce,
+                request_fingerprint: stepUp.requestFingerprint
+              },
               headers: { Authorization: `Bearer ${accessToken}` }
             });
           } catch (err) {
@@ -9020,7 +9024,10 @@
         contractDeleteBtn.onclick = () => {
           if (!guardEdit()) return;
           const targetId = latestSig?.id || contractEntry?.id || s.lastContractId || '';
-          deleteContractForStudent(targetId, s.id);
+          deleteContractForStudent(targetId, s.id).catch((err) => {
+            console.error('Contract delete failed', err);
+            alert(err?.message || t('alert.delete_failed_try_again'));
+          });
         };
       }
       if (contractMeta) {
@@ -10817,8 +10824,18 @@
           continue;
         }
         const accessToken = requireAccessToken(t('alert.sign_in_first'));
+        const stepUp = await issueActionNonce(
+          ACTION_NONCE_ACTIONS.refund,
+          { session_id: sess.id, student_id: sid },
+          accessToken
+        );
         const { data, error } = await supabaseClient.functions.invoke('payfast-refund', {
-          body: { session_id: sess.id, student_id: sid },
+          body: {
+            session_id: sess.id,
+            student_id: sid,
+            action_nonce: stepUp.nonce,
+            request_fingerprint: stepUp.requestFingerprint
+          },
           headers: { Authorization: `Bearer ${accessToken}` }
         });
         if (error) {

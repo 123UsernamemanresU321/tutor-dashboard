@@ -311,6 +311,18 @@
         });
         if (error) {
           const ctx = error?.context || {};
+          const status = ctx.status || error.status || 0;
+          let retryAfter = data?.retry_after_sec;
+          if (!retryAfter && ctx.body) {
+            try {
+              const parsed = typeof ctx.body === 'string' ? JSON.parse(ctx.body) : ctx.body;
+              retryAfter = Number(parsed?.retry_after_sec || 0);
+            } catch (_) { }
+          }
+          if (status === 429) {
+            const mins = retryAfter ? Math.max(1, Math.ceil(retryAfter / 60)) : 30;
+            throw new Error(t('auth.error_retry', { mins }));
+          }
           let details = ctx.error || ctx.message || error?.message || '';
           if (!details && ctx.body) {
             try {
@@ -318,14 +330,7 @@
               details = parsed?.error || '';
             } catch (_) { }
           }
-
-          // Fallback: try direct auth sign-in if edge function path fails.
-          const direct = await supabaseClient.auth.signInWithPassword({ email, password });
-          if (direct?.error || !direct?.data?.session) {
-            throw new Error(details || direct?.error?.message || t('auth.error_login_failed'));
-          }
-          window.location.href = appUrl('/index.html');
-          return;
+          throw new Error(details || t('auth.error_login_failed'));
         }
         if (!data?.access_token || !data?.refresh_token) {
           throw new Error(data?.error || t('auth.error_login_failed'));
