@@ -3545,6 +3545,7 @@
         storage_path: r.storage_path,
         file_name: r.fileName
       }));
+      const resourceIdSet = new Set(resources.map(r => cleanId(r.id)).filter(Boolean));
       try {
         await upsertAndPrune('resources', resources, 'id');
       } catch (err) {
@@ -3564,16 +3565,25 @@
         console.warn('Activity log sync skipped', err);
       }
 
-      const homework = state.homework.map(h => ({
-        id: cleanId(h.id),
-        user_id: uid,
-        student_id: cleanId(h.studentId),
-        resource_id: cleanId(h.resourceId),
-        status: h.status,
-        due_date: h.dueDate,
-        assigned_date: h.assignedDate
-      }));
-      await upsertAndPrune('homework', homework, 'id');
+      const homework = state.homework
+        .map(h => ({
+          id: cleanId(h.id),
+          user_id: uid,
+          student_id: cleanId(h.studentId),
+          resource_id: cleanId(h.resourceId),
+          status: h.status,
+          due_date: h.dueDate,
+          assigned_date: h.assignedDate
+        }))
+        .filter(h => h.id && h.student_id && h.resource_id && studentIdSet.has(h.student_id) && resourceIdSet.has(h.resource_id));
+      if (homework.length !== state.homework.length) {
+        console.warn('Skipping homework rows with missing student/resource references during sync');
+      }
+      try {
+        await upsertAndPrune('homework', homework, 'id');
+      } catch (err) {
+        console.warn('Homework sync skipped', err);
+      }
 
       const documents = state.documents.map(d => ({
         id: cleanId(d.id),
