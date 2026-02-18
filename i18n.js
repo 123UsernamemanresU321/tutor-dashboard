@@ -136,7 +136,7 @@
       'confirm.cta_confirmed': 'Proceed to sign in',
 
       'confirmation.title_email': '✅ Email confirmed',
-      'confirmation.message_email': 'Your account is verified. You can now sign in to the tutor dashboard.',
+      'confirmation.message_email': 'Your account is verified. You can now sign in to Tutor Control Center.',
       'confirmation.cta': 'Go to dashboard',
       'confirmation.meta': 'You can close this tab if you’re already signed in elsewhere.',
       'confirmation.title_recovery': '🔑 Password reset',
@@ -314,7 +314,7 @@
       'confirm.cta_confirmed': 'Continuar a iniciar sesión',
 
       'confirmation.title_email': '✅ Correo confirmado',
-      'confirmation.message_email': 'Tu cuenta está verificada. Ya puedes iniciar sesión en el panel.',
+      'confirmation.message_email': 'Tu cuenta está verificada. Ya puedes iniciar sesión en Tutor Control Center.',
       'confirmation.cta': 'Ir al panel',
       'confirmation.meta': 'Puedes cerrar esta pestaña si ya iniciaste sesión en otro lugar.',
       'confirmation.title_recovery': '🔑 Restablecer contraseña',
@@ -492,7 +492,7 @@
       'confirm.cta_confirmed': 'Continuer vers la connexion',
 
       'confirmation.title_email': '✅ Email confirmé',
-      'confirmation.message_email': 'Votre compte est vérifié. Vous pouvez maintenant vous connecter au tableau de bord.',
+      'confirmation.message_email': 'Votre compte est vérifié. Vous pouvez maintenant vous connecter à Tutor Control Center.',
       'confirmation.cta': 'Aller au tableau de bord',
       'confirmation.meta': 'Vous pouvez fermer cet onglet si vous êtes déjà connecté ailleurs.',
       'confirmation.title_recovery': '🔑 Réinitialisation du mot de passe',
@@ -670,7 +670,7 @@
       'confirm.cta_confirmed': '继续登录',
 
       'confirmation.title_email': '✅ 邮箱已确认',
-      'confirmation.message_email': '您的账户已验证，现在可以登录导师系统。',
+      'confirmation.message_email': '您的账户已验证，现在可以登录 Tutor Control Center。',
       'confirmation.cta': '进入系统',
       'confirmation.meta': '如果您已在其他页面登录，可关闭此标签页。',
       'confirmation.title_recovery': '🔑 重置密码',
