@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>Tutoring Dashboard – Physics • Chemistry • Maths</title>
+  <title>Tutor Control Center – Physics • Chemistry • Maths</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' https: data: blob:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://js.hcaptcha.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.deepseek.com; frame-src https://hcaptcha.com https://*.hcaptcha.com https://8x8.vc https://*.8x8.vc;">
 
@@ -709,7 +709,7 @@
           T
         </div>
         <div>
-          <div class="font-semibold text-sm" data-brand-name>BRAND_NAME</div>
+          <div class="font-semibold text-sm" data-platform-name>PLATFORM_NAME</div>
           <div class="text-xs text-slate-400" data-i18n="brand.tagline">Physics • Chemistry • Maths</div>
         </div>
       </div>
@@ -1855,7 +1855,7 @@
     class="fixed inset-0 z-50 bg-gradient-to-br from-indigo-50 via-white to-cyan-50 text-slate-900 hidden overflow-y-auto">
     <div class="max-w-5xl mx-auto px-6 py-12">
       <header class="flex items-center justify-between mb-10">
-        <div class="text-xl font-bold text-indigo-700" data-brand-name>BRAND_NAME</div>
+        <div class="text-xl font-bold text-indigo-700" data-platform-name>PLATFORM_NAME</div>
         <div class="flex gap-3">
           <a href="./login.html"
             class="px-4 py-2 rounded-full border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-sm font-semibold" data-i18n="landing.tutor_sign_in">Tutor
@@ -2016,6 +2016,7 @@
 
     const BUSINESS = window.BUSINESS_CONFIG || {};
     const BRAND_NAME = BUSINESS.brandName || 'BRAND_NAME';
+    const PLATFORM_NAME = BUSINESS.platformName || BRAND_NAME;
     const OPERATOR_NAME = BUSINESS.operatorName || 'OPERATOR_NAME';
     const MERCHANT_NAME = BUSINESS.merchantName || 'MERCHANT_NAME';
     const SUPPORT_EMAIL = BUSINESS.supportEmail || 'SUPPORT_EMAIL';
@@ -4210,7 +4211,7 @@
     const TOUR_STEPS = [
       {
         view: 'dashboard',
-        title: 'Welcome to the tutor dashboard',
+        title: `Welcome to ${PLATFORM_NAME}`,
         body: 'This is a safe demo. Explore KPIs and weekly focus. Changes stay local.'
       },
       {
@@ -10919,7 +10920,7 @@
       const lines = [];
       lines.push('BEGIN:VCALENDAR');
       lines.push('VERSION:2.0');
-      lines.push('PRODID:-//Tutor Dashboard//ICS');
+      lines.push(`PRODID:-//${PLATFORM_NAME}//ICS`);
       getScheduleVisibleSessions().forEach(sess => {
         const dtStart = new Date(sess.date + 'T' + (sess.startTime || '00:00'));
         const durationMs = Number(sess.durationHours || 1) * 60 * 60 * 1000;
@@ -10927,7 +10928,7 @@
         const format = (d) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
         const names = sess.studentIds.map(id => getStudentById(id)?.name || 'Student').join(', ');
         lines.push('BEGIN:VEVENT');
-        lines.push('UID:' + sess.id + '@tutor-dashboard');
+        lines.push('UID:' + sess.id + '@tutor-mcp.com');
         lines.push('DTSTAMP:' + format(new Date()));
         lines.push('DTSTART:' + format(dtStart));
         lines.push('DTEND:' + format(dtEnd));
