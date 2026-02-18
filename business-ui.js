@@ -6,6 +6,7 @@
   });
   const tokens = {
     brandName: config.brandName || 'BRAND_NAME',
+    platformName: config.platformName || config.brandName || 'PLATFORM_NAME',
     operatorName: config.operatorName || 'OPERATOR_NAME',
     merchantName: config.merchantName || 'MERCHANT_NAME',
     supportEmail: config.supportEmail || 'SUPPORT_EMAIL',
@@ -16,6 +17,9 @@
   function applyText(root = document) {
     root.querySelectorAll('[data-brand-name]').forEach(el => {
       el.textContent = tokens.brandName;
+    });
+    root.querySelectorAll('[data-platform-name]').forEach(el => {
+      el.textContent = tokens.platformName;
     });
     root.querySelectorAll('[data-operator-name]').forEach(el => {
       el.textContent = tokens.operatorName;
