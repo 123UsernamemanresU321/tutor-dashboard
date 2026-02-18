@@ -1,5 +1,6 @@
 window.BUSINESS_CONFIG = {
-  brandName: 'Tutor Control Center',
+  brandName: 'MCP Tutor',
+  platformName: 'Tutor Control Center',
   operatorName: 'Shangjing Huang',
   merchantName: 'Qin Yu',
   supportEmail: 'info@tutor-mcp.com',
