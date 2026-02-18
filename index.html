@@ -2101,6 +2101,14 @@
     let maintenanceTicker = null;
     let presenceMap = new Map();
 
+    function requireAccessToken(errorMessage = '') {
+      const token = supabaseSession?.access_token;
+      if (!token) {
+        throw new Error(errorMessage || t('alert.sign_in_first'));
+      }
+      return token;
+    }
+
     // SAFE deep clone helper
     function deepClone(obj) {
       return JSON.parse(JSON.stringify(obj));
@@ -2499,9 +2507,10 @@
         return;
       }
       try {
+        const accessToken = requireAccessToken(t('alert.sign_in_first'));
         const { data, error } = await supabaseClient.functions.invoke('payfast-create-payment', {
           body: { invoice_id: inv.id },
-          headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
+          headers: { Authorization: `Bearer ${accessToken}` }
         });
         if (error) throw error;
         if (!data?.fields || !data?.process_url) {
@@ -3783,15 +3792,16 @@
       renderStudentTimeline(studentId);
       renderStudentsView();
       // remote cleanup
-      if (isSupabaseReady()) {
-        try {
-          // Call backend function to ensure storage + rows are removed
-          try {
-            await supabaseClient.functions.invoke('delete-contract', {
-              body: { contract_id: signatureId || undefined, student_id: studentId },
-              headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
-            });
-          } catch (err) {
+	      if (isSupabaseReady()) {
+	        try {
+	          const accessToken = requireAccessToken(t('alert.sign_in_first'));
+	          // Call backend function to ensure storage + rows are removed
+	          try {
+	            await supabaseClient.functions.invoke('delete-contract', {
+	              body: { contract_id: signatureId || undefined, student_id: studentId },
+	              headers: { Authorization: `Bearer ${accessToken}` }
+	            });
+	          } catch (err) {
             console.warn('delete-contract function failed; falling back to direct deletes', err);
           }
           if (signatureId) {
@@ -3882,6 +3892,7 @@
       const normalized = normalizeCode(code);
       if (!normalized) return;
       try {
+        const accessToken = requireAccessToken(t('alert.sign_in_first'));
         await supabaseClient.functions.invoke('issue-login-code', {
           body: {
             role,
@@ -3890,7 +3901,7 @@
             parentId: opts.parentId || null,
             fullName: opts.fullName || ''
           },
-          headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
+          headers: { Authorization: `Bearer ${accessToken}` }
         });
       } catch (err) {
         console.warn('Login code provisioning failed', err);
@@ -6030,9 +6041,10 @@
 
           let removedViaCode = false;
           if (loginCodeToDelete) {
+            const accessToken = requireAccessToken(t('alert.sign_in_first'));
             const { data: deleteByCodeData, error: deleteByCodeErr } = await supabaseClient.functions.invoke('delete-account', {
               body: { login_code: loginCodeToDelete },
-              headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
+              headers: { Authorization: `Bearer ${accessToken}` }
             });
             if (deleteByCodeErr) {
               console.warn('Delete by login code failed; falling back to row-based deletion.', deleteByCodeErr);
@@ -7987,9 +7999,10 @@
       }
       const studentName = student?.name ? `&student_name=${encodeURIComponent(student.name)}` : '';
       const parentProfile = parentMode ? getParentProfileBySession() : null;
+      const accessToken = requireAccessToken(t('alert.sign_in_first'));
       const { data, error } = await supabaseClient.functions.invoke('issue-contract-sign-token', {
         body: { student_id: studentId, parent_email: parentProfile?.email || student?.parentEmail || null },
-        headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
+        headers: { Authorization: `Bearer ${accessToken}` }
       });
       if (error || !data?.token) {
         throw new Error(data?.error || error?.message || t('alert.contract_link_failed'));
@@ -8655,9 +8668,10 @@
         }
         if (loginCodeToDelete) {
           try {
+            const accessToken = requireAccessToken(t('alert.sign_in_first'));
             await supabaseClient.functions.invoke('delete-account', {
               body: { login_code: loginCodeToDelete },
-              headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
+              headers: { Authorization: `Bearer ${accessToken}` }
             });
           } catch (err) {
             console.warn('Auth user delete by code failed', err);
@@ -10792,9 +10806,10 @@
           refunds.push({ success: true, cash: true });
           continue;
         }
+        const accessToken = requireAccessToken(t('alert.sign_in_first'));
         const { data, error } = await supabaseClient.functions.invoke('payfast-refund', {
           body: { session_id: sess.id, student_id: sid },
-          headers: { Authorization: `Bearer ${supabaseSession?.access_token || SUPABASE_ANON_KEY}` }
+          headers: { Authorization: `Bearer ${accessToken}` }
         });
         if (error) {
           throw new Error(error.message || 'Refund failed.');
@@ -11318,7 +11333,7 @@
       });
       saveState();
       if (isSupabaseReady()) {
-        const token = supabaseSession?.access_token || SUPABASE_ANON_KEY;
+        const token = requireAccessToken(t('alert.sign_in_first'));
         supabaseClient.functions.invoke('assign-homework', {
           body: { assignments: newAssignments },
           headers: { Authorization: `Bearer ${token}` }
