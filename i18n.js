@@ -4150,9 +4150,21 @@
     }
   }
 
+  function syncCurrentUrlLang(lang) {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('lang', normalizeLang(lang));
+      const next = `${url.pathname}${url.search}${url.hash}`;
+      window.history.replaceState(null, '', next);
+    } catch (_err) {
+      // ignore
+    }
+  }
+
   function setLanguage(lang, opts = {}) {
     const normalized = normalizeLang(lang);
     localStorage.setItem('lang', normalized);
+    syncCurrentUrlLang(normalized);
     document.documentElement.lang = normalized === 'zh' ? 'zh-Hans' : normalized;
     if (!opts.skipApply) applyI18n();
     if (!opts.skipLinks) updateInternalLinks();
