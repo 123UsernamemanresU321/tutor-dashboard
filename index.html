@@ -8170,7 +8170,15 @@
             return await mapSnapshotToState(snapshot);
           }
         } catch (err) {
-          console.warn('Portal snapshot fetch failed; snapshot is required for this role.', err);
+          const ctx = err?.context || {};
+          let details = ctx?.error || ctx?.message || '';
+          if (!details && ctx?.body) {
+            try {
+              const parsed = typeof ctx.body === 'string' ? JSON.parse(ctx.body) : ctx.body;
+              details = parsed?.error || parsed?.code || '';
+            } catch { }
+          }
+          console.warn('Portal snapshot fetch failed; snapshot is required for this role.', details || err?.message || err);
         }
         const fallback = buildRoleScopedLocalFallback();
         const hasCachedData = (fallback.students?.length || 0) > 0 ||
