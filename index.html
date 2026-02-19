@@ -1561,6 +1561,10 @@
                     class="portal-cta-btn portal-cta-pay portal-cta-btn-block text-[11px]">
                     Send overdue reminder emails
                   </button>
+                  <button id="sendOverdueReminderTestEmailBtn"
+                    class="portal-cta-btn portal-cta-subtle portal-cta-btn-block text-[11px]">
+                    Send test reminder email (eh8125809@gmail.com)
+                  </button>
                   <div id="sendOverdueReminderEmailsStatus" class="hidden text-[10px] rounded-lg border px-2 py-1"></div>
                 </div>
                 <p class="mt-2 text-[10px] text-slate-500" data-i18n="finance.reminder_hint">Click “Reminder text” to generate a polite message you can paste into email or chat.</p>
@@ -2430,6 +2434,7 @@
     let announcementShownInThisSession = false;
     let announcementAdminTicker = null;
     let overdueReminderSendInFlight = false;
+    let overdueReminderTestSendInFlight = false;
 
     function requireAccessToken(errorMessage = '') {
       const token = supabaseSession?.access_token;
@@ -5124,6 +5129,12 @@
       if (sendOverdueReminderEmailsBtn) {
         sendOverdueReminderEmailsBtn.addEventListener('click', () => {
           sendOverdueReminderEmails();
+        });
+      }
+      const sendOverdueReminderTestEmailBtn = document.getElementById('sendOverdueReminderTestEmailBtn');
+      if (sendOverdueReminderTestEmailBtn) {
+        sendOverdueReminderTestEmailBtn.addEventListener('click', () => {
+          sendOverdueReminderTestEmail();
         });
       }
       const addParentBtn = document.getElementById('addParentBtn');
@@ -12794,6 +12805,65 @@
       }
     }
 
+    async function sendOverdueReminderTestEmail() {
+      if (overdueReminderTestSendInFlight) return;
+      if (!guardEdit()) return;
+      if (!supabaseAvailable || !isSupabaseReady()) {
+        alert(t('alert.sign_in_first'));
+        return;
+      }
+      if (!isOwner()) {
+        alert('Only the owner account can send test reminder emails.');
+        return;
+      }
+
+      const confirmSend = confirm('Send a test overdue reminder email to eh8125809@gmail.com now?');
+      if (!confirmSend) return;
+
+      const btn = document.getElementById('sendOverdueReminderTestEmailBtn');
+      const accessToken = requireAccessToken(t('alert.sign_in_first'));
+      overdueReminderTestSendInFlight = true;
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Sending test email...';
+      }
+      setOverdueReminderEmailStatus('Sending test reminder email...', 'info');
+
+      try {
+        const { data, error } = await supabaseClient.functions.invoke('send-overdue-invoice-reminders', {
+          body: { debug_test: true, dry_run: false },
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (error) {
+          const ctx = error?.context || {};
+          let message = error?.message || 'Failed to send test reminder email.';
+          if (ctx.body) {
+            try {
+              const parsed = typeof ctx.body === 'string' ? JSON.parse(ctx.body) : ctx.body;
+              message = parsed?.error || parsed?.message || message;
+            } catch (_) { }
+          }
+          throw new Error(message);
+        }
+        const debugEmail = String(data?.debug_target_email || 'eh8125809@gmail.com');
+        const invoiceId = String(data?.invoice_id || '');
+        const summary = invoiceId
+          ? `Test email sent to ${debugEmail} (invoice ${invoiceId}).`
+          : `Test email sent to ${debugEmail}.`;
+        setOverdueReminderEmailStatus(summary, 'success');
+        logActivity('Sent test overdue reminder email', summary);
+      } catch (err) {
+        console.error('Overdue reminder test send failed', err);
+        setOverdueReminderEmailStatus(err?.message || 'Failed to send test reminder email.', 'error');
+      } finally {
+        overdueReminderTestSendInFlight = false;
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Send test reminder email (eh8125809@gmail.com)';
+        }
+      }
+    }
+
     function renderFinanceView() {
       const showVoided = !!state.settings.showVoidedInvoices;
       const knownStudentIds = new Set((state.students || []).map(s => cleanId(s.id)).filter(Boolean));
@@ -12813,8 +12883,15 @@
       }
       const reminderBtn = document.getElementById('sendOverdueReminderEmailsBtn');
       if (reminderBtn) {
-        reminderBtn.disabled = readOnlyMode || overdueReminderSendInFlight;
+        reminderBtn.disabled = readOnlyMode || overdueReminderSendInFlight || overdueReminderTestSendInFlight;
         reminderBtn.textContent = overdueReminderSendInFlight ? 'Sending reminders...' : 'Send overdue reminder emails';
+      }
+      const reminderTestBtn = document.getElementById('sendOverdueReminderTestEmailBtn');
+      if (reminderTestBtn) {
+        reminderTestBtn.disabled = readOnlyMode || overdueReminderSendInFlight || overdueReminderTestSendInFlight;
+        reminderTestBtn.textContent = overdueReminderTestSendInFlight
+          ? 'Sending test email...'
+          : 'Send test reminder email (eh8125809@gmail.com)';
       }
       const tbody = document.getElementById('financeStudentTable');
       if (!state.students.length) {
