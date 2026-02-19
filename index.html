@@ -1567,17 +1567,30 @@
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label class="text-[11px]">
-                    <span>Button label (optional)</span>
+                    <span>Primary button label (optional)</span>
                     <input id="announcementCtaLabelInput" type="text"
                       placeholder="Open details"
                       class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
                   </label>
                   <label class="text-[11px]">
-                    <span>Button URL (optional)</span>
+                    <span>Primary button URL (optional)</span>
                     <input id="announcementCtaUrlInput" type="text"
                       placeholder="https://example.com"
                       class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
                   </label>
+                </div>
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="text-[11px] font-medium text-slate-700">Additional buttons (optional)</div>
+                    <button id="announcementAddButtonRowBtn"
+                      class="px-2 py-1 rounded-lg border border-slate-300 text-[10px]">
+                      Add button
+                    </button>
+                  </div>
+                  <div id="announcementButtonRows" class="space-y-2"></div>
+                  <div class="text-[10px] text-slate-500">
+                    Add multiple links (for example Privacy Policy and Terms). Each button needs both label and URL.
+                  </div>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                   <button id="announcementPresetDomainBtn"
@@ -2103,11 +2116,8 @@
       <h3 id="announcementOverlayTitle" class="mt-2 text-base font-semibold text-slate-900">Important update</h3>
       <p id="announcementOverlayBody" class="mt-2 text-slate-700 whitespace-pre-wrap"></p>
       <div id="announcementOverlayMeta" class="mt-2 text-[10px] text-slate-500 hidden"></div>
+      <div id="announcementOverlayActions" class="mt-4 hidden flex flex-wrap items-center gap-2"></div>
       <div class="mt-4 flex flex-wrap items-center gap-2">
-        <button id="announcementOverlayCtaBtn"
-          class="hidden px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700">
-          Open
-        </button>
         <button id="announcementOverlayDismissBtn"
           class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs">
           Dismiss
@@ -2217,6 +2227,7 @@
     let announcementCheckInFlight = null;
     let announcementCheckedUserId = '';
     let announcementShownInThisSession = false;
+    let announcementAdminTicker = null;
 
     function requireAccessToken(errorMessage = '') {
       const token = supabaseSession?.access_token;
@@ -4858,6 +4869,19 @@
       if (announcementPresetPrivacyBtn) {
         announcementPresetPrivacyBtn.addEventListener('click', () => applyAnnouncementPreset('privacy_policy_update'));
       }
+      const announcementAddButtonRowBtn = document.getElementById('announcementAddButtonRowBtn');
+      if (announcementAddButtonRowBtn) {
+        announcementAddButtonRowBtn.addEventListener('click', () => appendAnnouncementButtonRow('', ''));
+      }
+      const announcementButtonRows = document.getElementById('announcementButtonRows');
+      if (announcementButtonRows) {
+        announcementButtonRows.addEventListener('click', (event) => {
+          const removeBtn = event.target?.closest?.('.announcement-btn-remove');
+          if (!removeBtn) return;
+          const row = removeBtn.closest('.announcement-button-row');
+          if (row) row.remove();
+        });
+      }
       const publishAnnouncementBtn = document.getElementById('publishAnnouncementBtn');
       if (publishAnnouncementBtn) {
         publishAnnouncementBtn.addEventListener('click', () => publishAnnouncementFromSettings());
@@ -4967,6 +4991,7 @@
       if (startInput) startInput.min = getMaintenanceMinDate();
       setVal('announcementTypeSelect', 'general');
       toggleAnnouncementTypeFields();
+      setAnnouncementButtonRows([]);
       const announcementStatus = document.getElementById('announcementAdminStatus');
       if (announcementStatus) {
         announcementStatus.textContent = '';
@@ -5005,8 +5030,16 @@
       }
       applyTheme();
       applyDensity();
+      if (announcementAdminTicker) {
+        clearInterval(announcementAdminTicker);
+        announcementAdminTicker = null;
+      }
       if (isOwner()) {
         loadOwnerAnnouncements();
+        announcementAdminTicker = setInterval(() => {
+          renderOwnerAnnouncementsList();
+          deactivateExpiredAnnouncementsForOwner();
+        }, 60 * 1000);
       } else {
         ownerAnnouncements = [];
         renderOwnerAnnouncementsList();
@@ -5192,6 +5225,92 @@
       localStorage.setItem(key, '1');
     }
 
+    function isMissingColumnError(err, columnName) {
+      const col = String(columnName || '').trim().toLowerCase();
+      if (!col) return false;
+      const code = String(err?.code || '').trim();
+      const msg = String(err?.message || '').toLowerCase();
+      return code === '42703' || (msg.includes('column') && msg.includes(col) && msg.includes('does not exist'));
+    }
+
+    function normalizeAnnouncementButtons(rawButtons, fallbackLabel, fallbackUrl) {
+      const out = [];
+      const pushIfValid = (labelRaw, urlRaw) => {
+        const label = String(labelRaw || '').trim();
+        const url = normalizeAnnouncementUrl(urlRaw);
+        if (!label || !url) return;
+        const key = `${label}::${url}`;
+        if (out.some(btn => `${btn.label}::${btn.url}` === key)) return;
+        out.push({ label, url });
+      };
+      if (Array.isArray(rawButtons)) {
+        rawButtons.forEach(btn => {
+          pushIfValid(btn?.label, btn?.url);
+        });
+      }
+      if (!out.length) {
+        pushIfValid(fallbackLabel, fallbackUrl);
+      }
+      return out.slice(0, 6);
+    }
+
+    function buildAnnouncementButtonRow(label = '', url = '') {
+      return `
+        <div class="announcement-button-row border border-slate-200 rounded-lg p-2 bg-slate-50/60">
+          <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr),minmax(0,1fr),auto] gap-2 items-end">
+            <label class="text-[10px]">
+              <span class="text-slate-600">Label</span>
+              <input type="text" value="${esc(label)}"
+                placeholder="Read Terms"
+                class="announcement-btn-label mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px] bg-white">
+            </label>
+            <label class="text-[10px]">
+              <span class="text-slate-600">URL</span>
+              <input type="text" value="${esc(url)}"
+                placeholder="https://example.com/terms"
+                class="announcement-btn-url mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px] bg-white">
+            </label>
+            <button type="button"
+              class="announcement-btn-remove px-2 py-1 rounded-lg border border-rose-200 text-rose-700 text-[10px]">
+              Remove
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function appendAnnouncementButtonRow(label = '', url = '') {
+      const rows = document.getElementById('announcementButtonRows');
+      if (!rows) return;
+      rows.insertAdjacentHTML('beforeend', buildAnnouncementButtonRow(label, url));
+    }
+
+    function setAnnouncementButtonRows(buttons = []) {
+      const rows = document.getElementById('announcementButtonRows');
+      if (!rows) return;
+      rows.innerHTML = '';
+      const valid = Array.isArray(buttons) ? buttons : [];
+      valid.forEach(btn => appendAnnouncementButtonRow(btn?.label || '', btn?.url || ''));
+    }
+
+    function readAnnouncementButtonRowsFromInputs() {
+      const rows = document.getElementById('announcementButtonRows');
+      if (!rows) return [];
+      const buttons = [];
+      rows.querySelectorAll('.announcement-button-row').forEach(row => {
+        const label = String(row.querySelector('.announcement-btn-label')?.value || '').trim();
+        const urlRaw = String(row.querySelector('.announcement-btn-url')?.value || '').trim();
+        if (!label && !urlRaw) return;
+        if (!label || !urlRaw) {
+          throw new Error('Each additional button needs both label and URL.');
+        }
+        const url = normalizeAnnouncementUrl(urlRaw);
+        if (!url) throw new Error(`Invalid button URL: ${urlRaw}`);
+        buttons.push({ label, url });
+      });
+      return buttons;
+    }
+
     function normalizeAnnouncementUrl(value) {
       const raw = String(value || '').trim();
       if (!raw) return '';
@@ -5221,7 +5340,13 @@
         const body = `We moved from ${fromLabel} to ${toLabel}. Please use the new domain for future access.`;
         const ctaLabel = 'Open new domain';
         const ctaUrl = toDomain ? ensureHttpUrl(toDomain) : APP_ORIGIN;
-        return { title, body, ctaLabel, ctaUrl };
+        return {
+          title,
+          body,
+          ctaLabel,
+          ctaUrl,
+          ctaButtons: [{ label: ctaLabel, url: ctaUrl }]
+        };
       }
       if (normalized === 'privacy_policy_update') {
         const version = String(draft.policy_version || '').trim();
@@ -5230,13 +5355,23 @@
         const body = 'Our Privacy Policy was updated. Please review the latest version.';
         const ctaLabel = 'Read Privacy Policy';
         const ctaUrl = appUrl('/privacy.html');
-        return { title, body, ctaLabel, ctaUrl };
+        return {
+          title,
+          body,
+          ctaLabel,
+          ctaUrl,
+          ctaButtons: [
+            { label: 'Read Privacy Policy', url: appUrl('/privacy.html') },
+            { label: 'Read Terms of Service', url: appUrl('/tos.html') }
+          ]
+        };
       }
       return {
         title: 'Important update',
         body: 'Please review this announcement.',
         ctaLabel: '',
-        ctaUrl: ''
+        ctaUrl: '',
+        ctaButtons: []
       };
     }
 
@@ -5267,6 +5402,10 @@
       if (bodyInput && !String(bodyInput.value || '').trim()) bodyInput.value = defaults.body;
       if (ctaLabelInput && !String(ctaLabelInput.value || '').trim()) ctaLabelInput.value = defaults.ctaLabel;
       if (ctaUrlInput && !String(ctaUrlInput.value || '').trim()) ctaUrlInput.value = defaults.ctaUrl;
+      const hasRows = Array.from(document.querySelectorAll('#announcementButtonRows .announcement-button-row')).length > 0;
+      if (!hasRows && Array.isArray(defaults.ctaButtons) && defaults.ctaButtons.length) {
+        setAnnouncementButtonRows(defaults.ctaButtons);
+      }
     }
 
     function buildAnnouncementPayloadFromInputs() {
@@ -5293,6 +5432,27 @@
         ctaUrl = policyUrlRaw;
       }
       ctaUrl = normalizeAnnouncementUrl(ctaUrl);
+      if (ctaLabel && !ctaUrl) {
+        throw new Error('Primary button URL is required when a primary label is provided.');
+      }
+      if (!ctaLabel && ctaUrl) {
+        throw new Error('Primary button label is required when a primary URL is provided.');
+      }
+      const additionalButtons = readAnnouncementButtonRowsFromInputs();
+      const defaultButtons = Array.isArray(defaults.ctaButtons) ? defaults.ctaButtons : [];
+      let ctaButtons = [];
+      if (ctaLabel && ctaUrl) {
+        ctaButtons.push({ label: ctaLabel, url: ctaUrl });
+      }
+      ctaButtons = ctaButtons.concat(additionalButtons);
+      if (!ctaButtons.length && defaultButtons.length && !titleRaw && !bodyRaw) {
+        ctaButtons = normalizeAnnouncementButtons(defaultButtons, '', '');
+      } else {
+        ctaButtons = normalizeAnnouncementButtons(ctaButtons, '', '');
+      }
+      if (ctaButtons.length > 6) {
+        throw new Error('Maximum 6 announcement buttons are allowed.');
+      }
       const expiresAtDate = expiresRaw ? parseLocalDateTimeInput(expiresRaw) : null;
       if (expiresRaw && !expiresAtDate) {
         throw new Error('Invalid expiry date/time.');
@@ -5304,8 +5464,9 @@
         announcement_type: type,
         title,
         body,
-        cta_label: ctaLabel || null,
-        cta_url: ctaUrl || null,
+        cta_label: ctaButtons[0]?.label || null,
+        cta_url: ctaButtons[0]?.url || null,
+        cta_buttons: ctaButtons.length ? ctaButtons : null,
         domain_from: domainFromRaw || null,
         domain_to: domainToRaw || null,
         policy_version: policyVersionRaw || null,
@@ -5330,30 +5491,44 @@
       setVal('announcementDomainToInput', '');
       setVal('announcementPolicyVersionInput', '');
       setVal('announcementPolicyUrlInput', '');
+      setAnnouncementButtonRows([]);
       toggleAnnouncementTypeFields();
+    }
+
+    function isAnnouncementExpired(announcement, nowTs = Date.now()) {
+      const expiresAt = String(announcement?.expires_at || '').trim();
+      if (!expiresAt) return false;
+      const ts = new Date(expiresAt).getTime();
+      if (!Number.isFinite(ts)) return false;
+      return ts < nowTs;
     }
 
     function renderOwnerAnnouncementsList() {
       const list = document.getElementById('announcementAdminList');
       if (!list) return;
-      if (!ownerAnnouncements.length) {
-        list.innerHTML = `<li class="text-slate-500 text-[11px]">No announcements yet.</li>`;
+      const nowTs = Date.now();
+      const visibleAnnouncements = ownerAnnouncements
+        .filter(a => !isAnnouncementExpired(a, nowTs))
+        .sort((a, b) => new Date(b.publish_at || 0) - new Date(a.publish_at || 0));
+      if (!visibleAnnouncements.length) {
+        list.innerHTML = `<li class="text-slate-500 text-[11px]">No active announcements right now.</li>`;
         return;
       }
-      list.innerHTML = ownerAnnouncements.map(a => {
+      list.innerHTML = visibleAnnouncements.map(a => {
         const id = cleanId(a.id);
         const isActive = !!a.is_active;
         const publishAt = a.publish_at ? formatDateTimeShort(a.publish_at) : t('common.na');
         const expiresAt = a.expires_at ? formatDateTimeShort(a.expires_at) : 'No expiry';
         const statusClass = isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-600';
         const toggleLabel = isActive ? 'Deactivate' : 'Activate';
+        const buttonCount = Array.isArray(a.cta_buttons) ? a.cta_buttons.length : 0;
         return `
           <li class="border border-slate-200 rounded-lg px-2 py-2 bg-white/90">
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0">
                 <div class="font-medium text-slate-900 truncate">${esc(a.title || 'Untitled announcement')}</div>
                 <div class="text-[10px] text-slate-500 mt-0.5">
-                  ${esc(formatAnnouncementTypeLabel(a.announcement_type))} • Published ${esc(publishAt)} • Expires ${esc(expiresAt)}
+                  ${esc(formatAnnouncementTypeLabel(a.announcement_type))} • Published ${esc(publishAt)} • Expires ${esc(expiresAt)} • Buttons ${esc(buttonCount)}
                 </div>
               </div>
               <span class="inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-medium ${statusClass}">${isActive ? 'Active' : 'Inactive'}</span>
@@ -5369,6 +5544,47 @@
       }).join('');
     }
 
+    function mapAnnouncementRow(row) {
+      const buttons = normalizeAnnouncementButtons(
+        row?.cta_buttons,
+        row?.cta_label || '',
+        row?.cta_url || ''
+      );
+      return {
+        id: row.id,
+        announcement_type: normalizeAnnouncementType(row.announcement_type),
+        title: row.title || '',
+        body: row.body || '',
+        cta_label: buttons[0]?.label || row.cta_label || '',
+        cta_url: buttons[0]?.url || normalizeAnnouncementUrl(row.cta_url || ''),
+        cta_buttons: buttons,
+        domain_from: row.domain_from || '',
+        domain_to: row.domain_to || '',
+        policy_version: row.policy_version || '',
+        publish_at: row.publish_at || row.created_at || '',
+        expires_at: row.expires_at || '',
+        is_active: !!row.is_active
+      };
+    }
+
+    async function deactivateExpiredAnnouncementsForOwner() {
+      if (!isSupabaseReady() || !isOwner()) return;
+      const nowIso = new Date().toISOString();
+      try {
+        const { error } = await supabaseClient
+          .from('global_announcements')
+          .update({
+            is_active: false,
+            updated_at: nowIso
+          })
+          .eq('is_active', true)
+          .lt('expires_at', nowIso);
+        if (error) throw error;
+      } catch (err) {
+        console.warn('Announcement expiry cleanup failed', err);
+      }
+    }
+
     async function loadOwnerAnnouncements() {
       if (!isSupabaseReady() || !isOwner()) {
         ownerAnnouncements = [];
@@ -5376,26 +5592,14 @@
         return;
       }
       try {
+        await deactivateExpiredAnnouncementsForOwner();
         const { data, error } = await supabaseClient
           .from('global_announcements')
           .select('*')
           .order('publish_at', { ascending: false })
           .limit(30);
         if (error) throw error;
-        ownerAnnouncements = (data || []).map(row => ({
-          id: row.id,
-          announcement_type: normalizeAnnouncementType(row.announcement_type),
-          title: row.title || '',
-          body: row.body || '',
-          cta_label: row.cta_label || '',
-          cta_url: row.cta_url || '',
-          domain_from: row.domain_from || '',
-          domain_to: row.domain_to || '',
-          policy_version: row.policy_version || '',
-          publish_at: row.publish_at || row.created_at || '',
-          expires_at: row.expires_at || '',
-          is_active: !!row.is_active
-        }));
+        ownerAnnouncements = (data || []).map(row => mapAnnouncementRow(row));
       } catch (err) {
         console.warn('Announcements load failed', err);
         ownerAnnouncements = [];
@@ -5421,12 +5625,21 @@
         if (!payload.title || !payload.body) {
           throw new Error('Title and message are required.');
         }
-        const { error } = await supabaseClient
+        const insertPayload = {
+          ...payload,
+          created_by: cleanId(supabaseSession?.user?.id || '')
+        };
+        let { error } = await supabaseClient
           .from('global_announcements')
-          .insert({
-            ...payload,
-            created_by: cleanId(supabaseSession?.user?.id || '')
-          });
+          .insert(insertPayload);
+        if (error && isMissingColumnError(error, 'cta_buttons')) {
+          const fallbackPayload = { ...insertPayload };
+          delete fallbackPayload.cta_buttons;
+          const retry = await supabaseClient
+            .from('global_announcements')
+            .insert(fallbackPayload);
+          error = retry.error;
+        }
         if (error) throw error;
         setStatus('Announcement published.');
         clearAnnouncementComposer(false);
@@ -5484,7 +5697,7 @@
       const titleEl = document.getElementById('announcementOverlayTitle');
       const bodyEl = document.getElementById('announcementOverlayBody');
       const metaEl = document.getElementById('announcementOverlayMeta');
-      const ctaBtn = document.getElementById('announcementOverlayCtaBtn');
+      const actionsEl = document.getElementById('announcementOverlayActions');
       const dismissBtn = document.getElementById('announcementOverlayDismissBtn');
 
       if (titleEl) titleEl.textContent = announcement.title || 'Announcement';
@@ -5504,15 +5717,30 @@
         metaEl.classList.toggle('hidden', !meta);
       }
 
-      if (ctaBtn) {
-        const rawUrl = normalizeAnnouncementUrl(announcement.cta_url || '');
-        const hasUrl = !!rawUrl;
-        ctaBtn.classList.toggle('hidden', !hasUrl);
-        ctaBtn.textContent = announcement.cta_label || t('common.open');
-        ctaBtn.onclick = () => {
-          if (!hasUrl) return;
-          openPopupWithConfirm(rawUrl, announcement.cta_label || 'Announcement link');
-        };
+      const buttons = normalizeAnnouncementButtons(
+        announcement?.cta_buttons,
+        announcement?.cta_label,
+        announcement?.cta_url
+      );
+      if (actionsEl) {
+        actionsEl.innerHTML = '';
+        if (buttons.length) {
+          buttons.forEach((btn, idx) => {
+            const buttonEl = document.createElement('button');
+            buttonEl.type = 'button';
+            buttonEl.className = idx === 0
+              ? 'px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700'
+              : 'px-3 py-1.5 rounded-xl border border-slate-300 text-xs';
+            buttonEl.textContent = btn.label || t('common.open');
+            buttonEl.addEventListener('click', () => {
+              openPopupWithConfirm(btn.url, btn.label || 'Announcement link');
+            });
+            actionsEl.appendChild(buttonEl);
+          });
+          actionsEl.classList.remove('hidden');
+        } else {
+          actionsEl.classList.add('hidden');
+        }
       }
 
       if (dismissBtn) {
@@ -5557,19 +5785,7 @@
       const seenSet = new Set((reads || []).map(r => cleanId(r.announcement_id)).filter(Boolean));
       return rows
         .filter(row => !seenSet.has(cleanId(row.id)))
-        .map(row => ({
-          id: row.id,
-          announcement_type: normalizeAnnouncementType(row.announcement_type),
-          title: row.title || '',
-          body: row.body || '',
-          cta_label: row.cta_label || '',
-          cta_url: row.cta_url || '',
-          domain_from: row.domain_from || '',
-          domain_to: row.domain_to || '',
-          policy_version: row.policy_version || '',
-          publish_at: row.publish_at || row.created_at || '',
-          expires_at: row.expires_at || ''
-        }));
+        .map(row => mapAnnouncementRow(row));
     }
 
     async function markAnnouncementSeen(announcementId) {
