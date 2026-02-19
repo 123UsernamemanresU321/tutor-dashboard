@@ -29,9 +29,9 @@
         <li>Authenticate and manage accounts</li>
         <li>Schedule and track tutoring sessions, homework, and resources</li>
         <li>Display and manage invoices and payment status</li>
-        <li>Communicate regarding lessons, changes, or academic updates</li>
+        <li>Communicate regarding lessons, changes, academic updates, and billing/service notices</li>
       </ul>
-      <p>No personal data is used for marketing or advertising.</p>
+      <p>Service emails may be sent for invoices, overdue balances, session changes, security notices, and policy/domain updates. Marketing emails are sent only where explicit opt-in consent is recorded and can be withdrawn at any time.</p>
 
       <h2>3. Storage and Security</h2>
       <ul>
@@ -97,9 +97,9 @@
         <li>Autenticar y gestionar cuentas</li>
         <li>Programar y hacer seguimiento de sesiones, tareas y recursos</li>
         <li>Mostrar y gestionar facturas y estado de pago</li>
-        <li>Comunicarnos sobre clases, cambios o actualizaciones académicas</li>
+        <li>Comunicarnos sobre clases, cambios, actualizaciones académicas y avisos de facturación/servicio</li>
       </ul>
-      <p>No se utiliza información personal para marketing o publicidad.</p>
+      <p>Podemos enviar correos de servicio para facturas, saldos vencidos, cambios de sesión, avisos de seguridad y actualizaciones de dominio/políticas. Los correos de marketing solo se envían con consentimiento explícito (opt-in) y puedes retirarlo en cualquier momento.</p>
 
       <h2>3. Almacenamiento y seguridad</h2>
       <ul>
@@ -165,9 +165,9 @@
         <li>Authentifier et gérer les comptes</li>
         <li>Planifier et suivre les séances, devoirs et ressources</li>
         <li>Afficher et gérer les factures et le statut de paiement</li>
-        <li>Communiquer sur les cours, changements ou mises à jour</li>
+        <li>Communiquer sur les cours, changements, mises à jour académiques et notifications de facturation/service</li>
       </ul>
-      <p>Aucune donnée personnelle n’est utilisée à des fins marketing.</p>
+      <p>Des emails de service peuvent être envoyés pour les factures, impayés, changements de séance, notifications de sécurité et mises à jour de domaine/politique. Les emails marketing ne sont envoyés qu’avec un consentement explicite (opt-in), révocable à tout moment.</p>
 
       <h2>3. Stockage et sécurité</h2>
       <ul>
@@ -233,9 +233,9 @@
         <li>认证与管理账户</li>
         <li>安排并跟踪课程、作业与资源</li>
         <li>展示与管理发票与支付状态</li>
-        <li>就课程、调整或学业更新进行沟通</li>
+        <li>就课程、调整、学业更新以及账单/服务通知进行沟通</li>
       </ul>
-      <p>不会将个人数据用于营销或广告。</p>
+      <p>我们可能发送服务类邮件（发票、逾期提醒、课程变更、安全通知、域名/政策更新）。营销邮件仅在获得明确同意（opt-in）后发送，且您可随时撤回同意。</p>
 
       <h2>3. 存储与安全</h2>
       <ul>
@@ -309,6 +309,8 @@
       <p>Payment is due by the stated due date using the agreed method. Payments are processed via PayFast on behalf of the Merchant of Record.</p>
       <h3>5.3 Late Payments</h3>
       <p>Repeated late payment may result in late fees and/or suspension of lessons.</p>
+      <h3>5.4 Service Email Notices</h3>
+      <p>By providing an email address and opting in on your profile, you authorize service notices by email (including invoices, overdue reminders, session changes, account-security notices, and policy/domain updates). Marketing emails require separate explicit consent.</p>
 
       <h2>Payments and Merchant Details</h2>
       <ul>
@@ -372,6 +374,8 @@
       <p>El pago vence en la fecha indicada usando el método acordado. Los pagos se procesan vía PayFast en nombre del comerciante de registro.</p>
       <h3>5.3 Pagos tardíos</h3>
       <p>Los pagos tardíos repetidos pueden generar cargos y/o suspensión de clases.</p>
+      <h3>5.4 Avisos por email de servicio</h3>
+      <p>Al proporcionar un correo y activar el consentimiento en tu perfil, autorizas avisos de servicio por email (incluyendo facturas, recordatorios de vencimiento, cambios de sesión, seguridad de cuenta y actualizaciones de políticas/dominio). El marketing requiere consentimiento explícito separado.</p>
 
       <h2>Pagos y datos del comerciante</h2>
       <ul>
@@ -435,6 +439,8 @@
       <p>Le paiement est dû à la date indiquée via le moyen convenu. Les paiements sont traités via PayFast pour le compte du commerçant de référence.</p>
       <h3>5.3 Retards de paiement</h3>
       <p>Des retards répétés peuvent entraîner des frais et/ou une suspension des cours.</p>
+      <h3>5.4 Notifications email de service</h3>
+      <p>En fournissant une adresse email et en activant le consentement dans votre profil, vous autorisez l’envoi de notifications de service par email (factures, rappels d’impayés, changements de séance, sécurité du compte et mises à jour de politique/domaine). Les emails marketing nécessitent un consentement explicite séparé.</p>
 
       <h2>Paiements et informations commerçant</h2>
       <ul>
@@ -498,6 +504,8 @@
       <p>需在到期日前按约定方式付款。付款由 PayFast 代收商户处理。</p>
       <h3>5.3 逾期付款</h3>
       <p>多次逾期可能产生滞纳费用和/或暂停课程。</p>
+      <h3>5.4 服务邮件通知</h3>
+      <p>当您提供邮箱并在资料中开启同意后，即授权我们发送服务类邮件通知（包括发票、逾期提醒、课程变更、账户安全通知以及域名/政策更新）。营销邮件需单独明确同意。</p>
 
       <h2>付款与商户信息</h2>
       <ul>
