@@ -5,5 +5,5 @@ window.BUSINESS_CONFIG = {
   merchantName: 'Qin Yu',
   supportEmail: 'info@tutor-mcp.com',
   businessAddress: 'Cape Town, South Africa',
-  termsEffectiveDate: '22 December 2025'
+  termsEffectiveDate: '19 February 2026'
 };
