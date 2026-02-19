@@ -1556,6 +1556,13 @@
               <div class="card p-4 col-span-1 max-h-[75vh] overflow-y-auto scrollbar-thin">
                 <h3 class="text-sm font-semibold mb-2" data-i18n="dashboard.overdue_invoices">Overdue invoices</h3>
                 <ul id="overdueInvoicesList" class="space-y-2 text-[11px]"></ul>
+                <div class="mt-3 space-y-2" data-owner-only>
+                  <button id="sendOverdueReminderEmailsBtn"
+                    class="portal-cta-btn portal-cta-pay portal-cta-btn-block text-[11px]">
+                    Send overdue reminder emails
+                  </button>
+                  <div id="sendOverdueReminderEmailsStatus" class="hidden text-[10px] rounded-lg border px-2 py-1"></div>
+                </div>
                 <p class="mt-2 text-[10px] text-slate-500" data-i18n="finance.reminder_hint">Click “Reminder text” to generate a polite message you can paste into email or chat.</p>
               </div>
             </div>
@@ -2422,6 +2429,7 @@
     let announcementCheckedUserId = '';
     let announcementShownInThisSession = false;
     let announcementAdminTicker = null;
+    let overdueReminderSendInFlight = false;
 
     function requireAccessToken(errorMessage = '') {
       const token = supabaseSession?.access_token;
@@ -5112,6 +5120,12 @@
       document.getElementById('addSessionBtn').addEventListener('click', () => { if (guardEdit()) openSessionModal(); });
       document.getElementById('addResourceBtn').addEventListener('click', () => { if (guardEdit()) openResourceModal(); });
       document.getElementById('addInvoiceBtn').addEventListener('click', () => { if (guardEdit()) openInvoiceModal(); });
+      const sendOverdueReminderEmailsBtn = document.getElementById('sendOverdueReminderEmailsBtn');
+      if (sendOverdueReminderEmailsBtn) {
+        sendOverdueReminderEmailsBtn.addEventListener('click', () => {
+          sendOverdueReminderEmails();
+        });
+      }
       const addParentBtn = document.getElementById('addParentBtn');
       if (addParentBtn) addParentBtn.onclick = () => { if (guardEdit()) openParentModal(); };
       const refreshBtn = document.getElementById('refreshBtn');
@@ -12692,6 +12706,94 @@
       };
     }
 
+    function setOverdueReminderEmailStatus(message = '', tone = 'info') {
+      const el = document.getElementById('sendOverdueReminderEmailsStatus');
+      if (!el) return;
+      if (!message) {
+        el.textContent = '';
+        el.classList.add('hidden');
+        el.classList.remove('border-emerald-200', 'bg-emerald-50', 'text-emerald-800');
+        el.classList.remove('border-rose-200', 'bg-rose-50', 'text-rose-800');
+        el.classList.remove('border-slate-200', 'bg-slate-50', 'text-slate-700');
+        return;
+      }
+      el.classList.remove('hidden');
+      el.textContent = message;
+      el.classList.remove('border-emerald-200', 'bg-emerald-50', 'text-emerald-800');
+      el.classList.remove('border-rose-200', 'bg-rose-50', 'text-rose-800');
+      el.classList.remove('border-slate-200', 'bg-slate-50', 'text-slate-700');
+      if (tone === 'success') {
+        el.classList.add('border-emerald-200', 'bg-emerald-50', 'text-emerald-800');
+      } else if (tone === 'error') {
+        el.classList.add('border-rose-200', 'bg-rose-50', 'text-rose-800');
+      } else {
+        el.classList.add('border-slate-200', 'bg-slate-50', 'text-slate-700');
+      }
+    }
+
+    async function sendOverdueReminderEmails() {
+      if (overdueReminderSendInFlight) return;
+      if (!guardEdit()) return;
+      if (!supabaseAvailable || !isSupabaseReady()) {
+        alert(t('alert.sign_in_first'));
+        return;
+      }
+      if (!isOwner()) {
+        alert('Only the owner account can send overdue reminder emails.');
+        return;
+      }
+
+      const confirmSend = confirm('Send overdue reminder emails now to opted-in parents with valid emails?');
+      if (!confirmSend) return;
+
+      const btn = document.getElementById('sendOverdueReminderEmailsBtn');
+      const accessToken = requireAccessToken(t('alert.sign_in_first'));
+      overdueReminderSendInFlight = true;
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Sending reminders...';
+      }
+      setOverdueReminderEmailStatus('Sending overdue reminders...', 'info');
+
+      try {
+        const { data, error } = await supabaseClient.functions.invoke('send-overdue-invoice-reminders', {
+          body: { dry_run: false },
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (error) {
+          const ctx = error?.context || {};
+          let message = error?.message || 'Failed to send overdue reminders.';
+          if (ctx.body) {
+            try {
+              const parsed = typeof ctx.body === 'string' ? JSON.parse(ctx.body) : ctx.body;
+              message = parsed?.error || parsed?.message || message;
+            } catch (_) { }
+          }
+          throw new Error(message);
+        }
+
+        const sent = Number(data?.sent_count || 0);
+        const failed = Number(data?.failed_count || 0);
+        const skipped = data?.skipped || {};
+        const skippedTotal = Number(skipped?.no_email || 0)
+          + Number(skipped?.invalid_email || 0)
+          + Number(skipped?.opt_out || 0)
+          + Number(skipped?.cooldown || 0);
+        const summary = `Done. Sent: ${sent}. Failed: ${failed}. Skipped: ${skippedTotal}.`;
+        setOverdueReminderEmailStatus(summary, failed > 0 ? 'error' : 'success');
+        logActivity('Sent overdue reminder emails', summary);
+      } catch (err) {
+        console.error('Overdue reminder send failed', err);
+        setOverdueReminderEmailStatus(err?.message || 'Failed to send overdue reminders.', 'error');
+      } finally {
+        overdueReminderSendInFlight = false;
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Send overdue reminder emails';
+        }
+      }
+    }
+
     function renderFinanceView() {
       const showVoided = !!state.settings.showVoidedInvoices;
       const knownStudentIds = new Set((state.students || []).map(s => cleanId(s.id)).filter(Boolean));
@@ -12708,6 +12810,11 @@
           renderFinanceView();
           if (selectedStudentId) renderStudentFinance(selectedStudentId);
         };
+      }
+      const reminderBtn = document.getElementById('sendOverdueReminderEmailsBtn');
+      if (reminderBtn) {
+        reminderBtn.disabled = readOnlyMode || overdueReminderSendInFlight;
+        reminderBtn.textContent = overdueReminderSendInFlight ? 'Sending reminders...' : 'Send overdue reminder emails';
       }
       const tbody = document.getElementById('financeStudentTable');
       if (!state.students.length) {
