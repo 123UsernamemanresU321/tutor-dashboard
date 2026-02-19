@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Tutor Control Center – Physics • Chemistry • Maths</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' https: data: blob:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://js.hcaptcha.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.deepseek.com; frame-src https://hcaptcha.com https://*.hcaptcha.com https://8x8.vc https://*.8x8.vc;">
 
   <!-- Tailwind CSS CDN -->
@@ -39,10 +39,19 @@
       --text-light: #020617;
       --text-dark: #e5e7eb;
       --border-dark: #1e293b;
+      --safe-area-top: env(safe-area-inset-top, 0px);
+      --safe-area-right: env(safe-area-inset-right, 0px);
+      --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-area-left: env(safe-area-inset-left, 0px);
     }
 
     .hidden {
       display: none !important;
+    }
+
+    html {
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
     }
 
     body {
@@ -402,6 +411,176 @@
       background: rgba(20, 184, 166, 0.14);
       color: #0f766e;
       border-color: rgba(20, 184, 166, 0.28);
+    }
+
+    .portal-cta-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      min-height: 44px;
+      padding: 0.5rem 0.95rem;
+      border-radius: 0.8rem;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      border: 1px solid transparent;
+      transition: transform 0.12s ease, box-shadow 0.18s ease, filter 0.15s ease;
+      line-height: 1.2;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-appearance: none;
+      appearance: none;
+      -webkit-tap-highlight-color: rgba(37, 99, 235, 0.2);
+    }
+
+    .portal-cta-btn:hover {
+      transform: translateY(-1px);
+      filter: brightness(0.98);
+    }
+
+    .portal-cta-btn:active {
+      transform: translateY(0);
+      filter: brightness(0.94);
+    }
+
+    .portal-cta-btn:focus-visible {
+      outline: 3px solid rgba(37, 99, 235, 0.35);
+      outline-offset: 2px;
+    }
+
+    .portal-cta-btn[disabled] {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .portal-cta-btn-block {
+      width: 100%;
+    }
+
+    .portal-cta-contract {
+      color: #ffffff;
+      background: #b45309;
+      border-color: #b45309;
+      box-shadow: 0 8px 22px -16px rgba(180, 83, 9, 0.75);
+    }
+
+    .portal-cta-join {
+      color: #ffffff;
+      background: #1d4ed8;
+      border-color: #1d4ed8;
+      box-shadow: 0 10px 24px -18px rgba(29, 78, 216, 0.8);
+    }
+
+    .portal-cta-pay {
+      color: #ffffff;
+      background: #047857;
+      border-color: #047857;
+      box-shadow: 0 10px 24px -18px rgba(4, 120, 87, 0.8);
+    }
+
+    .portal-cta-subtle {
+      color: #334155;
+      background: #ffffff;
+      border-color: rgba(148, 163, 184, 0.45);
+    }
+
+    .portal-consent-card {
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      background: rgba(255, 251, 235, 0.85);
+      border-radius: 0.8rem;
+      padding: 0.7rem 0.75rem;
+    }
+
+    body.dark .portal-cta-subtle {
+      color: #e2e8f0;
+      background: rgba(15, 23, 42, 0.75);
+      border-color: rgba(148, 163, 184, 0.35);
+    }
+
+    body.dark .portal-consent-card {
+      border-color: rgba(245, 158, 11, 0.42);
+      background: rgba(120, 53, 15, 0.22);
+    }
+
+    @media (max-width: 1024px) {
+      .sidebar {
+        width: 13.5rem;
+      }
+
+      .topbar {
+        min-height: 4.5rem;
+        height: auto;
+        padding: 0.75rem 1rem;
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+
+      .topbar>div:first-child {
+        flex: 1 1 260px;
+        max-width: none;
+      }
+
+      .topbar>div:last-child {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+      }
+
+      #viewsContainer {
+        padding: 1rem;
+      }
+
+      footer {
+        padding-inline: 1rem !important;
+      }
+    }
+
+    @media (hover: none) and (pointer: coarse) {
+      .portal-cta-btn {
+        min-height: 52px;
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+      }
+
+      .portal-cta-btn:hover {
+        transform: none;
+        filter: none;
+      }
+
+      #parentProfilePrompt .flex,
+      #parentEmailOptInCard .flex,
+      #parentGuideCard .flex {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      #parentCompleteProfileBtn,
+      #parentEmailOptInBtn,
+      #parentInvoiceAlertActionBtn {
+        width: 100%;
+      }
+    }
+
+    @supports (-webkit-touch-callout: none) {
+      @media (hover: none) and (pointer: coarse) {
+        body,
+        body.dark {
+          background-attachment: scroll;
+        }
+
+        input[type="text"],
+        input[type="search"],
+        input[type="number"],
+        input[type="date"],
+        input[type="time"],
+        textarea,
+        select {
+          font-size: 16px !important;
+        }
+      }
     }
 
     .session-time {
@@ -1872,25 +2051,37 @@
               </button>
             </div>
             <div id="parentProfilePrompt" class="card p-4 hidden">
-              <div class="flex items-start justify-between gap-3">
+              <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div>
                   <div class="text-sm font-semibold" data-i18n="parent.complete_profile_title">Complete your profile</div>
                   <div id="parentProfilePromptText" class="text-[11px] text-slate-500"></div>
                 </div>
                 <button id="parentCompleteProfileBtn"
-                  class="px-3 py-1.5 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-[11px]">
+                  class="w-full sm:w-auto px-3 py-1.5 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-[11px]">
                   <span data-i18n="parent.complete_profile">Complete profile</span>
                 </button>
               </div>
             </div>
+            <div id="parentEmailOptInCard" class="card p-4 hidden border border-amber-200 bg-amber-50/70">
+              <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div>
+                  <div class="text-sm font-semibold text-amber-900">Email notices</div>
+                  <div id="parentEmailOptInText" class="text-[11px] text-amber-800"></div>
+                </div>
+                <button id="parentEmailOptInBtn"
+                  class="portal-cta-btn portal-cta-subtle text-[11px] w-full sm:w-auto">
+                  Update
+                </button>
+              </div>
+            </div>
             <div id="parentGuideCard" class="card p-4 hidden">
-              <div class="flex items-start justify-between gap-3">
+              <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div>
                   <div class="text-sm font-semibold" data-i18n="parent.getting_started">Getting started</div>
                   <div id="parentGuideSummary" class="text-[11px] text-slate-500"></div>
                 </div>
                 <button id="parentGuideDismissBtn"
-                  class="px-2 py-1 rounded-lg border border-slate-300 text-[10px] hover:bg-slate-50">
+                  class="w-full sm:w-auto px-2 py-1 rounded-lg border border-slate-300 text-[10px] hover:bg-slate-50">
                   <span data-i18n="parent.hide_guide">Hide guide</span>
                 </button>
               </div>
@@ -1935,6 +2126,9 @@
                 <div id="parentInvoiceAlert" class="hidden rounded-lg border border-amber-200 bg-amber-50/70 p-2">
                   <div class="text-[11px] font-medium text-amber-900" data-i18n="parent.invoice_alert_title">Payment needed to schedule lessons</div>
                   <div class="text-[10px] text-amber-800" data-i18n="parent.invoice_alert_detail">Tap a “Pay now” button below to confirm payment.</div>
+                  <button id="parentInvoiceAlertActionBtn" type="button" class="mt-2 portal-cta-btn portal-cta-pay portal-cta-btn-block">
+                    Go to unpaid invoices
+                  </button>
                 </div>
                 <div id="parentInvoiceStatus" class="hidden rounded-lg border border-amber-200 bg-amber-50/70 p-2">
                   <div id="parentInvoiceStatusTitle" class="text-[11px] font-medium text-amber-900"></div>
@@ -6053,12 +6247,12 @@
           const safeSessionId = cleanId(s.id);
           const joinBtn = isOnline
             ? (isBusyDay
-              ? `<button class="ml-auto px-2 py-0.5 rounded-lg border border-rose-200 text-[10px] text-rose-600 cursor-not-allowed" disabled>
+              ? `<button class="portal-cta-btn portal-cta-subtle portal-cta-btn-block text-rose-700 border-rose-300 cursor-not-allowed" disabled>
                   ${esc(t('schedule.tutor_busy_on_date'))}
                 </button>`
               : canJoinMeetingNow(s)
-              ? `<button class="ml-auto px-2 py-0.5 rounded-lg bg-indigo-600 text-white text-[10px]" onclick="openMeetingForSession('${safeSessionId}')">${esc(t('meeting.join_online'))}</button>`
-              : `<button class="ml-auto px-2 py-0.5 rounded-lg border border-slate-200 text-[10px] text-slate-500 cursor-not-allowed" disabled>
+              ? `<button class="portal-cta-btn portal-cta-join portal-cta-btn-block" onclick="openMeetingForSession('${safeSessionId}')" aria-label="Join online lesson for ${esc(s.subject || t('common.lesson'))} on ${esc(s.date)}">${esc(t('meeting.join_online'))}</button>`
+              : `<button class="portal-cta-btn portal-cta-subtle portal-cta-btn-block cursor-not-allowed" disabled>
                   ${esc(t('meeting.join_10_min_before'))}
                 </button>`)
             : '';
@@ -6068,8 +6262,8 @@
             <div class="text-[10px] text-slate-500 flex items-center gap-2">
               <span>${esc(s.date)} ${esc(s.startTime || '')} • ${esc(s.durationHours || 1)}h • ${esc(modeLabel)}</span>
               ${busyLabel}
-              ${joinBtn}
             </div>
+            ${joinBtn ? `<div class="mt-2">${joinBtn}</div>` : ''}
           </li>
         `;
         }).join('') : `<li class="text-slate-500 text-xs">${esc(t('portal.no_sessions_next_14'))}</li>`;
@@ -6275,10 +6469,15 @@
             <input name="email" value="${esc(parent.email || '')}" placeholder="${t('form.email_placeholder')}"
               class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
           </div>
-          <label class="flex items-start gap-2 text-[11px] text-slate-600">
-            <input type="checkbox" name="emailNotificationsOptIn" ${currentEmailOptIn ? 'checked' : ''} class="mt-0.5">
-            <span>I agree to receive service emails (invoices, overdue reminders, policy/domain notices).</span>
-          </label>
+          <div class="portal-consent-card">
+            <label class="flex items-start gap-3 text-[12px] text-slate-800 cursor-pointer">
+              <input type="checkbox" name="emailNotificationsOptIn" ${currentEmailOptIn ? 'checked' : ''} class="mt-0.5 h-5 w-5 accent-indigo-600">
+              <span>
+                <span class="font-semibold">Enable service email notices</span>
+                <span class="block text-[11px] text-slate-600 mt-0.5">Receive invoices, overdue reminders, lesson/schedule updates, and policy/domain notices.</span>
+              </span>
+            </label>
+          </div>
           <div>
             <label class="block text-[11px] mb-1">${t('common.phone')}</label>
             <div class="flex gap-2">
@@ -6421,6 +6620,33 @@
       }
     }
 
+    function updateParentEmailOptInCard(parent) {
+      const card = document.getElementById('parentEmailOptInCard');
+      const textEl = document.getElementById('parentEmailOptInText');
+      const btn = document.getElementById('parentEmailOptInBtn');
+      if (btn) btn.onclick = () => openParentSelfProfileModal(parent);
+      if (!card) return;
+      if (!parent) {
+        card.classList.add('hidden');
+        return;
+      }
+      const email = normalizePersonValue(parent.email || '').toLowerCase();
+      const optedIn = !!parent.emailNotificationsOptIn && !!email;
+      if (optedIn) {
+        card.classList.add('hidden');
+        return;
+      }
+      if (textEl) {
+        textEl.textContent = email
+          ? 'Enable service email notices to receive invoice reminders, schedule updates, and policy/domain notices.'
+          : 'Add an email address and enable service email notices so you do not miss invoice or schedule updates.';
+      }
+      if (btn) {
+        btn.textContent = email ? 'Enable now' : 'Add email';
+      }
+      card.classList.remove('hidden');
+    }
+
     function renderParentPortal() {
       const parent = tourMode ? getTourParent() : getParentProfileBySession();
       const students = tourMode && parent ? getParentLinkedStudents(parent.id) : getChildrenForParent();
@@ -6432,6 +6658,7 @@
       const editProfileBtn = document.getElementById('parentEditProfileBtn');
       if (editProfileBtn) editProfileBtn.onclick = () => openParentSelfProfileModal(parent);
       updateParentProfilePrompt(parent);
+      updateParentEmailOptInCard(parent);
       const guideCard = document.getElementById('parentGuideCard');
       const guideSummary = document.getElementById('parentGuideSummary');
       const guideSteps = document.getElementById('parentGuideSteps');
@@ -6445,8 +6672,8 @@
           const contractLabel = signed ? t('parent.contract_valid') : t('parent.contract_invalid');
           const contractClass = signed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700';
           const contractAction = signed
-            ? `<button class="px-2 py-1 rounded-lg border border-slate-300 opacity-60 cursor-not-allowed" disabled>${t('parent.contract_signed_button')}</button>`
-            : `<button class="px-2 py-1 rounded-lg bg-amber-500 text-white border border-amber-500 hover:bg-amber-600 shadow-sm" onclick="openContractLink('${safeStudentId}')">${t('parent.sign_contract_button')}</button>`;
+            ? `<button class="portal-cta-btn portal-cta-subtle opacity-60 cursor-not-allowed" disabled>${t('parent.contract_signed_button')}</button>`
+            : `<button class="portal-cta-btn portal-cta-contract" onclick="event.stopPropagation(); openContractLink('${safeStudentId}')" aria-label="Sign contract for ${esc(s.name)}">${t('parent.sign_contract_button')}</button>`;
           const aiSummaryBtn = isOwner()
             ? `<button id="btn-summary-${safeStudentId}" class="px-2 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50" onclick="parentSummaryAI('${safeStudentId}')">${t('parent.ai_summary_button')}</button>`
             : '';
@@ -6496,6 +6723,11 @@
       if (invoiceAlert) {
         invoiceAlert.classList.toggle('hidden', pendingInvoices.length === 0);
       }
+      const invoiceAlertActionBtn = document.getElementById('parentInvoiceAlertActionBtn');
+      if (invoiceAlertActionBtn) {
+        invoiceAlertActionBtn.classList.toggle('hidden', pendingInvoices.length === 0);
+        invoiceAlertActionBtn.onclick = () => scrollToParentInvoices();
+      }
       const invoiceStatus = document.getElementById('parentInvoiceStatus');
       const invoiceStatusTitle = document.getElementById('parentInvoiceStatusTitle');
       const invoiceStatusDetail = document.getElementById('parentInvoiceStatusDetail');
@@ -6543,11 +6775,11 @@
                 ${unsignedStudents.map(s => {
                   const safeStudentId = cleanId(s.id);
                   return `
-                  <li class="flex items-center justify-between gap-2">
-                    <span>${esc(s.name)}</span>
-                    <button class="px-2 py-1 rounded-lg bg-amber-500 text-white border border-amber-500 hover:bg-amber-600 text-[10px] shadow-sm"
-                      onclick="openContractLink('${safeStudentId}')">${t('parent.guide_sign_button')}</button>
-                  </li>
+                    <li class="flex items-center justify-between gap-2">
+                      <span>${esc(s.name)}</span>
+                      <button class="portal-cta-btn portal-cta-contract"
+                        onclick="openContractLink('${safeStudentId}')">${t('parent.guide_sign_button')}</button>
+                    </li>
                 `;
                 }).join('')}
               </ul>
@@ -6569,13 +6801,13 @@
                   return `
                     <li class="flex items-center justify-between gap-2">
                       <span>${esc(stu?.name || t('common.student'))} • ${esc(inv.dueDate || t('common.na'))} • R ${esc(Number(inv.total || 0).toFixed(2))}</span>
-                      <button class="px-2 py-1 rounded-lg bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700 text-[10px] shadow-sm"
+                      <button class="portal-cta-btn portal-cta-pay"
                         onclick="startPayfastPayment('${safeInvId}')">${t('invoice.pay_now')}</button>
                     </li>
                   `;
                 }).join('')}
               </ul>
-              <button class="mt-2 px-2 py-1 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-[10px]"
+              <button class="mt-2 portal-cta-btn portal-cta-subtle"
                 onclick="scrollToParentInvoices()">${t('parent.guide_go_to_invoices')}</button>
             </div>
           ` : `
@@ -6673,12 +6905,12 @@
           const safeSessionId = cleanId(s.id);
           const joinBtn = isOnline
             ? (isBusyDay
-              ? `<button class="mt-1 px-2 py-1 rounded-lg border border-rose-200 text-[10px] text-rose-600 cursor-not-allowed" disabled>
+              ? `<button class="portal-cta-btn portal-cta-subtle portal-cta-btn-block mt-2 text-rose-700 border-rose-300 cursor-not-allowed" disabled>
                   ${esc(t('schedule.tutor_busy_on_date'))}
                 </button>`
               : canJoinMeetingNow(s)
-              ? `<button class="mt-1 px-2 py-1 rounded-lg bg-indigo-600 text-white text-[10px]" onclick="openMeetingForSession('${safeSessionId}')">${esc(t('meeting.join_online_session'))}</button>`
-              : `<button class="mt-1 px-2 py-1 rounded-lg border border-slate-200 text-[10px] text-slate-500 cursor-not-allowed" disabled>
+              ? `<button class="portal-cta-btn portal-cta-join portal-cta-btn-block mt-2" onclick="openMeetingForSession('${safeSessionId}')" aria-label="Join online lesson for ${esc(namesRaw)} on ${esc(s.date)}">${esc(t('meeting.join_online_session'))}</button>`
+              : `<button class="portal-cta-btn portal-cta-subtle portal-cta-btn-block mt-2 cursor-not-allowed" disabled>
                   ${esc(t('meeting.join_available_10_min'))}
                 </button>`)
             : '';
@@ -6742,7 +6974,7 @@
             </div>
             <div class="flex flex-wrap gap-2 mt-1 text-[10px]">
               ${aiBtn}
-              ${!inv.paid && !isInvoiceVoid(inv) && (inv.invoiceType || inv.invoice_type) !== 'refund' ? `<button class="px-2 py-1 rounded-lg bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700 shadow-sm" onclick="startPayfastPayment('${safeInvId}')">${t('invoice.pay_now')}</button>` : ''}
+              ${!inv.paid && !isInvoiceVoid(inv) && (inv.invoiceType || inv.invoice_type) !== 'refund' ? `<button class="parent-pay-now-btn portal-cta-btn portal-cta-pay" onclick="startPayfastPayment('${safeInvId}')" aria-label="Pay invoice ${esc(inv.id)} now">${t('invoice.pay_now')}</button>` : ''}
             </div>
             <div id="ai-invoice-${safeInvId}" class="text-[10px] text-slate-600 whitespace-pre-wrap"></div>
           </li>`;
@@ -7380,7 +7612,7 @@
           ${meetingSessions.map(s => {
             const safeSessionId = cleanId(s.id);
             return `
-              <button class="px-2 py-1 rounded-lg bg-indigo-600 text-white text-[11px]" onclick="openMeetingForSession('${safeSessionId}')">
+              <button class="portal-cta-btn portal-cta-join" onclick="openMeetingForSession('${safeSessionId}')">
                 ${t('meeting.join_label', { time: esc(s.startTime || t('meeting.session')) })}
               </button>`;
           }).join('')}
@@ -8958,6 +9190,12 @@
     function scrollToParentInvoices() {
       const target = document.getElementById('parentInvoicesCard');
       if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setTimeout(() => {
+        const firstPayBtn = document.querySelector('#parentInvoices .parent-pay-now-btn');
+        if (firstPayBtn && typeof firstPayBtn.focus === 'function') {
+          firstPayBtn.focus({ preventScroll: true });
+        }
+      }, 320);
     }
 
     function renderAllViewsUI() {
@@ -9673,10 +9911,15 @@
               ${parentEmailOptions}
             </datalist>
           </div>
-          <label class="flex items-start gap-2 text-[11px] text-slate-600">
-            <input type="checkbox" name="emailNotificationsOptIn" ${existingEmailOptIn ? 'checked' : ''} class="mt-0.5">
-            <span>I have consent to send service emails to this address (invoices, overdue reminders, policy/domain notices).</span>
-          </label>
+          <div class="portal-consent-card">
+            <label class="flex items-start gap-3 text-[12px] text-slate-800 cursor-pointer">
+              <input type="checkbox" name="emailNotificationsOptIn" ${existingEmailOptIn ? 'checked' : ''} class="mt-0.5 h-5 w-5 accent-indigo-600">
+              <span>
+                <span class="font-semibold">I confirm service-email consent for this address</span>
+                <span class="block text-[11px] text-slate-600 mt-0.5">Required to send invoices, overdue reminders, schedule updates, and policy/domain notices.</span>
+              </span>
+            </label>
+          </div>
           <div>
             <label class="block text-[11px] mb-1">${t('common.phone')}</label>
             <div class="flex gap-2">
@@ -11928,7 +12171,7 @@
                 : t('schedule.scheduled');
       const safeSessionId = cleanId(sess.id);
       const joinBtn = (!parentMode && canJoinMeetingNow(sess))
-        ? `<button id="sessionJoinBtn" class="w-full px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium">${esc(t('meeting.join_online_session'))}</button>`
+        ? `<button id="sessionJoinBtn" class="portal-cta-btn portal-cta-join portal-cta-btn-block">${esc(t('meeting.join_online_session'))}</button>`
         : '';
       const attended = !!sess.attended;
       const isComplete = status === SESSION_STATUS.COMPLETE;
