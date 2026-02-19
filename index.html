@@ -1506,6 +1506,98 @@
               </div>
 
               <div class="card p-5 text-xs space-y-3" data-owner-only>
+                <h3 class="text-sm font-semibold mb-1">Broadcast announcements</h3>
+                <p class="text-[11px] text-slate-500">
+                  Publish one-time overlays for all users. Useful for domain changes and Privacy Policy updates.
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label class="text-[11px]">
+                    <span>Type</span>
+                    <select id="announcementTypeSelect" class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
+                      <option value="general">General</option>
+                      <option value="domain_change">Domain change</option>
+                      <option value="privacy_policy_update">Privacy policy update</option>
+                    </select>
+                  </label>
+                  <label class="text-[11px]">
+                    <span>Expires at (optional)</span>
+                    <input id="announcementExpiresAtInput" type="datetime-local"
+                      class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
+                  </label>
+                </div>
+                <label class="text-[11px] block">
+                  <span>Title</span>
+                  <input id="announcementTitleInput" type="text"
+                    placeholder="Important update"
+                    class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
+                </label>
+                <label class="text-[11px] block">
+                  <span>Message</span>
+                  <textarea id="announcementBodyInput" rows="3"
+                    placeholder="Write the update your users should see once on next login."
+                    class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]"></textarea>
+                </label>
+                <div id="announcementDomainFields" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label class="text-[11px]">
+                    <span>Old domain</span>
+                    <input id="announcementDomainFromInput" type="text"
+                      placeholder="old.example.com"
+                      class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
+                  </label>
+                  <label class="text-[11px]">
+                    <span>New domain</span>
+                    <input id="announcementDomainToInput" type="text"
+                      placeholder="new.example.com"
+                      class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
+                  </label>
+                </div>
+                <div id="announcementPrivacyFields" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label class="text-[11px]">
+                    <span>Privacy policy version</span>
+                    <input id="announcementPolicyVersionInput" type="text"
+                      placeholder="2026-02-19"
+                      class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
+                  </label>
+                  <label class="text-[11px]">
+                    <span>Policy link (optional)</span>
+                    <input id="announcementPolicyUrlInput" type="text"
+                      placeholder="./privacy.html"
+                      class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
+                  </label>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label class="text-[11px]">
+                    <span>Button label (optional)</span>
+                    <input id="announcementCtaLabelInput" type="text"
+                      placeholder="Open details"
+                      class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
+                  </label>
+                  <label class="text-[11px]">
+                    <span>Button URL (optional)</span>
+                    <input id="announcementCtaUrlInput" type="text"
+                      placeholder="https://example.com"
+                      class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
+                  </label>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button id="announcementPresetDomainBtn"
+                    class="px-3 py-1.5 rounded-2xl border border-slate-300 text-xs">
+                    Use domain-change template
+                  </button>
+                  <button id="announcementPresetPrivacyBtn"
+                    class="px-3 py-1.5 rounded-2xl border border-slate-300 text-xs">
+                    Use privacy-update template
+                  </button>
+                  <button id="publishAnnouncementBtn"
+                    class="px-3 py-1.5 rounded-2xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700">
+                    Publish announcement
+                  </button>
+                </div>
+                <div id="announcementAdminStatus" class="text-[11px] text-slate-600 hidden"></div>
+                <ul id="announcementAdminList" class="space-y-2 max-h-56 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+
+              <div class="card p-5 text-xs space-y-3" data-owner-only>
                 <h3 class="text-sm font-semibold mb-1">Debug test accounts</h3>
                 <p class="text-[11px] text-slate-500">
                   Instantly create a linked test parent + student with contract status already signed.
@@ -2002,6 +2094,27 @@
       </p>
     </div>
   </div>
+
+  <div id="announcementOverlay" class="maintenance-overlay">
+    <div class="max-w-lg w-full bg-white rounded-2xl shadow-2xl p-5 text-slate-900 text-xs">
+      <div class="inline-flex items-center px-2 py-0.5 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] font-medium">
+        Announcement
+      </div>
+      <h3 id="announcementOverlayTitle" class="mt-2 text-base font-semibold text-slate-900">Important update</h3>
+      <p id="announcementOverlayBody" class="mt-2 text-slate-700 whitespace-pre-wrap"></p>
+      <div id="announcementOverlayMeta" class="mt-2 text-[10px] text-slate-500 hidden"></div>
+      <div class="mt-4 flex flex-wrap items-center gap-2">
+        <button id="announcementOverlayCtaBtn"
+          class="hidden px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700">
+          Open
+        </button>
+        <button id="announcementOverlayDismissBtn"
+          class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs">
+          Dismiss
+        </button>
+      </div>
+    </div>
+  </div>
   <script>
     /***********************
      * STATE & PERSISTENCE *
@@ -2100,6 +2213,10 @@
     let presenceHeartbeat = null;
     let maintenanceTicker = null;
     let presenceMap = new Map();
+    let ownerAnnouncements = [];
+    let announcementCheckInFlight = null;
+    let announcementCheckedUserId = '';
+    let announcementShownInThisSession = false;
 
     function requireAccessToken(errorMessage = '') {
       const token = supabaseSession?.access_token;
@@ -4436,6 +4553,7 @@
         await tryLoadRemoteThenLocal();
         await loadAccountEmails().catch(err => console.warn('Account email fetch failed', err));
         renderAllViews();
+        await maybeShowPendingAnnouncement().catch(err => console.warn('Announcement check failed', err));
       }
       window.addEventListener('i18n:change', () => {
         if (window.applyBusinessText) window.applyBusinessText(document);
@@ -4473,6 +4591,8 @@
       window.markContractStatus = markContractStatus;
       window.explainInvoiceAI = explainInvoiceAI;
       window.parentSummaryAI = parentSummaryAI;
+      window.setAnnouncementActive = setAnnouncementActive;
+      window.markAnnouncementSeenForCurrentUser = markAnnouncementSeenForCurrentUser;
       setupRealtime();
     });
 
@@ -4693,6 +4813,22 @@
           renderMaintenanceUI();
         });
       }
+      const announcementTypeSelect = document.getElementById('announcementTypeSelect');
+      if (announcementTypeSelect) {
+        announcementTypeSelect.addEventListener('change', () => toggleAnnouncementTypeFields());
+      }
+      const announcementPresetDomainBtn = document.getElementById('announcementPresetDomainBtn');
+      if (announcementPresetDomainBtn) {
+        announcementPresetDomainBtn.addEventListener('click', () => applyAnnouncementPreset('domain_change'));
+      }
+      const announcementPresetPrivacyBtn = document.getElementById('announcementPresetPrivacyBtn');
+      if (announcementPresetPrivacyBtn) {
+        announcementPresetPrivacyBtn.addEventListener('click', () => applyAnnouncementPreset('privacy_policy_update'));
+      }
+      const publishAnnouncementBtn = document.getElementById('publishAnnouncementBtn');
+      if (publishAnnouncementBtn) {
+        publishAnnouncementBtn.addEventListener('click', () => publishAnnouncementFromSettings());
+      }
       const createDebugPairBtn = document.getElementById('createDebugTestPairBtn');
       if (createDebugPairBtn) {
         createDebugPairBtn.addEventListener('click', () => {
@@ -4796,6 +4932,13 @@
       setVal('maintenanceMessageInput', state.settings.maintenanceMessage || '');
       const startInput = document.getElementById('maintenanceStartInput');
       if (startInput) startInput.min = getMaintenanceMinDate();
+      setVal('announcementTypeSelect', 'general');
+      toggleAnnouncementTypeFields();
+      const announcementStatus = document.getElementById('announcementAdminStatus');
+      if (announcementStatus) {
+        announcementStatus.textContent = '';
+        announcementStatus.classList.add('hidden');
+      }
       // lock settings for students
       const lockIds = [
         'settingsWeeklyGoal', 'settingsMonthlyGoal', 'settingsDefaultDuration',
@@ -4829,6 +4972,12 @@
       }
       applyTheme();
       applyDensity();
+      if (isOwner()) {
+        loadOwnerAnnouncements();
+      } else {
+        ownerAnnouncements = [];
+        renderOwnerAnnouncementsList();
+      }
       renderDebugTestPairs();
     }
 
@@ -4980,6 +5129,470 @@
         clearInterval(maintenanceTicker);
         maintenanceTicker = null;
       }
+    }
+
+    function normalizeAnnouncementType(type) {
+      const raw = String(type || '').trim().toLowerCase();
+      if (raw === 'domain_change') return 'domain_change';
+      if (raw === 'privacy_policy_update') return 'privacy_policy_update';
+      return 'general';
+    }
+
+    function formatAnnouncementTypeLabel(type) {
+      const normalized = normalizeAnnouncementType(type);
+      if (normalized === 'domain_change') return 'Domain change';
+      if (normalized === 'privacy_policy_update') return 'Privacy policy update';
+      return 'General';
+    }
+
+    function getAnnouncementSeenStorageKey(userId, announcementId) {
+      return `announcement_seen_v1_${cleanId(userId)}_${cleanId(announcementId)}`;
+    }
+
+    function isAnnouncementLocallySeen(userId, announcementId) {
+      const key = getAnnouncementSeenStorageKey(userId, announcementId);
+      return localStorage.getItem(key) === '1';
+    }
+
+    function markAnnouncementLocallySeen(userId, announcementId) {
+      const key = getAnnouncementSeenStorageKey(userId, announcementId);
+      localStorage.setItem(key, '1');
+    }
+
+    function normalizeAnnouncementUrl(value) {
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      let candidate = raw;
+      if (candidate.startsWith('./') || candidate.startsWith('/')) {
+        candidate = appUrl(candidate.replace(/^\.\//, '/'));
+      } else if (!/^https?:\/\//i.test(candidate)) {
+        candidate = ensureHttpUrl(candidate);
+      }
+      try {
+        const parsed = new URL(candidate);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+        return parsed.href;
+      } catch (_err) {
+        return '';
+      }
+    }
+
+    function announcementDefaultsForType(type, draft = {}) {
+      const normalized = normalizeAnnouncementType(type);
+      if (normalized === 'domain_change') {
+        const fromDomain = String(draft.domain_from || '').trim();
+        const toDomain = String(draft.domain_to || '').trim();
+        const fromLabel = fromDomain || 'the previous domain';
+        const toLabel = toDomain || window.location.host;
+        const title = 'Domain update';
+        const body = `We moved from ${fromLabel} to ${toLabel}. Please use the new domain for future access.`;
+        const ctaLabel = 'Open new domain';
+        const ctaUrl = toDomain ? ensureHttpUrl(toDomain) : APP_ORIGIN;
+        return { title, body, ctaLabel, ctaUrl };
+      }
+      if (normalized === 'privacy_policy_update') {
+        const version = String(draft.policy_version || '').trim();
+        const versionPart = version ? ` (${version})` : '';
+        const title = `Privacy Policy update${versionPart}`;
+        const body = 'Our Privacy Policy was updated. Please review the latest version.';
+        const ctaLabel = 'Read Privacy Policy';
+        const ctaUrl = appUrl('/privacy.html');
+        return { title, body, ctaLabel, ctaUrl };
+      }
+      return {
+        title: 'Important update',
+        body: 'Please review this announcement.',
+        ctaLabel: '',
+        ctaUrl: ''
+      };
+    }
+
+    function toggleAnnouncementTypeFields() {
+      const type = normalizeAnnouncementType(document.getElementById('announcementTypeSelect')?.value || 'general');
+      const domainFields = document.getElementById('announcementDomainFields');
+      const privacyFields = document.getElementById('announcementPrivacyFields');
+      if (domainFields) domainFields.classList.toggle('hidden', type !== 'domain_change');
+      if (privacyFields) privacyFields.classList.toggle('hidden', type !== 'privacy_policy_update');
+    }
+
+    function applyAnnouncementPreset(type) {
+      const normalized = normalizeAnnouncementType(type);
+      const typeSelect = document.getElementById('announcementTypeSelect');
+      if (typeSelect) typeSelect.value = normalized;
+      toggleAnnouncementTypeFields();
+      const draft = {
+        domain_from: document.getElementById('announcementDomainFromInput')?.value || '',
+        domain_to: document.getElementById('announcementDomainToInput')?.value || '',
+        policy_version: document.getElementById('announcementPolicyVersionInput')?.value || ''
+      };
+      const defaults = announcementDefaultsForType(normalized, draft);
+      const titleInput = document.getElementById('announcementTitleInput');
+      const bodyInput = document.getElementById('announcementBodyInput');
+      const ctaLabelInput = document.getElementById('announcementCtaLabelInput');
+      const ctaUrlInput = document.getElementById('announcementCtaUrlInput');
+      if (titleInput && !String(titleInput.value || '').trim()) titleInput.value = defaults.title;
+      if (bodyInput && !String(bodyInput.value || '').trim()) bodyInput.value = defaults.body;
+      if (ctaLabelInput && !String(ctaLabelInput.value || '').trim()) ctaLabelInput.value = defaults.ctaLabel;
+      if (ctaUrlInput && !String(ctaUrlInput.value || '').trim()) ctaUrlInput.value = defaults.ctaUrl;
+    }
+
+    function buildAnnouncementPayloadFromInputs() {
+      const type = normalizeAnnouncementType(document.getElementById('announcementTypeSelect')?.value || 'general');
+      const titleRaw = String(document.getElementById('announcementTitleInput')?.value || '').trim();
+      const bodyRaw = String(document.getElementById('announcementBodyInput')?.value || '').trim();
+      const ctaLabelRaw = String(document.getElementById('announcementCtaLabelInput')?.value || '').trim();
+      const ctaUrlRaw = String(document.getElementById('announcementCtaUrlInput')?.value || '').trim();
+      const expiresRaw = String(document.getElementById('announcementExpiresAtInput')?.value || '').trim();
+      const domainFromRaw = String(document.getElementById('announcementDomainFromInput')?.value || '').trim();
+      const domainToRaw = String(document.getElementById('announcementDomainToInput')?.value || '').trim();
+      const policyVersionRaw = String(document.getElementById('announcementPolicyVersionInput')?.value || '').trim();
+      const policyUrlRaw = String(document.getElementById('announcementPolicyUrlInput')?.value || '').trim();
+      const defaults = announcementDefaultsForType(type, {
+        domain_from: domainFromRaw,
+        domain_to: domainToRaw,
+        policy_version: policyVersionRaw
+      });
+      const title = titleRaw || defaults.title;
+      const body = bodyRaw || defaults.body;
+      const ctaLabel = ctaLabelRaw || defaults.ctaLabel;
+      let ctaUrl = ctaUrlRaw || defaults.ctaUrl;
+      if (!ctaUrl && type === 'privacy_policy_update' && policyUrlRaw) {
+        ctaUrl = policyUrlRaw;
+      }
+      ctaUrl = normalizeAnnouncementUrl(ctaUrl);
+      const expiresAtDate = expiresRaw ? parseLocalDateTimeInput(expiresRaw) : null;
+      if (expiresRaw && !expiresAtDate) {
+        throw new Error('Invalid expiry date/time.');
+      }
+      if (expiresAtDate && expiresAtDate <= new Date()) {
+        throw new Error('Expiry must be in the future.');
+      }
+      return {
+        announcement_type: type,
+        title,
+        body,
+        cta_label: ctaLabel || null,
+        cta_url: ctaUrl || null,
+        domain_from: domainFromRaw || null,
+        domain_to: domainToRaw || null,
+        policy_version: policyVersionRaw || null,
+        publish_at: new Date().toISOString(),
+        expires_at: expiresAtDate ? expiresAtDate.toISOString() : null,
+        is_active: true
+      };
+    }
+
+    function clearAnnouncementComposer(resetType = false) {
+      const setVal = (id, value = '') => {
+        const el = document.getElementById(id);
+        if (el) el.value = value;
+      };
+      if (resetType) setVal('announcementTypeSelect', 'general');
+      setVal('announcementTitleInput', '');
+      setVal('announcementBodyInput', '');
+      setVal('announcementCtaLabelInput', '');
+      setVal('announcementCtaUrlInput', '');
+      setVal('announcementExpiresAtInput', '');
+      setVal('announcementDomainFromInput', '');
+      setVal('announcementDomainToInput', '');
+      setVal('announcementPolicyVersionInput', '');
+      setVal('announcementPolicyUrlInput', '');
+      toggleAnnouncementTypeFields();
+    }
+
+    function renderOwnerAnnouncementsList() {
+      const list = document.getElementById('announcementAdminList');
+      if (!list) return;
+      if (!ownerAnnouncements.length) {
+        list.innerHTML = `<li class="text-slate-500 text-[11px]">No announcements yet.</li>`;
+        return;
+      }
+      list.innerHTML = ownerAnnouncements.map(a => {
+        const id = cleanId(a.id);
+        const isActive = !!a.is_active;
+        const publishAt = a.publish_at ? formatDateTimeShort(a.publish_at) : t('common.na');
+        const expiresAt = a.expires_at ? formatDateTimeShort(a.expires_at) : 'No expiry';
+        const statusClass = isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-600';
+        const toggleLabel = isActive ? 'Deactivate' : 'Activate';
+        return `
+          <li class="border border-slate-200 rounded-lg px-2 py-2 bg-white/90">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <div class="font-medium text-slate-900 truncate">${esc(a.title || 'Untitled announcement')}</div>
+                <div class="text-[10px] text-slate-500 mt-0.5">
+                  ${esc(formatAnnouncementTypeLabel(a.announcement_type))} • Published ${esc(publishAt)} • Expires ${esc(expiresAt)}
+                </div>
+              </div>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-medium ${statusClass}">${isActive ? 'Active' : 'Inactive'}</span>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <button class="px-2 py-1 rounded-lg border border-slate-300 text-[10px]"
+                onclick="setAnnouncementActive('${id}', ${isActive ? 'false' : 'true'})">${toggleLabel}</button>
+              <button class="px-2 py-1 rounded-lg border border-slate-300 text-[10px]"
+                onclick="markAnnouncementSeenForCurrentUser('${id}')">Mark current account seen</button>
+            </div>
+          </li>
+        `;
+      }).join('');
+    }
+
+    async function loadOwnerAnnouncements() {
+      if (!isSupabaseReady() || !isOwner()) {
+        ownerAnnouncements = [];
+        renderOwnerAnnouncementsList();
+        return;
+      }
+      try {
+        const { data, error } = await supabaseClient
+          .from('global_announcements')
+          .select('*')
+          .order('publish_at', { ascending: false })
+          .limit(30);
+        if (error) throw error;
+        ownerAnnouncements = (data || []).map(row => ({
+          id: row.id,
+          announcement_type: normalizeAnnouncementType(row.announcement_type),
+          title: row.title || '',
+          body: row.body || '',
+          cta_label: row.cta_label || '',
+          cta_url: row.cta_url || '',
+          domain_from: row.domain_from || '',
+          domain_to: row.domain_to || '',
+          policy_version: row.policy_version || '',
+          publish_at: row.publish_at || row.created_at || '',
+          expires_at: row.expires_at || '',
+          is_active: !!row.is_active
+        }));
+      } catch (err) {
+        console.warn('Announcements load failed', err);
+        ownerAnnouncements = [];
+      }
+      renderOwnerAnnouncementsList();
+    }
+
+    async function publishAnnouncementFromSettings() {
+      if (!isSupabaseReady() || !isOwner()) {
+        alert('Owner sign-in is required.');
+        return;
+      }
+      const statusEl = document.getElementById('announcementAdminStatus');
+      const setStatus = (msg, isError = false) => {
+        if (!statusEl) return;
+        statusEl.textContent = msg;
+        statusEl.classList.remove('hidden');
+        statusEl.classList.toggle('text-rose-600', !!isError);
+        statusEl.classList.toggle('text-emerald-700', !isError);
+      };
+      try {
+        const payload = buildAnnouncementPayloadFromInputs();
+        if (!payload.title || !payload.body) {
+          throw new Error('Title and message are required.');
+        }
+        const { error } = await supabaseClient
+          .from('global_announcements')
+          .insert({
+            ...payload,
+            created_by: cleanId(supabaseSession?.user?.id || '')
+          });
+        if (error) throw error;
+        setStatus('Announcement published.');
+        clearAnnouncementComposer(false);
+        await loadOwnerAnnouncements();
+        logActivity('Published announcement', payload.title);
+      } catch (err) {
+        console.error('Announcement publish failed', err);
+        setStatus(err?.message || 'Failed to publish announcement.', true);
+      }
+    }
+
+    async function setAnnouncementActive(id, active) {
+      const announcementId = cleanId(id);
+      if (!announcementId || !isSupabaseReady() || !isOwner()) return;
+      try {
+        const { error } = await supabaseClient
+          .from('global_announcements')
+          .update({ is_active: !!active, updated_at: new Date().toISOString() })
+          .eq('id', announcementId);
+        if (error) throw error;
+        await loadOwnerAnnouncements();
+      } catch (err) {
+        console.warn('Announcement status update failed', err);
+        alert(err?.message || 'Failed to update announcement status.');
+      }
+    }
+
+    async function markAnnouncementSeenForCurrentUser(id) {
+      const announcementId = cleanId(id);
+      const uid = cleanId(supabaseSession?.user?.id || '');
+      if (!announcementId || !uid || !isSupabaseReady()) return;
+      try {
+        const { error } = await supabaseClient
+          .from('announcement_reads')
+          .upsert({
+            announcement_id: announcementId,
+            user_id: uid,
+            seen_at: new Date().toISOString()
+          }, { onConflict: 'announcement_id,user_id' });
+        if (error) throw error;
+        markAnnouncementLocallySeen(uid, announcementId);
+      } catch (err) {
+        console.warn('Announcement mark seen failed', err);
+      }
+    }
+
+    function hideAnnouncementOverlay() {
+      const overlay = document.getElementById('announcementOverlay');
+      if (overlay) overlay.classList.remove('show');
+    }
+
+    function showAnnouncementOverlay(announcement) {
+      const overlay = document.getElementById('announcementOverlay');
+      if (!overlay) return;
+      const titleEl = document.getElementById('announcementOverlayTitle');
+      const bodyEl = document.getElementById('announcementOverlayBody');
+      const metaEl = document.getElementById('announcementOverlayMeta');
+      const ctaBtn = document.getElementById('announcementOverlayCtaBtn');
+      const dismissBtn = document.getElementById('announcementOverlayDismissBtn');
+
+      if (titleEl) titleEl.textContent = announcement.title || 'Announcement';
+      if (bodyEl) bodyEl.textContent = announcement.body || '';
+
+      const metaParts = [];
+      metaParts.push(formatAnnouncementTypeLabel(announcement.announcement_type));
+      if (announcement.policy_version) metaParts.push(`Version: ${announcement.policy_version}`);
+      if (announcement.domain_from || announcement.domain_to) {
+        const fromLabel = announcement.domain_from || '?';
+        const toLabel = announcement.domain_to || '?';
+        metaParts.push(`${fromLabel} -> ${toLabel}`);
+      }
+      if (metaEl) {
+        const meta = metaParts.filter(Boolean).join(' • ');
+        metaEl.textContent = meta;
+        metaEl.classList.toggle('hidden', !meta);
+      }
+
+      if (ctaBtn) {
+        const rawUrl = normalizeAnnouncementUrl(announcement.cta_url || '');
+        const hasUrl = !!rawUrl;
+        ctaBtn.classList.toggle('hidden', !hasUrl);
+        ctaBtn.textContent = announcement.cta_label || t('common.open');
+        ctaBtn.onclick = () => {
+          if (!hasUrl) return;
+          openPopupWithConfirm(rawUrl, announcement.cta_label || 'Announcement link');
+        };
+      }
+
+      if (dismissBtn) {
+        dismissBtn.textContent = t('common.dismiss');
+        dismissBtn.onclick = () => hideAnnouncementOverlay();
+      }
+      overlay.classList.add('show');
+    }
+
+    async function getPendingAnnouncementsForCurrentUser() {
+      if (!isSupabaseReady()) return [];
+      const userId = cleanId(supabaseSession?.user?.id || '');
+      if (!userId) return [];
+      const nowIso = new Date().toISOString();
+      const { data, error } = await supabaseClient
+        .from('global_announcements')
+        .select('*')
+        .eq('is_active', true)
+        .lte('publish_at', nowIso)
+        .order('publish_at', { ascending: true });
+      if (error) throw error;
+      const nowTime = Date.now();
+      const rows = (data || [])
+        .filter(row => {
+          if (!row?.expires_at) return true;
+          const expiry = new Date(row.expires_at).getTime();
+          return Number.isFinite(expiry) ? expiry >= nowTime : true;
+        })
+        .filter(row => !isAnnouncementLocallySeen(userId, row.id));
+      if (!rows.length) return [];
+
+      const ids = rows.map(row => cleanId(row.id)).filter(Boolean);
+      if (!ids.length) return [];
+      const { data: reads, error: readsErr } = await supabaseClient
+        .from('announcement_reads')
+        .select('announcement_id')
+        .eq('user_id', userId)
+        .in('announcement_id', ids);
+      if (readsErr) {
+        console.warn('Announcement reads fetch failed', readsErr);
+      }
+      const seenSet = new Set((reads || []).map(r => cleanId(r.announcement_id)).filter(Boolean));
+      return rows
+        .filter(row => !seenSet.has(cleanId(row.id)))
+        .map(row => ({
+          id: row.id,
+          announcement_type: normalizeAnnouncementType(row.announcement_type),
+          title: row.title || '',
+          body: row.body || '',
+          cta_label: row.cta_label || '',
+          cta_url: row.cta_url || '',
+          domain_from: row.domain_from || '',
+          domain_to: row.domain_to || '',
+          policy_version: row.policy_version || '',
+          publish_at: row.publish_at || row.created_at || '',
+          expires_at: row.expires_at || ''
+        }));
+    }
+
+    async function markAnnouncementSeen(announcementId) {
+      const uid = cleanId(supabaseSession?.user?.id || '');
+      const id = cleanId(announcementId);
+      if (!uid || !id || !isSupabaseReady()) return;
+      markAnnouncementLocallySeen(uid, id);
+      const { error } = await supabaseClient
+        .from('announcement_reads')
+        .upsert({
+          announcement_id: id,
+          user_id: uid,
+          seen_at: new Date().toISOString()
+        }, { onConflict: 'announcement_id,user_id' });
+      if (error) {
+        console.warn('Announcement seen upsert failed', error);
+      }
+    }
+
+    async function maybeShowPendingAnnouncement(opts = {}) {
+      if (!isSupabaseReady()) return;
+      if (announcementShownInThisSession) return;
+      if (getMaintenanceStatus().active && !isOwner()) return;
+      const uid = cleanId(supabaseSession?.user?.id || '');
+      if (!uid) return;
+      const force = !!opts.force;
+      if (!force && announcementCheckedUserId === uid) return;
+      if (announcementCheckInFlight) {
+        await announcementCheckInFlight;
+        return;
+      }
+      announcementCheckInFlight = (async () => {
+        try {
+          const pending = await getPendingAnnouncementsForCurrentUser();
+          announcementCheckedUserId = uid;
+          if (!pending.length) return;
+          const next = pending[0];
+          await markAnnouncementSeen(next.id);
+          announcementShownInThisSession = true;
+          showAnnouncementOverlay(next);
+        } catch (err) {
+          console.warn('Announcement check failed', err);
+        }
+      })();
+      try {
+        await announcementCheckInFlight;
+      } finally {
+        announcementCheckInFlight = null;
+      }
+    }
+
+    function resetAnnouncementSessionState() {
+      announcementCheckInFlight = null;
+      announcementCheckedUserId = '';
+      announcementShownInThisSession = false;
+      hideAnnouncementOverlay();
     }
 
     function renderActivityLog() {
@@ -6246,6 +6859,7 @@
           tryLoadRemoteThenLocal()
             .then(() => {
               renderAllViews();
+              maybeShowPendingAnnouncement().catch(err => console.warn('Announcement check failed', err));
               try {
                 setupRealtime();
                 startPresence();
@@ -6260,6 +6874,7 @@
           accountEmails = [];
           privacyRead = false;
           tosRead = false;
+          resetAnnouncementSessionState();
           stopPresence();
         }
         updateReadOnlyUI();
@@ -6768,6 +7383,7 @@
           }
           setSupabaseStatusBanner('');
           updateReadOnlyUI();
+          await maybeShowPendingAnnouncement().catch(err => console.warn('Announcement check failed', err));
           return;
         } catch (e) {
           console.error('Failed to load from Supabase, falling back to local', e);
