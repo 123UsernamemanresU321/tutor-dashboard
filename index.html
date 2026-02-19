@@ -4844,6 +4844,7 @@
       window.parentSummaryAI = parentSummaryAI;
       window.setAnnouncementActive = setAnnouncementActive;
       window.markAnnouncementSeenForCurrentUser = markAnnouncementSeenForCurrentUser;
+      window.markAnnouncementUnseenForAll = markAnnouncementUnseenForAll;
       setupRealtime();
     });
 
@@ -5430,18 +5431,47 @@
       return 'General';
     }
 
-    function getAnnouncementSeenStorageKey(userId, announcementId) {
-      return `announcement_seen_v1_${cleanId(userId)}_${cleanId(announcementId)}`;
+    function resolveAnnouncementSeenVersion(announcement) {
+      const raw = String(
+        announcement?.seen_version ||
+        announcement?.updated_at ||
+        announcement?.publish_at ||
+        announcement?.created_at ||
+        ''
+      ).trim();
+      if (!raw) return 'v0';
+      const ts = new Date(raw).getTime();
+      if (Number.isFinite(ts) && !Number.isNaN(ts)) return `ts_${ts}`;
+      return `raw_${raw.replace(/[^a-z0-9]+/gi, '_').slice(0, 48)}`;
     }
 
-    function isAnnouncementLocallySeen(userId, announcementId) {
-      const key = getAnnouncementSeenStorageKey(userId, announcementId);
+    function getAnnouncementSeenStorageKey(userId, announcementId, seenVersion = '') {
+      const uid = cleanId(userId);
+      const aid = cleanId(announcementId);
+      const version = String(seenVersion || 'v0').trim() || 'v0';
+      return `announcement_seen_v1_${uid}_${aid}_${version}`;
+    }
+
+    function isAnnouncementLocallySeen(userId, announcementId, seenVersion = '') {
+      const key = getAnnouncementSeenStorageKey(userId, announcementId, seenVersion);
       return localStorage.getItem(key) === '1';
     }
 
-    function markAnnouncementLocallySeen(userId, announcementId) {
-      const key = getAnnouncementSeenStorageKey(userId, announcementId);
+    function markAnnouncementLocallySeen(userId, announcementId, seenVersion = '') {
+      const key = getAnnouncementSeenStorageKey(userId, announcementId, seenVersion);
       localStorage.setItem(key, '1');
+    }
+
+    function clearAnnouncementLocalSeen(userId, announcementId) {
+      const uid = cleanId(userId);
+      const aid = cleanId(announcementId);
+      const prefix = `announcement_seen_v1_${uid}_${aid}_`;
+      const toDelete = [];
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(prefix)) toDelete.push(key);
+      }
+      toDelete.forEach(key => localStorage.removeItem(key));
     }
 
     function isMissingColumnError(err, columnName) {
@@ -5757,6 +5787,8 @@
                 onclick="setAnnouncementActive('${id}', ${isActive ? 'false' : 'true'})">${toggleLabel}</button>
               <button class="px-2 py-1 rounded-lg border border-slate-300 text-[10px]"
                 onclick="markAnnouncementSeenForCurrentUser('${id}')">Mark current account seen</button>
+              <button class="px-2 py-1 rounded-lg border border-amber-300 text-amber-700 text-[10px]"
+                onclick="markAnnouncementUnseenForAll('${id}')">Mark all accounts unseen</button>
             </div>
           </li>
         `;
@@ -5781,6 +5813,8 @@
         domain_to: row.domain_to || '',
         policy_version: row.policy_version || '',
         publish_at: row.publish_at || row.created_at || '',
+        updated_at: row.updated_at || '',
+        seen_version: resolveAnnouncementSeenVersion(row),
         expires_at: row.expires_at || '',
         is_active: !!row.is_active
       };
@@ -5890,6 +5924,8 @@
       const announcementId = cleanId(id);
       const uid = cleanId(supabaseSession?.user?.id || '');
       if (!announcementId || !uid || !isSupabaseReady()) return;
+      const announcement = ownerAnnouncements.find(a => cleanId(a.id) === announcementId);
+      const seenVersion = resolveAnnouncementSeenVersion(announcement);
       try {
         const { error } = await supabaseClient
           .from('announcement_reads')
@@ -5899,9 +5935,39 @@
             seen_at: new Date().toISOString()
           }, { onConflict: 'announcement_id,user_id' });
         if (error) throw error;
-        markAnnouncementLocallySeen(uid, announcementId);
+        markAnnouncementLocallySeen(uid, announcementId, seenVersion);
       } catch (err) {
         console.warn('Announcement mark seen failed', err);
+      }
+    }
+
+    async function markAnnouncementUnseenForAll(id) {
+      const announcementId = cleanId(id);
+      if (!announcementId || !isSupabaseReady() || !isOwner()) return;
+      const announcement = ownerAnnouncements.find(a => cleanId(a.id) === announcementId);
+      const title = announcement?.title || 'this announcement';
+      if (!confirm(`Mark all accounts as unseen for "${title}"?`)) return;
+      try {
+        const nowIso = new Date().toISOString();
+        const { error: deleteReadsErr } = await supabaseClient
+          .from('announcement_reads')
+          .delete()
+          .eq('announcement_id', announcementId);
+        if (deleteReadsErr) throw deleteReadsErr;
+        const { error: updateErr } = await supabaseClient
+          .from('global_announcements')
+          .update({ updated_at: nowIso })
+          .eq('id', announcementId);
+        if (updateErr) throw updateErr;
+        const uid = cleanId(supabaseSession?.user?.id || '');
+        if (uid) clearAnnouncementLocalSeen(uid, announcementId);
+        announcementCheckedUserId = '';
+        announcementShownInThisSession = false;
+        await loadOwnerAnnouncements();
+        logActivity('Marked announcement unseen for all accounts', title);
+      } catch (err) {
+        console.warn('Announcement mark unseen for all failed', err);
+        alert(err?.message || 'Failed to mark all accounts as unseen for this announcement.');
       }
     }
 
@@ -5988,7 +6054,7 @@
           const expiry = new Date(row.expires_at).getTime();
           return Number.isFinite(expiry) ? expiry >= nowTime : true;
         })
-        .filter(row => !isAnnouncementLocallySeen(userId, row.id));
+        .filter(row => !isAnnouncementLocallySeen(userId, row.id, resolveAnnouncementSeenVersion(row)));
       if (!rows.length) return [];
 
       const ids = rows.map(row => cleanId(row.id)).filter(Boolean);
@@ -6007,11 +6073,11 @@
         .map(row => mapAnnouncementRow(row));
     }
 
-    async function markAnnouncementSeen(announcementId) {
+    async function markAnnouncementSeen(announcementId, seenVersion = '') {
       const uid = cleanId(supabaseSession?.user?.id || '');
       const id = cleanId(announcementId);
       if (!uid || !id || !isSupabaseReady()) return;
-      markAnnouncementLocallySeen(uid, id);
+      markAnnouncementLocallySeen(uid, id, seenVersion || resolveAnnouncementSeenVersion({}));
       const { error } = await supabaseClient
         .from('announcement_reads')
         .upsert({
@@ -6042,7 +6108,7 @@
           announcementCheckedUserId = uid;
           if (!pending.length) return;
           const next = pending[0];
-          await markAnnouncementSeen(next.id);
+          await markAnnouncementSeen(next.id, resolveAnnouncementSeenVersion(next));
           announcementShownInThisSession = true;
           showAnnouncementOverlay(next);
         } catch (err) {
