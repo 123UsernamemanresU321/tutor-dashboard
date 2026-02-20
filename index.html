@@ -9954,6 +9954,24 @@
               details = parsed?.error || parsed?.code || '';
             } catch { }
           }
+          if (!details) {
+            const resp = (typeof Response !== 'undefined' && ctx instanceof Response)
+              ? ctx
+              : (typeof Response !== 'undefined' && err?.response instanceof Response ? err.response : null);
+            if (resp) {
+              try {
+                const raw = await resp.clone().text();
+                if (raw) {
+                  try {
+                    const parsed = JSON.parse(raw);
+                    details = parsed?.error || parsed?.code || raw;
+                  } catch {
+                    details = raw;
+                  }
+                }
+              } catch { }
+            }
+          }
           console.warn('Portal snapshot fetch failed; snapshot is required for this role.', details || err?.message || err);
         }
         const fallback = buildRoleScopedLocalFallback();
