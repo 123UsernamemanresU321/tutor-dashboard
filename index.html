@@ -1660,6 +1660,19 @@
                 <p class="text-[11px] text-slate-500" data-i18n="settings.maintenance_hint">Notify users ahead of time and lock the site during maintenance.</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label class="text-[11px]">
+                    <span>Mode</span>
+                    <select id="maintenanceModeSelect"
+                      class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
+                      <option value="graceful">Graceful degradation (banner + restricted mode)</option>
+                      <option value="hard_stop">Hard stop (serve 503 page)</option>
+                    </select>
+                  </label>
+                  <label class="text-[11px]">
+                    <span>Warning starts (optional)</span>
+                    <input id="maintenanceWarningStartInput" type="datetime-local"
+                      class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
+                  </label>
+                  <label class="text-[11px]">
                     <span data-i18n="settings.maintenance_start">Start date/time</span>
                     <input id="maintenanceStartInput" type="datetime-local"
                       class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
@@ -1669,6 +1682,14 @@
                     <input id="maintenanceEndInput" type="datetime-local"
                       class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
                   </label>
+                </div>
+                <label class="text-[11px] block">
+                  <span>Retry-After seconds (for hard stop / 503)</span>
+                  <input id="maintenanceRetryAfterInput" type="number" min="60" step="60"
+                    class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
+                </label>
+                <div class="text-[10px] text-slate-500">
+                  Hard stop requires server-level 503 responses. Use the ops config in <code>ops/nginx-maintenance.conf.example</code>.
                 </div>
                 <div class="text-[10px] text-slate-500" data-i18n="settings.maintenance_end_hint">Leave end blank to keep maintenance active until you clear it.</div>
                 <label class="text-[11px] block">
@@ -2306,7 +2327,7 @@
 
   <div id="maintenanceOverlay" class="maintenance-overlay">
     <div class="max-w-md w-full bg-white rounded-2xl shadow-2xl p-5 text-slate-900 text-xs">
-      <div class="text-sm font-semibold text-amber-700" data-i18n="maintenance.overlay_title">Scheduled maintenance in progress</div>
+      <div id="maintenanceOverlayTitle" class="text-sm font-semibold text-amber-700" data-i18n="maintenance.overlay_title">Scheduled maintenance in progress</div>
       <p id="maintenanceOverlayMessage" class="mt-2 text-slate-600">
         <span data-i18n="maintenance.overlay_message">The dashboard is temporarily locked while maintenance is underway. Please check back soon.</span>
       </p>
@@ -2860,6 +2881,7 @@
     }
 
     async function startPayfastPayment(invoiceId) {
+      if (!guardMaintenanceWrite('Invoice payment')) return;
       if (!supabaseAvailable || !supabaseSession) {
         alert(t('alert.sign_in_pay_invoices'));
         return;
@@ -2947,6 +2969,9 @@
         maintenanceEnd: '',
         maintenanceStartAt: '',
         maintenanceEndAt: '',
+        maintenanceWarningStartAt: '',
+        maintenanceMode: 'graceful',
+        maintenanceRetryAfterSeconds: 3600,
         maintenanceMessage: ''
       }
     };
@@ -3899,7 +3924,20 @@
       }
 
       if (isOwner()) {
-        const settingsRow = {
+        const settingsRowFull = {
+          user_id: uid,
+          maintenance_enabled: !!state.settings.maintenanceEnabled,
+          maintenance_mode: normalizeMaintenanceMode(state.settings.maintenanceMode || 'graceful'),
+          maintenance_start: state.settings.maintenanceStart || null,
+          maintenance_end: state.settings.maintenanceEnd || null,
+          maintenance_start_at: state.settings.maintenanceStartAt || null,
+          maintenance_end_at: state.settings.maintenanceEndAt || null,
+          maintenance_warning_start_at: state.settings.maintenanceWarningStartAt || null,
+          maintenance_retry_after_seconds: Math.max(60, Number(state.settings.maintenanceRetryAfterSeconds || 3600) || 3600),
+          maintenance_message: (state.settings.maintenanceMessage || '').trim() || null,
+          updated_at: new Date().toISOString()
+        };
+        const settingsRowMid = {
           user_id: uid,
           maintenance_enabled: !!state.settings.maintenanceEnabled,
           maintenance_start: state.settings.maintenanceStart || null,
@@ -3909,29 +3947,44 @@
           maintenance_message: (state.settings.maintenanceMessage || '').trim() || null,
           updated_at: new Date().toISOString()
         };
+        const settingsRowLegacy = {
+          user_id: uid,
+          maintenance_enabled: !!state.settings.maintenanceEnabled,
+          maintenance_start: state.settings.maintenanceStart || null,
+          maintenance_end: state.settings.maintenanceEnd || null,
+          maintenance_message: (state.settings.maintenanceMessage || '').trim() || null,
+          updated_at: new Date().toISOString()
+        };
         try {
-          const { error: settingsErr } = await supabaseClient
+          let { error: settingsErr } = await supabaseClient
             .from('owner_settings')
-            .upsert(settingsRow, { onConflict: 'user_id' });
+            .upsert(settingsRowFull, { onConflict: 'user_id' });
           if (settingsErr) {
             const msg = String(settingsErr.message || settingsErr).toLowerCase();
-            if (msg.includes('maintenance_start_at') || msg.includes('maintenance_end_at')) {
-              const legacyRow = {
-                user_id: uid,
-                maintenance_enabled: !!state.settings.maintenanceEnabled,
-                maintenance_start: state.settings.maintenanceStart || null,
-                maintenance_end: state.settings.maintenanceEnd || null,
-                maintenance_message: (state.settings.maintenanceMessage || '').trim() || null,
-                updated_at: new Date().toISOString()
-              };
-              const { error: legacyErr } = await supabaseClient
+            if (
+              msg.includes('maintenance_mode') ||
+              msg.includes('maintenance_warning_start_at') ||
+              msg.includes('maintenance_retry_after_seconds')
+            ) {
+              const mid = await supabaseClient
                 .from('owner_settings')
-                .upsert(legacyRow, { onConflict: 'user_id' });
-              if (legacyErr) {
-                console.warn('Owner settings sync failed', legacyErr);
+                .upsert(settingsRowMid, { onConflict: 'user_id' });
+              settingsErr = mid.error;
+            }
+            if (settingsErr) {
+              const nextMsg = String(settingsErr.message || settingsErr).toLowerCase();
+              if (nextMsg.includes('maintenance_start_at') || nextMsg.includes('maintenance_end_at')) {
+                const { error: legacyErr } = await supabaseClient
+                  .from('owner_settings')
+                  .upsert(settingsRowLegacy, { onConflict: 'user_id' });
+                if (legacyErr) {
+                  console.warn('Owner settings sync failed', legacyErr);
+                }
+              } else {
+                console.warn('Owner settings sync failed', settingsErr);
               }
             } else {
-              console.warn('Owner settings sync failed', settingsErr);
+              // synced via fallback row
             }
           }
         } catch (err) {
@@ -4997,17 +5050,28 @@
       if (maintenanceSaveBtn) {
         maintenanceSaveBtn.addEventListener('click', () => {
           if (!isOwner()) return;
+          const modeSelect = document.getElementById('maintenanceModeSelect');
+          const warningStartInput = document.getElementById('maintenanceWarningStartInput');
+          const retryAfterInput = document.getElementById('maintenanceRetryAfterInput');
           const startInput = document.getElementById('maintenanceStartInput');
           const endInput = document.getElementById('maintenanceEndInput');
           const msgInput = document.getElementById('maintenanceMessageInput');
+          const mode = normalizeMaintenanceMode(modeSelect?.value || state.settings.maintenanceMode || 'graceful');
+          const warningVal = (warningStartInput?.value || '').trim();
           const startVal = (startInput?.value || '').trim();
           const endVal = (endInput?.value || '').trim();
           if (!startVal) {
             alert(t('maintenance.alert_select_start'));
             return;
           }
+          const warningStartDate = warningVal ? parseLocalDateTimeInput(warningVal) : null;
           const startDate = parseLocalDateTimeInput(startVal);
           const endDate = endVal ? parseLocalDateTimeInput(endVal) : null;
+          const retryAfterSeconds = Math.max(60, Number(retryAfterInput?.value || state.settings.maintenanceRetryAfterSeconds || 3600) || 3600);
+          if (warningVal && !warningStartDate) {
+            alert('Invalid warning start date/time.');
+            return;
+          }
           if (!startDate) {
             alert(t('maintenance.alert_invalid_start'));
             return;
@@ -5022,9 +5086,16 @@
             alert(t('maintenance.alert_end_after_start'));
             return;
           }
+          if (warningStartDate && warningStartDate > startDate) {
+            alert('Warning start must be before maintenance start.');
+            return;
+          }
           state.settings.maintenanceEnabled = true;
+          state.settings.maintenanceMode = mode;
           state.settings.maintenanceStartAt = startDate.toISOString();
           state.settings.maintenanceEndAt = endDate ? endDate.toISOString() : '';
+          state.settings.maintenanceWarningStartAt = warningStartDate ? warningStartDate.toISOString() : '';
+          state.settings.maintenanceRetryAfterSeconds = retryAfterSeconds;
           state.settings.maintenanceStart = toDateOnly(startDate);
           state.settings.maintenanceEnd = endDate ? toDateOnly(endDate) : '';
           state.settings.maintenanceMessage = (msgInput?.value || '').trim();
@@ -5037,11 +5108,24 @@
         maintenanceStartNowBtn.addEventListener('click', () => {
           if (!isOwner()) return;
           if (!confirm(t('maintenance.confirm_start_now'))) return;
+          const modeSelect = document.getElementById('maintenanceModeSelect');
+          const warningStartInput = document.getElementById('maintenanceWarningStartInput');
+          const retryAfterInput = document.getElementById('maintenanceRetryAfterInput');
           const msgInput = document.getElementById('maintenanceMessageInput');
           const now = new Date();
+          const warningVal = (warningStartInput?.value || '').trim();
+          const warningStartDate = warningVal ? parseLocalDateTimeInput(warningVal) : null;
+          const retryAfterSeconds = Math.max(60, Number(retryAfterInput?.value || state.settings.maintenanceRetryAfterSeconds || 3600) || 3600);
+          if (warningVal && !warningStartDate) {
+            alert('Invalid warning start date/time.');
+            return;
+          }
           state.settings.maintenanceEnabled = true;
+          state.settings.maintenanceMode = normalizeMaintenanceMode(modeSelect?.value || state.settings.maintenanceMode || 'graceful');
           state.settings.maintenanceStartAt = now.toISOString();
           state.settings.maintenanceEndAt = '';
+          state.settings.maintenanceWarningStartAt = warningStartDate ? warningStartDate.toISOString() : '';
+          state.settings.maintenanceRetryAfterSeconds = retryAfterSeconds;
           state.settings.maintenanceStart = toDateOnly(now);
           state.settings.maintenanceEnd = '';
           state.settings.maintenanceMessage = (msgInput?.value || '').trim();
@@ -5059,6 +5143,9 @@
           state.settings.maintenanceEnd = '';
           state.settings.maintenanceStartAt = '';
           state.settings.maintenanceEndAt = '';
+          state.settings.maintenanceWarningStartAt = '';
+          state.settings.maintenanceMode = 'graceful';
+          state.settings.maintenanceRetryAfterSeconds = 3600;
           state.settings.maintenanceMessage = '';
           saveState();
           applySettingsToUI();
@@ -5202,10 +5289,14 @@
       setVal('notifyInvoicesDays', state.settings.notifyInvoicesDays ?? 3);
       const startAtValue = state.settings.maintenanceStartAt || '';
       const endAtValue = state.settings.maintenanceEndAt || '';
+      const warningAtValue = state.settings.maintenanceWarningStartAt || '';
       const legacyStart = state.settings.maintenanceStart || '';
       const legacyEnd = state.settings.maintenanceEnd || '';
+      setVal('maintenanceModeSelect', normalizeMaintenanceMode(state.settings.maintenanceMode || 'graceful'));
+      setVal('maintenanceWarningStartInput', toLocalDateTimeInput(warningAtValue));
       setVal('maintenanceStartInput', toLocalDateTimeInput(startAtValue || (legacyStart ? `${legacyStart}T00:00` : '')));
       setVal('maintenanceEndInput', toLocalDateTimeInput(endAtValue || (legacyEnd ? `${legacyEnd}T23:59` : '')));
+      setVal('maintenanceRetryAfterInput', Math.max(60, Number(state.settings.maintenanceRetryAfterSeconds || 3600) || 3600));
       setVal('maintenanceMessageInput', state.settings.maintenanceMessage || '');
       const startInput = document.getElementById('maintenanceStartInput');
       if (startInput) startInput.min = getMaintenanceMinDate();
@@ -5233,12 +5324,19 @@
         if (!status.enabled) {
           statusText.textContent = t('maintenance.none_scheduled');
         } else if (status.active) {
-          statusText.textContent = status.endAt
-            ? t('maintenance.active_until', {
-              countdown: formatCountdown(status.msToEnd),
-              range: formatMaintenanceRange(status)
-            })
-            : t('maintenance.active_open');
+          if (status.mode === 'hard_stop') {
+            const retrySeconds = Math.max(60, Number(status.retryAfterSeconds || 3600) || 3600);
+            statusText.textContent = `Hard stop active (503). Retry-After: ${retrySeconds}s${status.endAt ? ` • ${formatMaintenanceRange(status)}` : ''}`;
+          } else {
+            statusText.textContent = status.endAt
+              ? t('maintenance.active_until', {
+                countdown: formatCountdown(status.msToEnd),
+                range: formatMaintenanceRange(status)
+              })
+              : t('maintenance.active_open');
+          }
+        } else if (status.warning) {
+          statusText.textContent = `Warning phase active. Maintenance ${status.mode === 'hard_stop' ? 'hard stop' : 'restricted mode'} starts in ${formatCountdown(status.msToStart)} (${formatMaintenanceRange(status)}).`;
         } else if (status.scheduled) {
           statusText.textContent = t('maintenance.scheduled_starts_in', {
             range: formatMaintenanceRange(status),
@@ -5323,32 +5421,99 @@
       return startLabel;
     }
 
+    function normalizeMaintenanceMode(value) {
+      return String(value || '').trim().toLowerCase() === 'hard_stop' ? 'hard_stop' : 'graceful';
+    }
+
+    function isMaintenanceGracefulWriteBlocked() {
+      const status = getMaintenanceStatus();
+      return status.gracefulActive && !isOwner();
+    }
+
+    function isMaintenanceHardStopForViewer() {
+      const status = getMaintenanceStatus();
+      return status.hardStopActive && !isOwner();
+    }
+
+    function guardMaintenanceWrite(actionLabel = 'This action') {
+      const status = getMaintenanceStatus();
+      if (!(status.gracefulActive || status.hardStopActive) || isOwner()) return true;
+      const range = formatMaintenanceRange(status);
+      const message = status.message || (status.hardStopActive
+        ? 'Service is temporarily unavailable due to maintenance.'
+        : 'Maintenance in progress');
+      alert(`${actionLabel} is temporarily disabled during maintenance.\n${message}${range ? `\nWindow: ${range}` : ''}`);
+      return false;
+    }
+
     function getMaintenanceStatus() {
       const enabled = !!state.settings.maintenanceEnabled;
+      const mode = normalizeMaintenanceMode(state.settings.maintenanceMode || 'graceful');
       let startAt = state.settings.maintenanceStartAt ? new Date(state.settings.maintenanceStartAt) : null;
       let endAt = state.settings.maintenanceEndAt ? new Date(state.settings.maintenanceEndAt) : null;
+      let warningStartAt = state.settings.maintenanceWarningStartAt ? new Date(state.settings.maintenanceWarningStartAt) : null;
       if ((!startAt || Number.isNaN(startAt.getTime())) && state.settings.maintenanceStart) {
         startAt = new Date(state.settings.maintenanceStart + 'T00:00:00');
       }
       if ((!endAt || Number.isNaN(endAt.getTime())) && state.settings.maintenanceEnd) {
         endAt = new Date(state.settings.maintenanceEnd + 'T23:59:00');
       }
+      if ((!warningStartAt || Number.isNaN(warningStartAt.getTime())) && startAt && !Number.isNaN(startAt.getTime())) {
+        warningStartAt = new Date(startAt.getTime() - (24 * 60 * 60 * 1000));
+      }
       if (!enabled || !startAt || Number.isNaN(startAt.getTime())) {
-        return { enabled: false, active: false, scheduled: false, startAt: null, endAt: null, message: '' };
+        return {
+          enabled: false,
+          active: false,
+          scheduled: false,
+          warning: false,
+          gracefulActive: false,
+          hardStopActive: false,
+          mode,
+          startAt: null,
+          endAt: null,
+          warningStartAt: null,
+          message: '',
+          retryAfterSeconds: Math.max(60, Number(state.settings.maintenanceRetryAfterSeconds || 3600) || 3600)
+        };
       }
       const now = new Date();
+      if (endAt && now > endAt) {
+        return {
+          enabled: false,
+          active: false,
+          scheduled: false,
+          warning: false,
+          gracefulActive: false,
+          hardStopActive: false,
+          mode,
+          startAt: null,
+          endAt: null,
+          warningStartAt: null,
+          message: '',
+          retryAfterSeconds: Math.max(60, Number(state.settings.maintenanceRetryAfterSeconds || 3600) || 3600)
+        };
+      }
       const active = now >= startAt && (!endAt || now <= endAt);
       const scheduled = now < startAt;
+      const warning = !!(scheduled && warningStartAt && now >= warningStartAt);
       const msToStart = startAt ? startAt.getTime() - now.getTime() : 0;
       const msToEnd = endAt ? endAt.getTime() - now.getTime() : 0;
+      const retryAfterSeconds = Math.max(60, Number(state.settings.maintenanceRetryAfterSeconds || 3600) || 3600);
       return {
         enabled: true,
         active,
         scheduled,
+        warning,
+        gracefulActive: active && mode === 'graceful',
+        hardStopActive: active && mode === 'hard_stop',
+        mode,
         startAt,
         endAt,
+        warningStartAt,
         msToStart,
         msToEnd,
+        retryAfterSeconds,
         message: (state.settings.maintenanceMessage || '').trim()
       };
     }
@@ -5357,6 +5522,7 @@
       const status = getMaintenanceStatus();
       const banner = document.getElementById('maintenanceBanner');
       const overlay = document.getElementById('maintenanceOverlay');
+      const overlayTitle = document.getElementById('maintenanceOverlayTitle');
       const overlayMsg = document.getElementById('maintenanceOverlayMessage');
       if (banner) {
         if (!status.enabled) {
@@ -5364,15 +5530,22 @@
           banner.textContent = '';
         } else {
           banner.classList.remove('hidden');
-          if (status.active) {
+          if (status.hardStopActive) {
             const suffix = status.endAt
               ? t('maintenance.overlay_ends_in', { countdown: formatCountdown(status.msToEnd) })
               : t('maintenance.overlay_active_until');
-            banner.textContent = t('maintenance.banner_active', {
+            banner.textContent = `Maintenance hard stop active (503 mode). ${status.message || t('maintenance.banner_default_active')} • ${suffix}`;
+          } else if (status.gracefulActive) {
+            const suffix = status.endAt
+              ? t('maintenance.overlay_ends_in', { countdown: formatCountdown(status.msToEnd) })
+              : t('maintenance.overlay_active_until');
+            banner.textContent = `Maintenance restricted mode active. Write actions are temporarily disabled. ${t('maintenance.banner_active', {
               range: formatMaintenanceRange(status),
               suffix,
               message: status.message || t('maintenance.banner_default_active')
-            });
+            })}`;
+          } else if (status.warning) {
+            banner.textContent = `Scheduled maintenance warning: ${status.mode === 'hard_stop' ? 'hard stop (503)' : 'restricted mode'} begins in ${formatCountdown(status.msToStart)} (${formatMaintenanceRange(status)}). ${status.message || t('maintenance.banner_default')}`;
           } else if (status.scheduled) {
             banner.textContent = t('maintenance.banner_scheduled_starts', {
               countdown: formatCountdown(status.msToStart),
@@ -5388,17 +5561,23 @@
         }
       }
       if (overlay) {
-        if (status.active && !isOwner()) {
+        if (status.hardStopActive && !isOwner()) {
           overlay.classList.add('show');
         } else {
           overlay.classList.remove('show');
         }
       }
-      if (overlayMsg && status.active) {
+      if (overlayTitle) {
+        overlayTitle.textContent = status.hardStopActive
+          ? 'Service temporarily unavailable (maintenance)'
+          : 'Scheduled maintenance in progress';
+      }
+      if (overlayMsg && status.hardStopActive) {
         const extra = status.endAt
           ? t('maintenance.overlay_ends_in', { countdown: formatCountdown(status.msToEnd) })
           : t('maintenance.overlay_active_until');
-        overlayMsg.textContent = status.message
+        const retryAfter = Math.max(60, Number(status.retryAfterSeconds || 3600) || 3600);
+        const details = status.message
           ? t('maintenance.overlay_with_message', {
             message: status.message,
             range: formatMaintenanceRange(status),
@@ -5408,6 +5587,7 @@
             range: formatMaintenanceRange(status),
             extra
           });
+        overlayMsg.textContent = `${details} Retry-After: ${retryAfter}s`;
       }
       if (status.enabled && !maintenanceTicker) {
         maintenanceTicker = setInterval(() => renderMaintenanceUI(), 60000);
@@ -6093,7 +6273,7 @@
     async function maybeShowPendingAnnouncement(opts = {}) {
       if (!isSupabaseReady()) return;
       if (announcementShownInThisSession) return;
-      if (getMaintenanceStatus().active && !isOwner()) return;
+      if (isMaintenanceHardStopForViewer()) return;
       const uid = cleanId(supabaseSession?.user?.id || '');
       if (!uid) return;
       const force = !!opts.force;
@@ -6534,6 +6714,7 @@
     }
 
     function openParentSelfProfileModal(parent, opts = {}) {
+      if (!opts?.allowMaintenanceBypass && !guardMaintenanceWrite('Profile updates')) return;
       if (!parent) {
         alert(t('parent.profile_not_found'));
         return;
@@ -6689,7 +6870,12 @@
       const promptCard = document.getElementById('parentProfilePrompt');
       const promptText = document.getElementById('parentProfilePromptText');
       const completeBtn = document.getElementById('parentCompleteProfileBtn');
-      if (completeBtn) completeBtn.onclick = () => openParentSelfProfileModal(parent);
+      const writeLocked = isMaintenanceGracefulWriteBlocked();
+      if (completeBtn) {
+        completeBtn.onclick = () => openParentSelfProfileModal(parent);
+        completeBtn.disabled = writeLocked;
+        completeBtn.title = writeLocked ? 'Temporarily disabled during maintenance restricted mode.' : '';
+      }
       if (!promptCard) return;
       if (!parent) {
         promptCard.classList.add('hidden');
@@ -6705,7 +6891,7 @@
         const missingLabels = missing.map(key => t(key)).join(', ');
         promptText.textContent = t('parent.profile_missing_prompt', { fields: missingLabels });
       }
-      if (!tourMode && !hasPromptedParentProfile(parent)) {
+      if (!tourMode && !hasPromptedParentProfile(parent) && !writeLocked) {
         markParentProfilePrompted(parent);
         openParentSelfProfileModal(parent, { forcePrompt: true });
       }
@@ -6715,7 +6901,12 @@
       const card = document.getElementById('parentEmailOptInCard');
       const textEl = document.getElementById('parentEmailOptInText');
       const btn = document.getElementById('parentEmailOptInBtn');
-      if (btn) btn.onclick = () => openParentSelfProfileModal(parent);
+      const writeLocked = isMaintenanceGracefulWriteBlocked();
+      if (btn) {
+        btn.onclick = () => openParentSelfProfileModal(parent);
+        btn.disabled = writeLocked;
+        btn.title = writeLocked ? 'Temporarily disabled during maintenance restricted mode.' : '';
+      }
       if (!card) return;
       if (!parent) {
         card.classList.add('hidden');
@@ -6740,6 +6931,7 @@
 
     function renderParentPortal() {
       const parent = tourMode ? getTourParent() : getParentProfileBySession();
+      const maintenanceWriteLocked = isMaintenanceGracefulWriteBlocked();
       const students = tourMode && parent ? getParentLinkedStudents(parent.id) : getChildrenForParent();
       let contractUpdated = false;
       students.forEach(s => {
@@ -6747,7 +6939,11 @@
       });
       if (contractUpdated) saveState();
       const editProfileBtn = document.getElementById('parentEditProfileBtn');
-      if (editProfileBtn) editProfileBtn.onclick = () => openParentSelfProfileModal(parent);
+      if (editProfileBtn) {
+        editProfileBtn.onclick = () => openParentSelfProfileModal(parent);
+        editProfileBtn.disabled = maintenanceWriteLocked;
+        editProfileBtn.title = maintenanceWriteLocked ? 'Temporarily disabled during maintenance restricted mode.' : '';
+      }
       updateParentProfilePrompt(parent);
       updateParentEmailOptInCard(parent);
       const guideCard = document.getElementById('parentGuideCard');
@@ -6764,7 +6960,9 @@
           const contractClass = signed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700';
           const contractAction = signed
             ? `<button class="portal-cta-btn portal-cta-subtle opacity-60 cursor-not-allowed" disabled>${t('parent.contract_signed_button')}</button>`
-            : `<button class="portal-cta-btn portal-cta-contract" onclick="event.stopPropagation(); openContractLink('${safeStudentId}')" aria-label="Sign contract for ${esc(s.name)}">${t('parent.sign_contract_button')}</button>`;
+            : maintenanceWriteLocked
+              ? `<button class="portal-cta-btn portal-cta-subtle opacity-60 cursor-not-allowed" disabled title="Temporarily disabled during maintenance restricted mode.">${t('parent.sign_contract_button')}</button>`
+              : `<button class="portal-cta-btn portal-cta-contract" onclick="event.stopPropagation(); openContractLink('${safeStudentId}')" aria-label="Sign contract for ${esc(s.name)}">${t('parent.sign_contract_button')}</button>`;
           const aiSummaryBtn = isOwner()
             ? `<button id="btn-summary-${safeStudentId}" class="px-2 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50" onclick="parentSummaryAI('${safeStudentId}')">${t('parent.ai_summary_button')}</button>`
             : '';
@@ -6868,8 +7066,10 @@
                   return `
                     <li class="flex items-center justify-between gap-2">
                       <span>${esc(s.name)}</span>
-                      <button class="portal-cta-btn portal-cta-contract"
-                        onclick="openContractLink('${safeStudentId}')">${t('parent.guide_sign_button')}</button>
+                      ${maintenanceWriteLocked
+            ? `<button class="portal-cta-btn portal-cta-subtle opacity-60 cursor-not-allowed" disabled title="Temporarily disabled during maintenance restricted mode.">${t('parent.guide_sign_button')}</button>`
+            : `<button class="portal-cta-btn portal-cta-contract"
+                        onclick="openContractLink('${safeStudentId}')">${t('parent.guide_sign_button')}</button>`}
                     </li>
                 `;
                 }).join('')}
@@ -6892,8 +7092,10 @@
                   return `
                     <li class="flex items-center justify-between gap-2">
                       <span>${esc(stu?.name || t('common.student'))} • ${esc(inv.dueDate || t('common.na'))} • R ${esc(Number(inv.total || 0).toFixed(2))}</span>
-                      <button class="portal-cta-btn portal-cta-pay"
-                        onclick="startPayfastPayment('${safeInvId}')">${t('invoice.pay_now')}</button>
+                      ${maintenanceWriteLocked
+            ? `<button class="portal-cta-btn portal-cta-subtle opacity-60 cursor-not-allowed" disabled title="Temporarily disabled during maintenance restricted mode.">${t('invoice.pay_now')}</button>`
+            : `<button class="portal-cta-btn portal-cta-pay"
+                        onclick="startPayfastPayment('${safeInvId}')">${t('invoice.pay_now')}</button>`}
                     </li>
                   `;
                 }).join('')}
@@ -7065,7 +7267,11 @@
             </div>
             <div class="flex flex-wrap gap-2 mt-1 text-[10px]">
               ${aiBtn}
-              ${!inv.paid && !isInvoiceVoid(inv) && (inv.invoiceType || inv.invoice_type) !== 'refund' ? `<button class="parent-pay-now-btn portal-cta-btn portal-cta-pay" onclick="startPayfastPayment('${safeInvId}')" aria-label="Pay invoice ${esc(inv.id)} now">${t('invoice.pay_now')}</button>` : ''}
+              ${!inv.paid && !isInvoiceVoid(inv) && (inv.invoiceType || inv.invoice_type) !== 'refund'
+                ? maintenanceWriteLocked
+                  ? `<button class="parent-pay-now-btn portal-cta-btn portal-cta-subtle opacity-60 cursor-not-allowed" disabled title="Temporarily disabled during maintenance restricted mode.">${t('invoice.pay_now')}</button>`
+                  : `<button class="parent-pay-now-btn portal-cta-btn portal-cta-pay" onclick="startPayfastPayment('${safeInvId}')" aria-label="Pay invoice ${esc(inv.id)} now">${t('invoice.pay_now')}</button>`
+                : ''}
             </div>
             <div id="ai-invoice-${safeInvId}" class="text-[10px] text-slate-600 whitespace-pre-wrap"></div>
           </li>`;
@@ -7952,6 +8158,9 @@
         alert(t('banner.read_only'));
         return false;
       }
+      if (!guardMaintenanceWrite('Editing')) {
+        return false;
+      }
       return true;
     }
 
@@ -8334,12 +8543,7 @@
         merged.settings = loadState().settings; // keep local settings
         const ownerSettings = (ownerSettingsRes?.data || [])[0];
         if (ownerSettings) {
-          merged.settings.maintenanceEnabled = !!ownerSettings.maintenance_enabled;
-          merged.settings.maintenanceStart = ownerSettings.maintenance_start || '';
-          merged.settings.maintenanceEnd = ownerSettings.maintenance_end || '';
-          merged.settings.maintenanceStartAt = ownerSettings.maintenance_start_at || '';
-          merged.settings.maintenanceEndAt = ownerSettings.maintenance_end_at || '';
-          merged.settings.maintenanceMessage = ownerSettings.maintenance_message || '';
+          applyOwnerMaintenanceSettings(merged.settings, ownerSettings);
         }
 
         // Merge in any local resources not yet in Supabase so they don't disappear on reload/switch
@@ -8502,12 +8706,7 @@
         out.settings = localSettings;
         const ownerSettings = snap.ownerSettings || snap.owner_settings;
         if (ownerSettings) {
-          out.settings.maintenanceEnabled = !!ownerSettings.maintenance_enabled;
-          out.settings.maintenanceStart = ownerSettings.maintenance_start || '';
-          out.settings.maintenanceEnd = ownerSettings.maintenance_end || '';
-          out.settings.maintenanceStartAt = ownerSettings.maintenance_start_at || '';
-          out.settings.maintenanceEndAt = ownerSettings.maintenance_end_at || '';
-          out.settings.maintenanceMessage = ownerSettings.maintenance_message || '';
+          applyOwnerMaintenanceSettings(out.settings, ownerSettings);
         }
         out.students = (snap.students || []).map(s => ({
           id: s.id,
@@ -8921,12 +9120,7 @@
       }));
       const ownerSettings = (ownerSettingsRes.data || [])[0];
       if (ownerSettings) {
-        merged.settings.maintenanceEnabled = !!ownerSettings.maintenance_enabled;
-        merged.settings.maintenanceStart = ownerSettings.maintenance_start || '';
-        merged.settings.maintenanceEnd = ownerSettings.maintenance_end || '';
-        merged.settings.maintenanceStartAt = ownerSettings.maintenance_start_at || '';
-        merged.settings.maintenanceEndAt = ownerSettings.maintenance_end_at || '';
-        merged.settings.maintenanceMessage = ownerSettings.maintenance_message || '';
+        applyOwnerMaintenanceSettings(merged.settings, ownerSettings);
       }
 
       const sessions = (sessionsRes.data || []).map(sess => {
@@ -9250,6 +9444,7 @@
     }
 
 	    async function openContractLink(studentId) {
+      if (!guardMaintenanceWrite('Contract signing')) return;
 	      let popup = null;
 	      try {
 	        // Open a placeholder tab immediately so pop-up blockers don't block the tokenized link.
@@ -12781,6 +12976,22 @@
         sender: msg.sender,
         created_at: msg.created_at
       };
+    }
+
+    function applyOwnerMaintenanceSettings(settings, ownerSettings) {
+      if (!settings || !ownerSettings) return;
+      settings.maintenanceEnabled = !!ownerSettings.maintenance_enabled;
+      settings.maintenanceStart = ownerSettings.maintenance_start || '';
+      settings.maintenanceEnd = ownerSettings.maintenance_end || '';
+      settings.maintenanceStartAt = ownerSettings.maintenance_start_at || '';
+      settings.maintenanceEndAt = ownerSettings.maintenance_end_at || '';
+      settings.maintenanceWarningStartAt = ownerSettings.maintenance_warning_start_at || '';
+      settings.maintenanceMode = normalizeMaintenanceMode(ownerSettings.maintenance_mode || settings.maintenanceMode || 'graceful');
+      settings.maintenanceRetryAfterSeconds = Math.max(
+        60,
+        Number(ownerSettings.maintenance_retry_after_seconds || settings.maintenanceRetryAfterSeconds || 3600) || 3600
+      );
+      settings.maintenanceMessage = ownerSettings.maintenance_message || '';
     }
 
     function setOverdueReminderEmailStatus(message = '', tone = 'info') {
