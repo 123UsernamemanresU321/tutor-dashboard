@@ -7181,6 +7181,7 @@
             <button id="supportThreadReplyBtn" class="portal-cta-btn portal-cta-pay text-[11px]">Send reply</button>
             <select id="supportThreadStatusSelect" class="border border-slate-300 rounded-lg px-2 py-1 text-[11px]"></select>
             <button id="supportThreadStatusBtn" class="portal-cta-btn portal-cta-subtle text-[11px]">Update status</button>
+            <button id="supportThreadDeleteBtn" class="hidden px-3 py-1.5 text-[11px] rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50">Delete ticket</button>
           </div>
           <div id="supportThreadStatusText" class="text-[11px] text-slate-500 hidden"></div>
         </div>
@@ -7192,12 +7193,15 @@
         const replyBtn = document.getElementById('supportThreadReplyBtn');
         const statusSelect = document.getElementById('supportThreadStatusSelect');
         const statusBtn = document.getElementById('supportThreadStatusBtn');
+        const deleteBtn = document.getElementById('supportThreadDeleteBtn');
         const statusText = document.getElementById('supportThreadStatusText');
         const internalWrap = document.getElementById('supportThreadInternalWrap');
         const internalInput = document.getElementById('supportThreadInternal');
         const roleHint = getSupportRoleHint();
-        if (!titleEl || !metaEl || !listEl || !replyEl || !replyBtn || !statusSelect || !statusBtn || !statusText || !internalWrap || !internalInput) return;
+        if (!titleEl || !metaEl || !listEl || !replyEl || !replyBtn || !statusSelect || !statusBtn || !deleteBtn || !statusText || !internalWrap || !internalInput) return;
         internalWrap.classList.toggle('hidden', roleHint !== 'owner');
+        deleteBtn.classList.toggle('hidden', roleHint !== 'owner');
+        let currentTicket = null;
 
         const setStatusText = (message, isError = false) => {
           const text = String(message || '').trim();
@@ -7218,6 +7222,7 @@
           try {
             const resp = await invokeSupportTicketApi('get_ticket_thread', { ticket_id: safeTicketId });
             const ticket = resp?.ticket || {};
+            currentTicket = ticket;
             const messages = Array.isArray(resp?.messages) ? resp.messages : [];
             const shortId = shortSupportTicketId(ticket.id || safeTicketId);
             titleEl.textContent = `Ticket #${shortId} • ${ticket.subject || 'Support ticket'}`;
@@ -7297,6 +7302,41 @@
             setStatusText(err?.message || 'Failed to update status.', true);
           } finally {
             statusBtn.disabled = false;
+          }
+        };
+
+        deleteBtn.onclick = async () => {
+          if (roleHint !== 'owner') return;
+          if (!guardMaintenanceWrite('Support ticket deletion')) return;
+          const typed = prompt('Type DELETE to permanently delete this ticket.');
+          if (typed === null) return;
+          if (String(typed || '').trim().toUpperCase() !== 'DELETE') {
+            setStatusText('Deletion cancelled. Confirmation did not match DELETE.', true);
+            return;
+          }
+          const reasonInput = prompt('Delete reason (required; stored in activity log):');
+          if (reasonInput === null) return;
+          const reason = String(reasonInput || '').trim();
+          if (!reason) {
+            setStatusText('Delete reason is required.', true);
+            return;
+          }
+          const shortId = shortSupportTicketId(currentTicket?.id || safeTicketId);
+          if (!confirm(`Delete ticket #${shortId}? This cannot be undone.`)) return;
+          deleteBtn.disabled = true;
+          setStatusText('Deleting ticket...');
+          try {
+            await invokeSupportTicketApi('delete_ticket', {
+              ticket_id: safeTicketId,
+              confirmation: 'DELETE',
+              reason
+            });
+            closeModal();
+            await refreshSupportForCurrentRole({ force: true });
+          } catch (err) {
+            setStatusText(err?.message || 'Failed to delete ticket.', true);
+          } finally {
+            deleteBtn.disabled = false;
           }
         };
 
@@ -8489,6 +8529,7 @@
               'contracts',
               'invoices',
               'homework',
+              'support_tickets',
               'student_todos',
               'student_checkins',
               'parent_contract_signatures',
@@ -11135,6 +11176,9 @@
       const parent = getParentById(parentId);
       state.parents = state.parents.filter(p => p.id !== parentId);
       state.parentLinks = state.parentLinks.filter(pl => pl.parentId !== parentId);
+      if (Array.isArray(supportTicketsCache?.tickets) && supportTicketsCache.tickets.length) {
+        supportTicketsCache.tickets = supportTicketsCache.tickets.filter(ticket => cleanId(ticket?.parent_id || '') !== cleanId(parentId));
+      }
       saveState();
       renderParentsList();
       // Remote
@@ -11144,6 +11188,12 @@
           const { data } = await supabaseClient.from('parents').select('login_code').eq('id', parentId).single();
           loginCodeToDelete = data?.login_code || '';
         } catch { }
+        try {
+          await supabaseClient.from('support_tickets').delete().eq('parent_id', parentId);
+          supportTicketsCache.loadedAt = 0;
+        } catch (err) {
+          console.warn('Remote support_tickets delete failed', err);
+        }
         try {
           await supabaseClient.from('parent_students').delete().eq('parent_id', parentId);
         } catch (err) {
