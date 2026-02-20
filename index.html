@@ -1133,6 +1133,23 @@
                 <ul id="prepQueueList" class="text-xs space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
               </div>
             </div>
+
+            <div class="card p-5 space-y-3" id="ownerSupportCard" data-owner-only>
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-sm font-semibold">Support inbox</h3>
+                  <p class="text-[11px] text-slate-500">Parent and student tickets.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button id="ownerSupportRefreshBtn"
+                    class="portal-cta-btn portal-cta-subtle text-[11px]">Refresh</button>
+                  <button id="ownerSupportNewBtn"
+                    class="portal-cta-btn portal-cta-pay text-[11px]">New ticket</button>
+                </div>
+              </div>
+              <div id="ownerSupportStatus" class="text-[11px] text-slate-500 hidden"></div>
+              <ul id="ownerSupportTickets" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin text-xs"></ul>
+            </div>
           </div>
         </section>
 
@@ -2009,6 +2026,14 @@
                 </div>
                 <ul id="portalMessages" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
               </div>
+              <div class="card p-4 space-y-2">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-sm font-semibold">Support</h3>
+                  <button id="portalSupportNewBtn" class="portal-cta-btn portal-cta-subtle text-[11px]">New ticket</button>
+                </div>
+                <div id="portalSupportStatus" class="text-[11px] text-slate-500 hidden"></div>
+                <ul id="portalSupportTickets" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+              </div>
               <div id="portalAiCard" class="card p-4 space-y-2">
                 <div class="flex items-center justify-between">
                   <h3 class="text-sm font-semibold" data-i18n="portal.ai_helper">AI Study Helper</h3>
@@ -2137,6 +2162,17 @@
                 <h3 class="text-sm font-semibold" data-i18n="parent.messages">Messages</h3>
                 <ul id="parentMessages" class="space-y-2 max-h-72 overflow-y-auto scrollbar-thin"></ul>
               </div>
+            </div>
+            <div class="card p-4 space-y-2 text-xs">
+              <div class="flex items-center justify-between">
+                <h3 class="text-sm font-semibold">Support</h3>
+                <div class="flex items-center gap-2">
+                  <button id="parentSupportRefreshBtn" class="portal-cta-btn portal-cta-subtle text-[11px]">Refresh</button>
+                  <button id="parentSupportNewBtn" class="portal-cta-btn portal-cta-pay text-[11px]">New ticket</button>
+                </div>
+              </div>
+              <div id="parentSupportStatus" class="text-[11px] text-slate-500 hidden"></div>
+              <ul id="parentSupportTickets" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
             </div>
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
               <div class="card p-4 space-y-2">
@@ -2456,6 +2492,15 @@
     let announcementAdminTicker = null;
     let overdueReminderSendInFlight = false;
     let overdueReminderTestSendInFlight = false;
+    const SUPPORT_CACHE_TTL_MS = 15000;
+    let supportTicketsCache = {
+      cacheKey: '',
+      loadedAt: 0,
+      tickets: [],
+      loading: false,
+      error: ''
+    };
+    let supportTicketsInFlight = null;
 
     function requireAccessToken(errorMessage = '') {
       const token = supabaseSession?.access_token;
@@ -4971,6 +5016,9 @@
       window.markContractStatus = markContractStatus;
       window.explainInvoiceAI = explainInvoiceAI;
       window.parentSummaryAI = parentSummaryAI;
+      window.openSupportTicketComposer = openSupportTicketComposer;
+      window.openSupportTicketThread = openSupportTicketThread;
+      window.refreshSupportForCurrentRole = refreshSupportForCurrentRole;
       window.setAnnouncementActive = setAnnouncementActive;
       window.markAnnouncementSeenForCurrentUser = markAnnouncementSeenForCurrentUser;
       window.markAnnouncementUnseenForAll = markAnnouncementUnseenForAll;
@@ -4998,7 +5046,7 @@
      ***********************/
     function setupRealtime() {
       if (!supabaseClient || !supabaseSession || !isOwner()) return;
-      const tables = ['students', 'lesson_sessions', 'session_cancellations', 'homework', 'invoices', 'messages', 'resources', 'documents', 'contracts', 'student_todos', 'student_checkins', 'parent_contract_signatures', 'presence'];
+      const tables = ['students', 'lesson_sessions', 'session_cancellations', 'homework', 'invoices', 'messages', 'resources', 'documents', 'contracts', 'student_todos', 'student_checkins', 'parent_contract_signatures', 'support_tickets', 'support_ticket_messages', 'presence'];
       tables.forEach(table => {
         supabaseClient
           .channel(`${table}-changes`)
@@ -5007,6 +5055,9 @@
               if (table === 'presence') {
                 await refreshPresence();
                 renderStudentsView();
+              } else if (table === 'support_tickets' || table === 'support_ticket_messages') {
+                supportTicketsCache.loadedAt = 0;
+                await renderOwnerSupportCard({ force: true });
               } else {
                 await tryLoadRemoteThenLocal();
                 renderAllViews();
@@ -6561,6 +6612,565 @@
       }
     }
 
+    function getSupportRoleHint() {
+      if (isOwner()) return 'owner';
+      if (parentMode) return 'parent';
+      if (studentMode) return 'student';
+      const sessionRole = getSessionRole();
+      if (sessionRole === 'owner' || sessionRole === 'parent' || sessionRole === 'student') {
+        return sessionRole;
+      }
+      return '';
+    }
+
+    function shortSupportTicketId(ticketId) {
+      const clean = cleanId(ticketId).replace(/-/g, '').toUpperCase();
+      return clean ? clean.slice(0, 8) : 'UNKNOWN';
+    }
+
+    function formatSupportTimestamp(value) {
+      if (!value) return '';
+      const dt = new Date(value);
+      if (Number.isNaN(dt.getTime())) return '';
+      return dt.toLocaleString();
+    }
+
+    function getSupportStatusLabel(status) {
+      const key = String(status || '').toLowerCase();
+      if (key === 'open') return 'Open';
+      if (key === 'waiting_owner') return 'Waiting on tutor';
+      if (key === 'waiting_parent') return 'Waiting on family';
+      if (key === 'resolved') return 'Resolved';
+      if (key === 'closed') return 'Closed';
+      return key || 'Unknown';
+    }
+
+    function getSupportStatusClass(status) {
+      const key = String(status || '').toLowerCase();
+      if (key === 'open') return 'bg-rose-100 text-rose-700';
+      if (key === 'waiting_owner') return 'bg-amber-100 text-amber-800';
+      if (key === 'waiting_parent') return 'bg-sky-100 text-sky-700';
+      if (key === 'resolved') return 'bg-emerald-100 text-emerald-700';
+      if (key === 'closed') return 'bg-slate-100 text-slate-600';
+      return 'bg-slate-100 text-slate-600';
+    }
+
+    function supportCacheKey(roleHint) {
+      const uid = cleanId(supabaseSession?.user?.id || '');
+      const parentId = roleHint === 'parent' ? cleanId(getParentProfileBySession()?.id || '') : '';
+      const studentId = roleHint === 'student' ? cleanId(getStudentProfileBySession()?.id || '') : '';
+      return [uid, roleHint, parentId, studentId].join('|');
+    }
+
+    async function invokeSupportTicketApi(action, payload = {}) {
+      if (!isSupabaseReady()) throw new Error('Please sign in first.');
+      const accessToken = requireAccessToken(t('alert.sign_in_first'));
+      const roleHint = getSupportRoleHint();
+      const body = {
+        action,
+        ...(payload || {})
+      };
+      if (roleHint && !body.role) body.role = roleHint;
+      const { data, error } = await supabaseClient.functions.invoke('support-ticket-api', {
+        body,
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (error || data?.success === false) {
+        const msg = data?.error || error?.message || 'Support request failed';
+        throw new Error(msg);
+      }
+      return data || {};
+    }
+
+    async function fetchSupportTickets({ force = false, status = 'all', limit = 60 } = {}) {
+      const roleHint = getSupportRoleHint();
+      const cacheKey = `${supportCacheKey(roleHint)}|${status}|${limit}`;
+      const now = Date.now();
+      if (!force && supportTicketsCache.cacheKey === cacheKey && (now - Number(supportTicketsCache.loadedAt || 0)) < SUPPORT_CACHE_TTL_MS) {
+        return supportTicketsCache.tickets || [];
+      }
+      if (supportTicketsCache.loading && supportTicketsInFlight && supportTicketsCache.cacheKey === cacheKey) {
+        return await supportTicketsInFlight;
+      }
+      supportTicketsCache.loading = true;
+      supportTicketsCache.cacheKey = cacheKey;
+      supportTicketsInFlight = (async () => {
+        const resp = await invokeSupportTicketApi('list_tickets', { status, limit });
+        const tickets = Array.isArray(resp?.tickets) ? resp.tickets : [];
+        supportTicketsCache = {
+          cacheKey,
+          loadedAt: Date.now(),
+          tickets,
+          loading: false,
+          error: ''
+        };
+        return tickets;
+      })();
+      try {
+        return await supportTicketsInFlight;
+      } catch (err) {
+        supportTicketsCache.loading = false;
+        supportTicketsCache.error = String(err?.message || err || 'Support ticket fetch failed');
+        throw err;
+      } finally {
+        supportTicketsInFlight = null;
+      }
+    }
+
+    function setSupportStatusText(elementId, message, isError = false) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      const text = String(message || '').trim();
+      el.textContent = text;
+      el.classList.toggle('hidden', !text);
+      el.className = `text-[11px] ${isError ? 'text-rose-700' : 'text-slate-500'}${text ? '' : ' hidden'}`;
+    }
+
+    function renderSupportTicketItems(listEl, tickets, { ownerView = false } = {}) {
+      if (!listEl) return;
+      if (!Array.isArray(tickets) || !tickets.length) {
+        listEl.innerHTML = `<li class="text-slate-500 text-xs">No support tickets yet.</li>`;
+        return;
+      }
+      listEl.innerHTML = tickets.map(ticket => {
+        const statusLabel = getSupportStatusLabel(ticket.status);
+        const statusClass = getSupportStatusClass(ticket.status);
+        const updatedAt = formatSupportTimestamp(ticket.last_message_at || ticket.updated_at || ticket.created_at);
+        const subject = esc(ticket.subject || 'Support request');
+        const ticketShort = shortSupportTicketId(ticket.id);
+        const ticketId = cleanId(ticket.id);
+        const ownerMeta = ownerView
+          ? `${esc(ticket.student_name || '—')} • ${esc(ticket.parent_name || '—')}`
+          : '';
+        const roleMeta = ownerMeta ? `${ownerMeta} • ` : '';
+        return `
+          <li class="border border-slate-200 rounded-lg px-2 py-2 bg-white/80">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <div class="font-medium">#${esc(ticketShort)} • ${subject}</div>
+                <div class="text-[10px] text-slate-500">${roleMeta}${esc(updatedAt || '—')}</div>
+              </div>
+              <span class="text-[10px] px-2 py-0.5 rounded-full ${statusClass}">${esc(statusLabel)}</span>
+            </div>
+            <div class="mt-2">
+              <button class="portal-cta-btn portal-cta-subtle text-[11px]" data-support-open="${ticketId}">
+                Open thread
+              </button>
+            </div>
+          </li>
+        `;
+      }).join('');
+      listEl.querySelectorAll('[data-support-open]').forEach(btn => {
+        btn.onclick = () => {
+          const ticketId = cleanId(btn.getAttribute('data-support-open') || '');
+          if (ticketId) openSupportTicketThread(ticketId);
+        };
+      });
+    }
+
+    function sortSupportTickets(tickets) {
+      const order = { open: 0, waiting_owner: 1, waiting_parent: 2, resolved: 3, closed: 4 };
+      return [...(tickets || [])].sort((a, b) => {
+        const aRank = order[String(a.status || '').toLowerCase()] ?? 9;
+        const bRank = order[String(b.status || '').toLowerCase()] ?? 9;
+        if (aRank !== bRank) return aRank - bRank;
+        const aTime = new Date(a.last_message_at || a.updated_at || a.created_at || 0).getTime();
+        const bTime = new Date(b.last_message_at || b.updated_at || b.created_at || 0).getTime();
+        return bTime - aTime;
+      });
+    }
+
+    async function renderOwnerSupportCard({ force = false } = {}) {
+      const card = document.getElementById('ownerSupportCard');
+      const listEl = document.getElementById('ownerSupportTickets');
+      const statusElId = 'ownerSupportStatus';
+      const refreshBtn = document.getElementById('ownerSupportRefreshBtn');
+      const newBtn = document.getElementById('ownerSupportNewBtn');
+      if (!card || !listEl || !refreshBtn || !newBtn) return;
+      if (!isOwner() || !isSupabaseReady()) {
+        card.classList.add('hidden');
+        return;
+      }
+      card.classList.remove('hidden');
+      refreshBtn.onclick = () => void renderOwnerSupportCard({ force: true });
+      newBtn.onclick = () => openSupportTicketComposer();
+      setSupportStatusText(statusElId, force ? 'Refreshing support tickets...' : 'Loading support tickets...');
+      try {
+        const tickets = sortSupportTickets(await fetchSupportTickets({ force, limit: 120 }));
+        const openCount = tickets.filter(t => {
+          const status = String(t.status || '').toLowerCase();
+          return status !== 'resolved' && status !== 'closed';
+        }).length;
+        setSupportStatusText(statusElId, `${openCount} open • ${tickets.length} total`);
+        renderSupportTicketItems(listEl, tickets.slice(0, 50), { ownerView: true });
+      } catch (err) {
+        setSupportStatusText(statusElId, err?.message || 'Failed to load support tickets.', true);
+        listEl.innerHTML = `<li class="text-rose-700 text-xs">${esc(err?.message || 'Failed to load support tickets.')}</li>`;
+      }
+    }
+
+    async function renderParentSupportCard({ force = false } = {}) {
+      const listEl = document.getElementById('parentSupportTickets');
+      const newBtn = document.getElementById('parentSupportNewBtn');
+      const refreshBtn = document.getElementById('parentSupportRefreshBtn');
+      const statusElId = 'parentSupportStatus';
+      if (!listEl || !newBtn || !refreshBtn) return;
+      const blocked = isMaintenanceGracefulWriteBlocked() || isMaintenanceHardStopForViewer();
+      newBtn.disabled = blocked;
+      newBtn.title = blocked ? 'Temporarily disabled during maintenance restricted mode.' : '';
+      newBtn.onclick = () => openSupportTicketComposer();
+      refreshBtn.onclick = () => void renderParentSupportCard({ force: true });
+      if (!isSupabaseReady() || !parentMode) {
+        setSupportStatusText(statusElId, 'Sign in to view support tickets.');
+        listEl.innerHTML = `<li class="text-slate-500 text-xs">No support tickets available.</li>`;
+        return;
+      }
+      setSupportStatusText(statusElId, force ? 'Refreshing support tickets...' : 'Loading support tickets...');
+      try {
+        const tickets = sortSupportTickets(await fetchSupportTickets({ force, limit: 80 }));
+        setSupportStatusText(statusElId, `${tickets.length} ticket${tickets.length === 1 ? '' : 's'}`);
+        renderSupportTicketItems(listEl, tickets);
+      } catch (err) {
+        setSupportStatusText(statusElId, err?.message || 'Failed to load support tickets.', true);
+        listEl.innerHTML = `<li class="text-rose-700 text-xs">${esc(err?.message || 'Failed to load support tickets.')}</li>`;
+      }
+    }
+
+    async function renderStudentSupportCard({ force = false } = {}) {
+      const listEl = document.getElementById('portalSupportTickets');
+      const newBtn = document.getElementById('portalSupportNewBtn');
+      const statusElId = 'portalSupportStatus';
+      if (!listEl || !newBtn) return;
+      const blocked = isMaintenanceGracefulWriteBlocked() || isMaintenanceHardStopForViewer();
+      newBtn.disabled = blocked;
+      newBtn.title = blocked ? 'Temporarily disabled during maintenance restricted mode.' : '';
+      newBtn.onclick = () => openSupportTicketComposer();
+      if (!isSupabaseReady() || !studentMode) {
+        setSupportStatusText(statusElId, 'Sign in to view support tickets.');
+        listEl.innerHTML = `<li class="text-slate-500 text-xs">No support tickets available.</li>`;
+        return;
+      }
+      setSupportStatusText(statusElId, force ? 'Refreshing support tickets...' : 'Loading support tickets...');
+      try {
+        const tickets = sortSupportTickets(await fetchSupportTickets({ force, limit: 80 }));
+        setSupportStatusText(statusElId, `${tickets.length} ticket${tickets.length === 1 ? '' : 's'}`);
+        renderSupportTicketItems(listEl, tickets);
+      } catch (err) {
+        setSupportStatusText(statusElId, err?.message || 'Failed to load support tickets.', true);
+        listEl.innerHTML = `<li class="text-rose-700 text-xs">${esc(err?.message || 'Failed to load support tickets.')}</li>`;
+      }
+    }
+
+    async function refreshSupportForCurrentRole({ force = true } = {}) {
+      supportTicketsCache.loadedAt = 0;
+      if (isOwner()) {
+        await renderOwnerSupportCard({ force });
+        return;
+      }
+      if (parentMode) {
+        await renderParentSupportCard({ force });
+        return;
+      }
+      if (studentMode) {
+        await renderStudentSupportCard({ force });
+      }
+    }
+
+    function buildSupportStatusOptions(roleHint, currentStatus) {
+      const ownerStatuses = ['open', 'waiting_owner', 'waiting_parent', 'resolved', 'closed'];
+      const memberStatuses = ['open', 'resolved', 'closed'];
+      const allowed = roleHint === 'owner' ? ownerStatuses : memberStatuses;
+      return allowed.map(status => {
+        const selected = status === currentStatus ? 'selected' : '';
+        return `<option value="${status}" ${selected}>${esc(getSupportStatusLabel(status))}</option>`;
+      }).join('');
+    }
+
+    function openSupportTicketComposer() {
+      if (!guardMaintenanceWrite('Support ticket creation')) return;
+      if (!isSupabaseReady()) {
+        alert('Please sign in first.');
+        return;
+      }
+      const roleHint = getSupportRoleHint();
+      const parent = parentMode ? getParentProfileBySession() : null;
+      const student = studentMode ? getStudentProfileBySession() : null;
+      const parentStudents = parent ? getChildrenForParent() : [];
+      const ownerStudents = isOwner() ? [...state.students].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))) : [];
+      const ownerParents = isOwner() ? [...state.parents].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))) : [];
+      const parentStudentOptions = [
+        `<option value="">General parent issue</option>`,
+        ...parentStudents.map(s => `<option value="${cleanId(s.id)}">${esc(s.name || 'Student')}</option>`)
+      ].join('');
+      const ownerStudentOptions = [`<option value="">Select student (optional)</option>`]
+        .concat(ownerStudents.map(s => `<option value="${cleanId(s.id)}">${esc(s.name || 'Student')}</option>`))
+        .join('');
+      const ownerParentOptions = [`<option value="">Select parent (optional)</option>`]
+        .concat(ownerParents.map(p => `<option value="${cleanId(p.id)}">${esc(p.name || p.email || 'Parent')}</option>`))
+        .join('');
+      const roleDetail = roleHint === 'owner'
+        ? 'Create a ticket for a parent and/or student.'
+        : roleHint === 'parent'
+          ? `Submitting as ${esc(parent?.name || 'Parent')}.`
+          : `Submitting as ${esc(student?.name || 'Student')}.`;
+      openModal(`
+        <div class="space-y-3 text-xs">
+          <h2 class="text-sm font-semibold">New support ticket</h2>
+          <p class="text-[11px] text-slate-500">${roleDetail}</p>
+          ${roleHint === 'owner' ? `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <label class="space-y-1">
+                <div class="text-[11px] text-slate-500">Parent</div>
+                <select id="supportComposeParentId" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${ownerParentOptions}</select>
+              </label>
+              <label class="space-y-1">
+                <div class="text-[11px] text-slate-500">Student</div>
+                <select id="supportComposeStudentId" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${ownerStudentOptions}</select>
+              </label>
+            </div>
+          ` : ''}
+          ${roleHint === 'parent' ? `
+            <label class="space-y-1">
+              <div class="text-[11px] text-slate-500">Student (optional)</div>
+              <select id="supportComposeStudentId" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${parentStudentOptions}</select>
+            </label>
+          ` : ''}
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <label class="space-y-1">
+              <div class="text-[11px] text-slate-500">Category</div>
+              <select id="supportComposeCategory" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
+                <option value="general">General</option>
+                <option value="billing">Billing</option>
+                <option value="schedule">Schedule</option>
+                <option value="technical">Technical</option>
+                <option value="contract">Contract</option>
+                <option value="account">Account</option>
+              </select>
+            </label>
+            <label class="space-y-1">
+              <div class="text-[11px] text-slate-500">Priority</div>
+              <select id="supportComposePriority" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
+                <option value="normal">Normal</option>
+                <option value="low">Low</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </label>
+          </div>
+          <label class="space-y-1">
+            <div class="text-[11px] text-slate-500">Subject</div>
+            <input id="supportComposeSubject" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]" maxlength="180"
+              placeholder="Short summary (e.g., Invoice due date question)" />
+          </label>
+          <label class="space-y-1">
+            <div class="text-[11px] text-slate-500">Message</div>
+            <textarea id="supportComposeBody" rows="5" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]"
+              maxlength="8000" placeholder="Describe the issue in detail."></textarea>
+          </label>
+          <div id="supportComposeStatus" class="text-[11px] text-slate-500 hidden"></div>
+          <div class="flex items-center gap-2">
+            <button id="supportComposeSubmitBtn" class="portal-cta-btn portal-cta-pay text-[11px]">Create ticket</button>
+            <button id="supportComposeCancelBtn" class="portal-cta-btn portal-cta-subtle text-[11px]">Cancel</button>
+          </div>
+        </div>
+      `, () => {
+        const submitBtn = document.getElementById('supportComposeSubmitBtn');
+        const cancelBtn = document.getElementById('supportComposeCancelBtn');
+        const statusEl = document.getElementById('supportComposeStatus');
+        const subjectEl = document.getElementById('supportComposeSubject');
+        if (cancelBtn) cancelBtn.onclick = closeModal;
+        if (!submitBtn || !statusEl || !subjectEl) return;
+        submitBtn.onclick = async () => {
+          const subject = String(document.getElementById('supportComposeSubject')?.value || '').trim();
+          const body = String(document.getElementById('supportComposeBody')?.value || '').trim();
+          const category = String(document.getElementById('supportComposeCategory')?.value || 'general').trim();
+          const priority = String(document.getElementById('supportComposePriority')?.value || 'normal').trim();
+          const parentId = cleanId(document.getElementById('supportComposeParentId')?.value || '');
+          const studentId = cleanId(document.getElementById('supportComposeStudentId')?.value || '');
+          if (!subject) {
+            statusEl.textContent = 'Please enter a subject.';
+            statusEl.className = 'text-[11px] text-rose-700';
+            statusEl.classList.remove('hidden');
+            return;
+          }
+          if (!body) {
+            statusEl.textContent = 'Please enter a message.';
+            statusEl.className = 'text-[11px] text-rose-700';
+            statusEl.classList.remove('hidden');
+            return;
+          }
+          const payload = { subject, body, category, priority };
+          if (roleHint === 'owner') {
+            if (parentId) payload.parent_id = parentId;
+            if (studentId) payload.student_id = studentId;
+          } else if (roleHint === 'parent') {
+            if (studentId) payload.student_id = studentId;
+          }
+          submitBtn.disabled = true;
+          statusEl.textContent = 'Creating ticket...';
+          statusEl.className = 'text-[11px] text-slate-500';
+          statusEl.classList.remove('hidden');
+          try {
+            const resp = await invokeSupportTicketApi('create_ticket', payload);
+            const ticketId = cleanId(resp?.ticket_id || '');
+            closeModal();
+            await refreshSupportForCurrentRole({ force: true });
+            if (ticketId) openSupportTicketThread(ticketId);
+          } catch (err) {
+            statusEl.textContent = err?.message || 'Failed to create ticket.';
+            statusEl.className = 'text-[11px] text-rose-700';
+          } finally {
+            submitBtn.disabled = false;
+          }
+        };
+      });
+    }
+
+    function openSupportTicketThread(ticketId) {
+      const safeTicketId = cleanId(ticketId);
+      if (!safeTicketId) return;
+      openModal(`
+        <div class="space-y-3 text-xs">
+          <h2 id="supportThreadTitle" class="text-sm font-semibold">Support ticket</h2>
+          <div id="supportThreadMeta" class="text-[11px] text-slate-500"></div>
+          <ul id="supportThreadMessages" class="space-y-2 max-h-72 overflow-y-auto scrollbar-thin border border-slate-200 rounded-lg p-2 bg-slate-50"></ul>
+          <label class="space-y-1">
+            <div class="text-[11px] text-slate-500">Reply</div>
+            <textarea id="supportThreadReplyBody" rows="4" maxlength="8000"
+              class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]"
+              placeholder="Type your reply"></textarea>
+          </label>
+          <label id="supportThreadInternalWrap" class="hidden flex items-center gap-2 text-[11px] text-slate-600">
+            <input id="supportThreadInternal" type="checkbox" />
+            Internal note (owner only)
+          </label>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="supportThreadReplyBtn" class="portal-cta-btn portal-cta-pay text-[11px]">Send reply</button>
+            <select id="supportThreadStatusSelect" class="border border-slate-300 rounded-lg px-2 py-1 text-[11px]"></select>
+            <button id="supportThreadStatusBtn" class="portal-cta-btn portal-cta-subtle text-[11px]">Update status</button>
+          </div>
+          <div id="supportThreadStatusText" class="text-[11px] text-slate-500 hidden"></div>
+        </div>
+      `, () => {
+        const titleEl = document.getElementById('supportThreadTitle');
+        const metaEl = document.getElementById('supportThreadMeta');
+        const listEl = document.getElementById('supportThreadMessages');
+        const replyEl = document.getElementById('supportThreadReplyBody');
+        const replyBtn = document.getElementById('supportThreadReplyBtn');
+        const statusSelect = document.getElementById('supportThreadStatusSelect');
+        const statusBtn = document.getElementById('supportThreadStatusBtn');
+        const statusText = document.getElementById('supportThreadStatusText');
+        const internalWrap = document.getElementById('supportThreadInternalWrap');
+        const internalInput = document.getElementById('supportThreadInternal');
+        const roleHint = getSupportRoleHint();
+        if (!titleEl || !metaEl || !listEl || !replyEl || !replyBtn || !statusSelect || !statusBtn || !statusText || !internalWrap || !internalInput) return;
+        internalWrap.classList.toggle('hidden', roleHint !== 'owner');
+
+        const setStatusText = (message, isError = false) => {
+          const text = String(message || '').trim();
+          statusText.textContent = text;
+          statusText.classList.toggle('hidden', !text);
+          statusText.className = `text-[11px] ${isError ? 'text-rose-700' : 'text-slate-500'}${text ? '' : ' hidden'}`;
+        };
+
+        const senderLabel = (senderRole) => {
+          if (senderRole === 'owner') return 'Tutor';
+          if (senderRole === 'parent') return 'Parent';
+          if (senderRole === 'student') return 'Student';
+          return 'User';
+        };
+
+        const refreshThread = async () => {
+          setStatusText('Loading ticket...');
+          try {
+            const resp = await invokeSupportTicketApi('get_ticket_thread', { ticket_id: safeTicketId });
+            const ticket = resp?.ticket || {};
+            const messages = Array.isArray(resp?.messages) ? resp.messages : [];
+            const shortId = shortSupportTicketId(ticket.id || safeTicketId);
+            titleEl.textContent = `Ticket #${shortId} • ${ticket.subject || 'Support ticket'}`;
+            const metaBits = [
+              `Status: ${getSupportStatusLabel(ticket.status)}`,
+              ticket.student_name ? `Student: ${ticket.student_name}` : '',
+              ticket.parent_name ? `Parent: ${ticket.parent_name}` : '',
+              `Updated: ${formatSupportTimestamp(ticket.last_message_at || ticket.updated_at || ticket.created_at)}`
+            ].filter(Boolean);
+            metaEl.textContent = metaBits.join(' • ');
+            statusSelect.innerHTML = buildSupportStatusOptions(roleHint, String(ticket.status || '').toLowerCase());
+            if (!messages.length) {
+              listEl.innerHTML = `<li class="text-slate-500 text-[11px]">No messages yet.</li>`;
+            } else {
+              listEl.innerHTML = messages.map(msg => {
+                const isInternal = !!msg.is_internal;
+                const body = esc(msg.body || '').replace(/\n/g, '<br/>');
+                return `
+                  <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white">
+                    <div class="flex items-center justify-between text-[10px] text-slate-500">
+                      <span>${esc(senderLabel(msg.sender_role))}${isInternal ? ' • Internal' : ''}</span>
+                      <span>${esc(formatSupportTimestamp(msg.created_at))}</span>
+                    </div>
+                    <div class="mt-1">${body || '—'}</div>
+                  </li>
+                `;
+              }).join('');
+            }
+            setStatusText('');
+          } catch (err) {
+            setStatusText(err?.message || 'Failed to load ticket thread.', true);
+            listEl.innerHTML = `<li class="text-rose-700 text-[11px]">${esc(err?.message || 'Failed to load ticket thread.')}</li>`;
+          }
+        };
+
+        replyBtn.onclick = async () => {
+          if (!guardMaintenanceWrite('Support reply')) return;
+          const body = String(replyEl.value || '').trim();
+          if (!body) {
+            setStatusText('Please enter a reply.', true);
+            return;
+          }
+          const isInternal = roleHint === 'owner' && !!internalInput.checked;
+          replyBtn.disabled = true;
+          setStatusText('Sending reply...');
+          try {
+            await invokeSupportTicketApi('reply_ticket', {
+              ticket_id: safeTicketId,
+              body,
+              is_internal: isInternal
+            });
+            replyEl.value = '';
+            internalInput.checked = false;
+            await refreshThread();
+            await refreshSupportForCurrentRole({ force: true });
+          } catch (err) {
+            setStatusText(err?.message || 'Failed to send reply.', true);
+          } finally {
+            replyBtn.disabled = false;
+          }
+        };
+
+        statusBtn.onclick = async () => {
+          if (!guardMaintenanceWrite('Support status update')) return;
+          const status = String(statusSelect.value || '').trim().toLowerCase();
+          if (!status) return;
+          statusBtn.disabled = true;
+          setStatusText('Updating status...');
+          try {
+            await invokeSupportTicketApi('set_ticket_status', {
+              ticket_id: safeTicketId,
+              status
+            });
+            await refreshThread();
+            await refreshSupportForCurrentRole({ force: true });
+          } catch (err) {
+            setStatusText(err?.message || 'Failed to update status.', true);
+          } finally {
+            statusBtn.disabled = false;
+          }
+        };
+
+        void refreshThread();
+      });
+    }
+
     function renderStudentPortal() {
       const student = tourMode ? getTourStudent() : getStudentProfileBySession();
       const sessionsUl = document.getElementById('portalSessions');
@@ -6574,6 +7184,7 @@
         if (hwUl) hwUl.innerHTML = msg;
         if (invUl) invUl.innerHTML = msg;
         if (resUl) resUl.innerHTML = msg;
+        void renderStudentSupportCard();
         return;
       }
       // If contract not signed, show blocker and limit content
@@ -6594,6 +7205,7 @@
         if (resUl) resUl.innerHTML = msg;
         const msgsList = document.getElementById('portalMessages');
         if (msgsList) msgsList.innerHTML = msg;
+        void renderStudentSupportCard();
         return;
       }
       const busyNotice = document.getElementById('portalBusyNotice');
@@ -6787,6 +7399,7 @@
           }
         };
       }
+      void renderStudentSupportCard();
     }
 
     function getChildrenForParent() {
@@ -7440,6 +8053,7 @@
           </li>`;
         }).join('') : `<li class="text-slate-500 text-xs">${esc(t('parent.no_messages'))}</li>`;
       }
+      void renderParentSupportCard();
     }
 
     async function explainInvoiceAI(invoiceId) {
@@ -9941,6 +10555,9 @@
                     onclick="openSessionQuickActions('${safeSessionId}')">${t('common.open')}</button>
           </li>`;
         }).join('');
+      }
+      if (isOwner()) {
+        void renderOwnerSupportCard();
       }
     }
 
