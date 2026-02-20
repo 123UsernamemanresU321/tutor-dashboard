@@ -5632,6 +5632,39 @@
       return false;
     }
 
+    async function getEdgeInvokeErrorMeta(error, fallbackMessage = 'Request failed') {
+      let status = Number(
+        error?.context?.status ||
+        error?.status ||
+        error?.response?.status ||
+        0
+      );
+      let message = String(error?.message || fallbackMessage).trim();
+      const response = (
+        (typeof Response !== 'undefined' && error?.context instanceof Response) ? error.context :
+        (typeof Response !== 'undefined' && error?.response instanceof Response) ? error.response :
+        null
+      );
+      if (response) {
+        if (!status) status = Number(response.status || 0);
+        try {
+          const bodyText = await response.clone().text();
+          if (bodyText) {
+            try {
+              const parsed = JSON.parse(bodyText);
+              const bodyMsg = String(parsed?.error || parsed?.message || '').trim();
+              if (bodyMsg) message = bodyMsg;
+            } catch {
+              message = String(bodyText).trim().slice(0, 300) || message;
+            }
+          }
+        } catch {
+          // keep fallback message
+        }
+      }
+      return { status, message: message || fallbackMessage };
+    }
+
     async function syncHardStopEdgeGate(source = 'dashboard_maintenance') {
       if (!isOwner()) return { skipped: true };
       if (!isSupabaseReady()) {
@@ -5656,7 +5689,11 @@
         headers: { Authorization: `Bearer ${accessToken}` }
       });
       if (error) {
-        throw new Error(error.message || 'Unable to sync hard-stop mode to Cloudflare.');
+        const meta = await getEdgeInvokeErrorMeta(error, 'Unable to sync hard-stop mode to Cloudflare.');
+        if (meta.status === 401) {
+          throw new Error('Re-authentication required. Please sign out and sign in again, then retry hard-stop sync.');
+        }
+        throw new Error(meta.message || 'Unable to sync hard-stop mode to Cloudflare.');
       }
       if (!data?.success) {
         throw new Error(data?.error || 'Cloudflare hard-stop sync failed.');
@@ -10362,7 +10399,12 @@
         if (error) throw error;
         accountEmails = Array.isArray(data?.emails) ? data.emails.filter(Boolean) : [];
       } catch (err) {
-        console.warn('Account emails fetch failed', err);
+        const meta = await getEdgeInvokeErrorMeta(err, 'Account email lookup failed');
+        if (meta.status === 401 || meta.status === 403) {
+          accountEmails = [];
+          return;
+        }
+        console.warn('Account emails fetch failed', meta.message || err);
       }
     }
 
