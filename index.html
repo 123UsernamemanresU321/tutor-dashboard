@@ -9935,6 +9935,7 @@
       let studentsRes = { data: [] };
       let parentsRes = { data: [] };
       let parentLinksRes = { data: [] };
+      let parentLinksAltRes = { data: [] };
       let sessionStudentsRes = { data: [] };
       let sessionsRes = { data: [] };
       let homeworkRes = { data: [] };
@@ -9995,11 +9996,25 @@
         try {
           parentLinksRes = await supabaseClient.from('parent_students').select('*').in('parent_id', parentIds);
         } catch { }
+        try {
+          parentLinksAltRes = await supabaseClient.from('parent_student_links').select('*').in('parent_id', parentIds);
+        } catch { }
       }
+
+      const parentLinksRaw = [
+        ...(parentLinksRes.data || []),
+        ...(parentLinksAltRes.data || [])
+      ];
+      const parentLinksData = Array.from(new Map(
+        parentLinksRaw.map(pl => {
+          const key = `${cleanId(pl.parent_id)}|${cleanId(pl.student_id)}|${String(pl.relationship || '')}`;
+          return [key, pl];
+        })
+      ).values());
 
       const studentIds = new Set([
         ...(studentsRes.data || []).map(s => s.id),
-        ...(parentLinksRes.data || []).map(pl => pl.student_id)
+        ...parentLinksData.map(pl => pl.student_id)
       ]);
       if (sessionRole === 'student' && sessionStudentId) studentIds.add(sessionStudentId);
       const studentIdArray = Array.from(studentIds);
@@ -10107,7 +10122,7 @@
         emailNotificationsOptIn: !!p.email_notifications_opt_in,
         emailNotificationsOptInAt: p.email_notifications_opt_in_at || ''
       }));
-      merged.parentLinks = (parentLinksRes.data || []).map(pl => ({
+      merged.parentLinks = parentLinksData.map(pl => ({
         id: pl.id,
         parentId: pl.parent_id,
         studentId: pl.student_id,
