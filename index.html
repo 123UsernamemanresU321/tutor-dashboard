@@ -2465,6 +2465,82 @@
       return token;
     }
 
+    function formatRandAmount(value) {
+      const amount = Number(value || 0);
+      if (!Number.isFinite(amount)) return 'R 0.00';
+      return `R ${amount.toFixed(2)}`;
+    }
+
+    function buildPortalInvoiceLink(invoiceId = '') {
+      try {
+        const url = new URL(appUrl('/index.html'));
+        if (invoiceId) url.searchParams.set('invoice', String(invoiceId));
+        return url.toString();
+      } catch (_) {
+        return appUrl('/index.html');
+      }
+    }
+
+    function buildPortalStudentLink(studentId = '') {
+      try {
+        const url = new URL(appUrl('/index.html'));
+        if (studentId) url.searchParams.set('student', String(studentId));
+        return url.toString();
+      } catch (_) {
+        return appUrl('/index.html');
+      }
+    }
+
+    async function notifyParentServiceEvent(payload, { silent = true } = {}) {
+      if (!isSupabaseReady() || !isOwner()) return null;
+      try {
+        const accessToken = requireAccessToken(t('alert.sign_in_first'));
+        const body = {
+          ...payload,
+          owner_user_id: cleanId(payload?.owner_user_id || supabaseSession?.user?.id || '')
+        };
+        if (!body.owner_user_id) return null;
+        const { data, error } = await supabaseClient.functions.invoke('notify-parent-service-event', {
+          body,
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (error || data?.success === false) {
+          const message = data?.error || error?.message || 'Notification email trigger failed';
+          if (!silent) throw new Error(message);
+          console.warn('notify-parent-service-event failed', { message, payload: body });
+          return null;
+        }
+        return data || null;
+      } catch (err) {
+        if (!silent) throw err;
+        console.warn('notify-parent-service-event exception', err);
+        return null;
+      }
+    }
+
+    function maybeNotifyInvoiceIssued(inv, { dedupeKey = '' } = {}) {
+      const invoice = inv || {};
+      const status = String(invoice.invoiceStatus || invoice.invoice_status || '').toLowerCase();
+      const total = Number(invoice.total || 0);
+      const studentId = cleanId(invoice.studentId || invoice.student_id || '');
+      if (!studentId || isInvoiceVoid(invoice) || invoice.paid || status === 'void' || !(total > 0)) return;
+      const student = getStudentById(studentId);
+      const invoiceId = cleanId(invoice.id || '');
+      void notifyParentServiceEvent({
+        event_type: 'invoice_issued',
+        student_id: studentId,
+        invoice_id: invoiceId,
+        dedupe_key: dedupeKey || (invoiceId ? `invoice_issued:${invoiceId}` : `invoice_issued:${studentId}:${Date.now()}`),
+        meta: {
+          student_name: student?.name || '',
+          amount: formatRandAmount(total),
+          due_date: invoice.dueDate || invoice.due_date || '',
+          cta_label: 'View invoice',
+          cta_url: buildPortalInvoiceLink(invoiceId)
+        }
+      });
+    }
+
     const ACTION_NONCE_ACTIONS = Object.freeze({
       deleteContract: 'delete_contract',
       refund: 'payfast_refund',
@@ -6133,6 +6209,22 @@
         clearAnnouncementComposer(false);
         await loadOwnerAnnouncements();
         logActivity('Published announcement', payload.title);
+        const primaryButton = Array.isArray(payload.cta_buttons) && payload.cta_buttons.length
+          ? payload.cta_buttons[0]
+          : null;
+        void notifyParentServiceEvent({
+          event_type: 'announcement_notice',
+          dedupe_key: `announcement_notice:${String(payload.title || '').slice(0, 80)}:${Date.now()}`,
+          meta: {
+            title: payload.title || '',
+            message: payload.body || '',
+            policy_version: payload.policy_version || '',
+            domain_from: payload.domain_from || '',
+            domain_to: payload.domain_to || '',
+            cta_label: primaryButton?.label || payload.cta_label || 'Read announcement',
+            cta_url: primaryButton?.url || payload.cta_url || buildPortalInvoiceLink('')
+          }
+        });
       } catch (err) {
         console.error('Announcement publish failed', err);
         setStatus(err?.message || 'Failed to publish announcement.', true);
@@ -11784,6 +11876,7 @@
       };
       state.invoices.push(inv);
       logActivity('Created invoice', inv.id);
+      maybeNotifyInvoiceIssued(inv);
       return true;
     }
 
@@ -12213,6 +12306,7 @@
         };
         state.invoices.push(inv);
         logActivity('Created invoice', inv.id);
+        maybeNotifyInvoiceIssued(inv);
       });
     }
 
@@ -14283,6 +14377,7 @@
                     state.invoices.push(restoreInv);
                     newSession.invoiceId = restoreInv.id;
                     logActivity('Restored session invoiced', restoreInv.id);
+                    maybeNotifyInvoiceIssued(restoreInv);
                   }
                 }
               }
@@ -14313,6 +14408,49 @@
           } else {
             state.sessions.push(newSession);
             logActivity('Added session', newSession.topic || newSession.subject || 'Session');
+          }
+          if (isEdit && session) {
+            if ((timeChanged || durationChanged) && !isMoveRequest) {
+              const prevDateTime = `${session.date || ''} ${normalizeTimeValue(session.startTime || '')}`.trim();
+              const nextDateTime = `${newSession.date || ''} ${normalizeTimeValue(newSession.startTime || '')}`.trim();
+              const studentIdsForNotice = Array.from(new Set((newSession.studentIds || []).filter(Boolean)));
+              studentIdsForNotice.forEach((sid) => {
+                const stu = getStudentById(sid);
+                void notifyParentServiceEvent({
+                  event_type: 'lesson_rescheduled',
+                  student_id: sid,
+                  session_id: newSession.id,
+                  dedupe_key: `lesson_rescheduled:${newSession.id}:${sid}:${newSession.date}:${newSession.startTime}:${newSession.durationHours}`,
+                  meta: {
+                    student_name: stu?.name || '',
+                    date: newSession.date || '',
+                    time: normalizeTimeValue(newSession.startTime || ''),
+                    message: prevDateTime && nextDateTime ? `Previous time: ${prevDateTime}. New time: ${nextDateTime}.` : '',
+                    cta_label: 'View schedule',
+                    cta_url: buildPortalStudentLink(sid)
+                  }
+                });
+              });
+            }
+            if (prevStatus !== SESSION_STATUS.VOIDED && nextStatus === SESSION_STATUS.VOIDED) {
+              const studentIdsForNotice = Array.from(new Set((newSession.studentIds || []).filter(Boolean)));
+              studentIdsForNotice.forEach((sid) => {
+                const stu = getStudentById(sid);
+                void notifyParentServiceEvent({
+                  event_type: 'lesson_cancelled',
+                  student_id: sid,
+                  session_id: newSession.id,
+                  dedupe_key: `lesson_cancelled:${newSession.id}:${sid}:${newSession.date}:${newSession.startTime}`,
+                  meta: {
+                    student_name: stu?.name || '',
+                    date: newSession.date || '',
+                    time: normalizeTimeValue(newSession.startTime || ''),
+                    cta_label: 'Review schedule',
+                    cta_url: buildPortalStudentLink(sid)
+                  }
+                });
+              });
+            }
           }
           refreshAutoBilling();
           saveState();
@@ -14347,6 +14485,23 @@
                 }
               }
               logActivity('Voided session', `${sess.date} ${sess.startTime || ''}`);
+              const studentIdsForNotice = Array.from(new Set((sess.studentIds || []).filter(Boolean)));
+              studentIdsForNotice.forEach((sid) => {
+                const stu = getStudentById(sid);
+                void notifyParentServiceEvent({
+                  event_type: 'lesson_cancelled',
+                  student_id: sid,
+                  session_id: sess.id,
+                  dedupe_key: `lesson_cancelled:${sess.id}:${sid}:${sess.date}:${sess.startTime || ''}`,
+                  meta: {
+                    student_name: stu?.name || '',
+                    date: sess.date || '',
+                    time: normalizeTimeValue(sess.startTime || ''),
+                    cta_label: 'Review schedule',
+                    cta_url: buildPortalStudentLink(sid)
+                  }
+                });
+              });
               refreshAutoBilling();
               saveState();
               closeModal();
@@ -15171,6 +15326,12 @@
               if (idx >= 0) state.invoices[idx] = newInv;
               else state.invoices.push(newInv);
               logActivity('Created invoice', newInv.id);
+            }
+            const shouldEmailInvoiceIssued = !isInvoiceVoid(newInv) &&
+              !newInv.paid &&
+              (!isEdit || isInvoiceVoid(inv) || !!inv?.paid);
+            if (shouldEmailInvoiceIssued) {
+              maybeNotifyInvoiceIssued(newInv, { dedupeKey: `invoice_issued:${newInv.id}` });
             }
             saveState();
             closeModal();
