@@ -1689,7 +1689,7 @@
                     class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
                 </label>
                 <div class="text-[10px] text-slate-500">
-                  Hard stop requires server-level 503 responses. Use the ops config in <code>ops/nginx-maintenance.conf.example</code>.
+                  Hard stop requires edge/server-level 503 responses. For Cloudflare use <code>ops/cloudflare-worker-maintenance.js</code>.
                 </div>
                 <div class="text-[10px] text-slate-500" data-i18n="settings.maintenance_end_hint">Leave end blank to keep maintenance active until you clear it.</div>
                 <label class="text-[11px] block">
@@ -5048,7 +5048,7 @@
       const maintenanceStartNowBtn = document.getElementById('maintenanceStartNowBtn');
       const maintenanceClearBtn = document.getElementById('maintenanceClearBtn');
       if (maintenanceSaveBtn) {
-        maintenanceSaveBtn.addEventListener('click', () => {
+        maintenanceSaveBtn.addEventListener('click', async () => {
           if (!isOwner()) return;
           const modeSelect = document.getElementById('maintenanceModeSelect');
           const warningStartInput = document.getElementById('maintenanceWarningStartInput');
@@ -5102,10 +5102,16 @@
           saveState();
           applySettingsToUI();
           renderMaintenanceUI();
+          try {
+            await syncHardStopEdgeGate('maintenance_schedule');
+          } catch (err) {
+            console.warn('Hard-stop sync failed after scheduling maintenance', err);
+            alert(`Maintenance saved, but Cloudflare hard-stop sync failed.\n${err?.message || err}`);
+          }
         });
       }
       if (maintenanceStartNowBtn) {
-        maintenanceStartNowBtn.addEventListener('click', () => {
+        maintenanceStartNowBtn.addEventListener('click', async () => {
           if (!isOwner()) return;
           if (!confirm(t('maintenance.confirm_start_now'))) return;
           const modeSelect = document.getElementById('maintenanceModeSelect');
@@ -5132,12 +5138,19 @@
           saveState();
           applySettingsToUI();
           renderMaintenanceUI();
+          try {
+            await syncHardStopEdgeGate('maintenance_start_now');
+          } catch (err) {
+            console.warn('Hard-stop sync failed after maintenance start-now', err);
+            alert(`Maintenance started, but Cloudflare hard-stop sync failed.\n${err?.message || err}`);
+          }
         });
       }
       if (maintenanceClearBtn) {
-        maintenanceClearBtn.addEventListener('click', () => {
+        maintenanceClearBtn.addEventListener('click', async () => {
           if (!isOwner()) return;
           if (!confirm(t('maintenance.confirm_clear'))) return;
+          const previousSettings = { ...state.settings };
           state.settings.maintenanceEnabled = false;
           state.settings.maintenanceStart = '';
           state.settings.maintenanceEnd = '';
@@ -5150,6 +5163,16 @@
           saveState();
           applySettingsToUI();
           renderMaintenanceUI();
+          try {
+            await syncHardStopEdgeGate('maintenance_clear');
+          } catch (err) {
+            console.warn('Hard-stop sync failed after maintenance clear', err);
+            state.settings = { ...previousSettings };
+            saveState();
+            applySettingsToUI();
+            renderMaintenanceUI();
+            alert(`Maintenance clear was rolled back because Cloudflare hard-stop sync failed.\n${err?.message || err}`);
+          }
         });
       }
       const announcementTypeSelect = document.getElementById('announcementTypeSelect');
@@ -5444,6 +5467,38 @@
         : 'Maintenance in progress');
       alert(`${actionLabel} is temporarily disabled during maintenance.\n${message}${range ? `\nWindow: ${range}` : ''}`);
       return false;
+    }
+
+    async function syncHardStopEdgeGate(source = 'dashboard_maintenance') {
+      if (!isOwner()) return { skipped: true };
+      if (!isSupabaseReady()) {
+        throw new Error('Cloudflare sync is unavailable right now. Please sign out and sign in again, then retry.');
+      }
+      const status = getMaintenanceStatus();
+      const targetMode = status.hardStopActive ? 'hard_stop' : 'off';
+      const retryAfter = Math.max(60, Number(status.retryAfterSeconds || 3600) || 3600);
+      const maintenanceMode = normalizeMaintenanceMode(state.settings.maintenanceMode || 'graceful');
+      const accessToken = requireAccessToken(t('alert.sign_in_first'));
+      const { data, error } = await supabaseClient.functions.invoke('sync-maintenance-hard-stop', {
+        body: {
+          mode: targetMode,
+          retry_after: retryAfter,
+          maintenance_enabled: !!state.settings.maintenanceEnabled,
+          maintenance_mode: maintenanceMode,
+          maintenance_start_at: state.settings.maintenanceStartAt || null,
+          maintenance_end_at: state.settings.maintenanceEndAt || null,
+          maintenance_warning_start_at: state.settings.maintenanceWarningStartAt || null,
+          source
+        },
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (error) {
+        throw new Error(error.message || 'Unable to sync hard-stop mode to Cloudflare.');
+      }
+      if (!data?.success) {
+        throw new Error(data?.error || 'Cloudflare hard-stop sync failed.');
+      }
+      return data;
     }
 
     function getMaintenanceStatus() {
