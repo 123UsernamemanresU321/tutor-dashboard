@@ -9935,8 +9935,6 @@
           const body = {};
           if (sessionLoginCode) body.code = sessionLoginCode;
           if (sessionRole) body.role = sessionRole;
-          if (sessionStudentId) body.studentId = sessionStudentId;
-          if (sessionParentId) body.parentId = sessionParentId;
           const { data: snapshot, error: snapErr } = await supabaseClient.functions.invoke('portal-snapshot', {
             body,
             headers: { Authorization: `Bearer ${accessToken}` }
@@ -9964,7 +9962,7 @@
                 if (raw) {
                   try {
                     const parsed = JSON.parse(raw);
-                    details = parsed?.error || parsed?.code || raw;
+                    details = parsed?.code || parsed?.error || raw;
                   } catch {
                     details = raw;
                   }
