@@ -6700,18 +6700,50 @@
 
     const SUPPORT_FUNCTION_NAMES = ['support-ticket-api', 'support-ticket'];
 
-    function isSupportFunctionMissing(error, data) {
-      const status = Number(
+    async function getSupportFunctionErrorMeta(error, data) {
+      let status = Number(
         error?.context?.status ||
         error?.status ||
         error?.response?.status ||
         0
       );
-      const text = `${String(error?.message || '')} ${String(data?.error || '')}`.toLowerCase();
-      if (status === 404) return true;
-      return text.includes('404') ||
-        text.includes('not found') ||
-        text.includes('no route matched');
+      let message = String(data?.error || error?.message || '').trim();
+      let responseBody = '';
+
+      const response = (
+        (typeof Response !== 'undefined' && error?.context instanceof Response) ? error.context :
+        (typeof Response !== 'undefined' && error?.response instanceof Response) ? error.response :
+        null
+      );
+
+      if (response) {
+        if (!status) status = Number(response.status || 0);
+        try {
+          const bodyText = await response.clone().text();
+          responseBody = String(bodyText || '').trim();
+          if (!message && responseBody) {
+            message = responseBody.slice(0, 300);
+          }
+          const parsed = JSON.parse(bodyText || '{}');
+          const bodyMsg = String(parsed?.error || parsed?.message || '').trim();
+          if (bodyMsg) message = bodyMsg;
+        } catch {
+          // keep fallback message
+        }
+      }
+
+      const combined = `${message} ${responseBody} ${String(error?.message || '')}`.toLowerCase();
+      const missingRoute = status === 404 && (
+        combined.includes('function not found') ||
+        combined.includes('no route matched') ||
+        combined.includes('worker not found')
+      );
+
+      return {
+        status,
+        missingRoute,
+        message: message || 'Support request failed'
+      };
     }
 
     async function invokeSupportTicketApi(action, payload = {}) {
@@ -6733,13 +6765,12 @@
         if (!error && data?.success !== false) {
           return data || {};
         }
-        const msg = data?.error || error?.message || 'Support request failed';
-        const missing = isSupportFunctionMissing(error, data);
-        if (!missing) {
-          throw new Error(msg);
+        const meta = await getSupportFunctionErrorMeta(error, data);
+        if (!meta.missingRoute) {
+          throw new Error(meta.message);
         }
         lastMissing = true;
-        lastMessage = msg;
+        lastMessage = meta.message;
       }
       if (lastMissing) {
         throw new Error('Support service is not deployed. Please deploy the "support-ticket-api" edge function.');
