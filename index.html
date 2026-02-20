@@ -1014,7 +1014,17 @@
         <!-- Dashboard -->
         <section id="view-dashboard" class="view">
           <div class="section-shell space-y-6">
-            <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+            <div id="ownerDashboardPanelNav" class="hidden card p-3 space-y-2" data-owner-only>
+              <div class="text-[11px] text-slate-500">Dashboard sections</div>
+              <div class="flex flex-wrap items-center gap-2">
+                <button data-owner-dashboard-panel-target="overview" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Overview</button>
+                <button data-owner-dashboard-panel-target="analytics" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Analytics</button>
+                <button data-owner-dashboard-panel-target="support" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Support</button>
+              </div>
+            </div>
+
+            <div data-owner-dashboard-panel="overview" class="space-y-6">
+              <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
               <div class="card p-5 col-span-8 space-y-3">
                 <div class="flex items-center justify-between">
                   <div>
@@ -1068,87 +1078,92 @@
                   </div>
                 </div>
               </div>
-            </div>
+              </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-              <div class="card p-5 col-span-1">
-                <div class="flex items-center justify-between mb-1">
-                  <h3 class="text-xs font-medium text-slate-500" data-i18n="dashboard.active_students">Active students</h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                <div class="card p-5 col-span-1">
+                  <div class="flex items-center justify-between mb-1">
+                    <h3 class="text-xs font-medium text-slate-500" data-i18n="dashboard.active_students">Active students</h3>
+                  </div>
+                  <div id="kpiStudents" class="text-2xl font-semibold text-slate-900">0</div>
+                  <p class="text-[11px] text-slate-500 mt-1" data-i18n="dashboard.active_students_hint">Students with at least one session in the last 30 days.</p>
                 </div>
-                <div id="kpiStudents" class="text-2xl font-semibold text-slate-900">0</div>
-                <p class="text-[11px] text-slate-500 mt-1" data-i18n="dashboard.active_students_hint">Students with at least one session in the last 30 days.</p>
-              </div>
-              <div class="card p-5 col-span-1">
-                <h3 class="text-xs font-medium text-slate-500 mb-1" data-i18n="dashboard.hours_this_week">Hours this week</h3>
-                <div id="kpiHoursWeek" class="text-2xl font-semibold text-slate-900">0</div>
-                <p class="text-[11px] text-slate-500 mt-1" data-i18n="dashboard.hours_week_hint">Sum of completed sessions.</p>
-              </div>
-              <div class="card p-5 col-span-1">
-                <h3 class="text-xs font-medium text-slate-500 mb-1" data-i18n="dashboard.expected_income_month">Expected income (month)</h3>
-                <div id="kpiExpectedIncome" class="text-2xl font-semibold text-slate-900">0</div>
-                <p class="text-[11px] text-slate-500 mt-1" data-i18n="dashboard.expected_income_hint">From issued & upcoming sessions.</p>
-              </div>
-              <div class="card p-5 col-span-1">
-                <h3 class="text-xs font-medium text-slate-500 mb-1" data-i18n="dashboard.overdue_invoices">Overdue invoices</h3>
-                <div id="kpiOverdue" class="text-2xl font-semibold text-rose-600">0</div>
-                <p class="text-[11px] text-slate-500 mt-1" data-i18n="dashboard.overdue_hint">Count of unpaid invoices past due date.</p>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
-              <div class="card p-5 col-span-7">
-                <div class="flex items-center justify-between mb-2">
-                  <h3 class="text-sm font-semibold" data-i18n="dashboard.subject_mix">Subject mix (hours)</h3>
+                <div class="card p-5 col-span-1">
+                  <h3 class="text-xs font-medium text-slate-500 mb-1" data-i18n="dashboard.hours_this_week">Hours this week</h3>
+                  <div id="kpiHoursWeek" class="text-2xl font-semibold text-slate-900">0</div>
+                  <p class="text-[11px] text-slate-500 mt-1" data-i18n="dashboard.hours_week_hint">Sum of completed sessions.</p>
                 </div>
-                <canvas id="subjectMixChart" class="w-full h-64"></canvas>
-              </div>
-              <div class="card p-5 col-span-5">
-                <div class="flex items-center justify-between mb-2">
-                  <h3 class="text-sm font-semibold" data-i18n="dashboard.upcoming_next_7_days">Upcoming sessions (next 7 days)</h3>
+                <div class="card p-5 col-span-1">
+                  <h3 class="text-xs font-medium text-slate-500 mb-1" data-i18n="dashboard.expected_income_month">Expected income (month)</h3>
+                  <div id="kpiExpectedIncome" class="text-2xl font-semibold text-slate-900">0</div>
+                  <p class="text-[11px] text-slate-500 mt-1" data-i18n="dashboard.expected_income_hint">From issued & upcoming sessions.</p>
                 </div>
-                <ul id="upcomingSessionsList" class="text-xs space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+                <div class="card p-5 col-span-1">
+                  <h3 class="text-xs font-medium text-slate-500 mb-1" data-i18n="dashboard.overdue_invoices">Overdue invoices</h3>
+                  <div id="kpiOverdue" class="text-2xl font-semibold text-rose-600">0</div>
+                  <p class="text-[11px] text-slate-500 mt-1" data-i18n="dashboard.overdue_hint">Count of unpaid invoices past due date.</p>
+                </div>
               </div>
             </div>
 
-            <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
-              <div class="card p-5 col-span-4">
-                <div class="flex items-center justify-between mb-2">
-                  <h3 class="text-sm font-semibold" data-i18n="dashboard.at_risk">At-risk students</h3>
-                  <span class="hint" data-i18n="dashboard.at_risk_hint">No session in 21+ days</span>
+            <div data-owner-dashboard-panel="analytics" class="space-y-6">
+              <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                <div class="card p-5 col-span-7">
+                  <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold" data-i18n="dashboard.subject_mix">Subject mix (hours)</h3>
+                  </div>
+                  <canvas id="subjectMixChart" class="w-full h-64"></canvas>
                 </div>
-                <ul id="atRiskList" class="text-xs space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+                <div class="card p-5 col-span-5">
+                  <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold" data-i18n="dashboard.upcoming_next_7_days">Upcoming sessions (next 7 days)</h3>
+                  </div>
+                  <ul id="upcomingSessionsList" class="text-xs space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+                </div>
               </div>
-              <div class="card p-5 col-span-4">
-                <div class="flex items-center justify-between mb-2">
-                  <h3 class="text-sm font-semibold" data-i18n="dashboard.homework_due">Homework due soon</h3>
-                  <span class="hint" data-i18n="dashboard.next_5_days">Next 5 days</span>
+
+              <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                <div class="card p-5 col-span-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold" data-i18n="dashboard.at_risk">At-risk students</h3>
+                    <span class="hint" data-i18n="dashboard.at_risk_hint">No session in 21+ days</span>
+                  </div>
+                  <ul id="atRiskList" class="text-xs space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
                 </div>
-                <ul id="dueHomeworkList" class="text-xs space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
-              </div>
-              <div class="card p-5 col-span-4">
-                <div class="flex items-center justify-between mb-2">
-                  <h3 class="text-sm font-semibold" data-i18n="dashboard.prep_queue">Prep queue (next 3)</h3>
-                  <span class="hint" data-i18n="dashboard.click_to_open">Click to open</span>
+                <div class="card p-5 col-span-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold" data-i18n="dashboard.homework_due">Homework due soon</h3>
+                    <span class="hint" data-i18n="dashboard.next_5_days">Next 5 days</span>
+                  </div>
+                  <ul id="dueHomeworkList" class="text-xs space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
                 </div>
-                <ul id="prepQueueList" class="text-xs space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+                <div class="card p-5 col-span-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold" data-i18n="dashboard.prep_queue">Prep queue (next 3)</h3>
+                    <span class="hint" data-i18n="dashboard.click_to_open">Click to open</span>
+                  </div>
+                  <ul id="prepQueueList" class="text-xs space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
+                </div>
               </div>
             </div>
 
-            <div class="card p-5 space-y-3" id="ownerSupportCard" data-owner-only>
-              <div class="flex items-center justify-between">
-                <div>
-                  <h3 class="text-sm font-semibold">Support inbox</h3>
-                  <p class="text-[11px] text-slate-500">Parent and student tickets.</p>
+            <div data-owner-dashboard-panel="support" class="space-y-6">
+              <div class="card p-5 space-y-3" id="ownerSupportCard" data-owner-only>
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h3 class="text-sm font-semibold">Support inbox</h3>
+                    <p class="text-[11px] text-slate-500">Parent and student tickets.</p>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button id="ownerSupportRefreshBtn"
+                      class="portal-cta-btn portal-cta-subtle text-[11px]">Refresh</button>
+                    <button id="ownerSupportNewBtn"
+                      class="portal-cta-btn portal-cta-pay text-[11px]">New ticket</button>
+                  </div>
                 </div>
-                <div class="flex items-center gap-2">
-                  <button id="ownerSupportRefreshBtn"
-                    class="portal-cta-btn portal-cta-subtle text-[11px]">Refresh</button>
-                  <button id="ownerSupportNewBtn"
-                    class="portal-cta-btn portal-cta-pay text-[11px]">New ticket</button>
-                </div>
+                <div id="ownerSupportStatus" class="text-[11px] text-slate-500 hidden"></div>
+                <ul id="ownerSupportTickets" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin text-xs"></ul>
               </div>
-              <div id="ownerSupportStatus" class="text-[11px] text-slate-500 hidden"></div>
-              <ul id="ownerSupportTickets" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin text-xs"></ul>
             </div>
           </div>
         </section>
@@ -1612,8 +1627,17 @@
               </div>
             </div>
 
+            <div id="ownerSettingsPanelNav" class="hidden card p-3 space-y-2" data-owner-only>
+              <div class="text-[11px] text-slate-500">Settings sections</div>
+              <div class="flex flex-wrap items-center gap-2">
+                <button data-owner-settings-panel-target="general" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">General</button>
+                <button data-owner-settings-panel-target="operations" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Operations</button>
+                <button data-owner-settings-panel-target="activity" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Activity</button>
+              </div>
+            </div>
+
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div class="card p-5 text-xs space-y-3">
+              <div class="card p-5 text-xs space-y-3" data-owner-settings-panel="general">
                 <h3 class="text-sm font-semibold mb-1" data-i18n="settings.appearance">Appearance</h3>
                 <div class="flex items-center justify-between">
                   <span data-i18n="settings.theme">Theme</span>
@@ -1631,7 +1655,7 @@
                 </div>
               </div>
 
-              <div class="card p-5 text-xs space-y-3">
+              <div class="card p-5 text-xs space-y-3" data-owner-settings-panel="general">
                 <h3 class="text-sm font-semibold mb-1" data-i18n="settings.goals_defaults">Goals & defaults</h3>
                 <div class="flex items-center justify-between gap-2">
                   <span data-i18n="settings.weekly_hours_goal">Weekly hours goal</span>
@@ -1672,7 +1696,7 @@
                 </div>
               </div>
 
-              <div class="card p-5 text-xs space-y-3" data-owner-only>
+              <div class="card p-5 text-xs space-y-3" data-owner-only data-owner-settings-panel="operations">
                 <h3 class="text-sm font-semibold mb-1" data-i18n="settings.maintenance_title">Scheduled maintenance</h3>
                 <p class="text-[11px] text-slate-500" data-i18n="settings.maintenance_hint">Notify users ahead of time and lock the site during maintenance.</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1733,7 +1757,7 @@
                 <div id="maintenanceStatusText" class="text-[11px] text-slate-500"></div>
               </div>
 
-              <div class="card p-5 text-xs space-y-3" data-owner-only>
+              <div class="card p-5 text-xs space-y-3" data-owner-only data-owner-settings-panel="operations">
                 <h3 class="text-sm font-semibold mb-1">Broadcast announcements</h3>
                 <p class="text-[11px] text-slate-500">
                   Publish one-time overlays for all users. Useful for domain changes and Privacy Policy updates.
@@ -1838,7 +1862,7 @@
                 <ul id="announcementAdminList" class="space-y-2 max-h-56 overflow-y-auto scrollbar-thin"></ul>
               </div>
 
-              <div class="card p-5 text-xs space-y-3" data-owner-only>
+              <div class="card p-5 text-xs space-y-3" data-owner-only data-owner-settings-panel="operations">
                 <h3 class="text-sm font-semibold mb-1">Debug test accounts</h3>
                 <p class="text-[11px] text-slate-500">
                   Instantly create a linked test parent + student with contract status already signed.
@@ -1857,7 +1881,7 @@
                 <ul id="debugTestPairsList" class="space-y-2 max-h-56 overflow-y-auto scrollbar-thin"></ul>
               </div>
 
-              <div class="card p-5 text-xs space-y-3">
+              <div class="card p-5 text-xs space-y-3" data-owner-settings-panel="general">
                 <h3 class="text-sm font-semibold mb-1" data-i18n="settings.data_backup">Data backup</h3>
                 <p data-i18n="settings.data_backup_hint">Export your dashboard data as JSON and paste it somewhere safe. You can import it later.</p>
                 <div class="flex gap-2">
@@ -1872,7 +1896,7 @@
                   placeholder="Exported JSON will appear here. Paste JSON here to import."></textarea>
               </div>
 
-              <div class="card p-5 text-xs space-y-3">
+              <div class="card p-5 text-xs space-y-3" data-owner-settings-panel="activity">
                 <h3 class="text-sm font-semibold mb-1" data-i18n="settings.activity_log">Activity log</h3>
                 <p class="text-[11px] text-slate-500" data-i18n="settings.activity_log_hint">Recent actions for this account (last 25).</p>
                 <ul id="activityLogList" class="space-y-1 max-h-64 overflow-y-auto scrollbar-thin"></ul>
@@ -2493,6 +2517,11 @@
     let overdueReminderSendInFlight = false;
     let overdueReminderTestSendInFlight = false;
     const SUPPORT_CACHE_TTL_MS = 15000;
+    const OWNER_PANEL_PREFS_KEY = 'ownerPanelPrefs_v1';
+    const ownerPanelPrefs = {
+      dashboard: 'overview',
+      settings: 'general'
+    };
     let supportTicketsCache = {
       cacheKey: '',
       loadedAt: 0,
@@ -4966,6 +4995,7 @@
       await initSupabaseAuth();
       setupNav();
       setupTopbar();
+      setupOwnerPanelNavigation();
       document.querySelectorAll('[data-tour-trigger]').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.preventDefault();
@@ -5090,12 +5120,18 @@
       const activeBtn = document.querySelector(`.nav-btn[data-view="${targetView}"]`);
       if (activeBtn) activeBtn.classList.add('bg-slate-800', 'active');
       currentView = targetView;
-      if (targetView === 'dashboard') updateKPIsAndCharts();
+      if (targetView === 'dashboard') {
+        updateKPIsAndCharts();
+        applyOwnerDashboardPanel();
+      }
       if (targetView === 'students') renderStudentsView();
       if (targetView === 'schedule') renderScheduleView();
       if (targetView === 'resources') renderResourcesView();
       if (targetView === 'finance') renderFinanceView();
-      if (targetView === 'settings') applySettingsToUI();
+      if (targetView === 'settings') {
+        applySettingsToUI();
+        applyOwnerSettingsPanel();
+      }
       if (targetView === 'profile') renderProfileView();
       if (targetView === 'portal') renderStudentPortal();
       if (targetView === 'parent-portal') renderParentPortal();
@@ -7171,6 +7207,124 @@
       });
     }
 
+    function loadOwnerPanelPrefs() {
+      try {
+        const raw = localStorage.getItem(OWNER_PANEL_PREFS_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          const dash = String(parsed.dashboard || '').trim();
+          const settings = String(parsed.settings || '').trim();
+          if (dash) ownerPanelPrefs.dashboard = dash;
+          if (settings) ownerPanelPrefs.settings = settings;
+        }
+      } catch {
+        // ignore invalid stored panel prefs
+      }
+    }
+
+    function saveOwnerPanelPrefs() {
+      try {
+        localStorage.setItem(OWNER_PANEL_PREFS_KEY, JSON.stringify(ownerPanelPrefs));
+      } catch {
+        // ignore storage failures
+      }
+    }
+
+    function applyOwnerDashboardPanel() {
+      const nav = document.getElementById('ownerDashboardPanelNav');
+      const panels = [...document.querySelectorAll('[data-owner-dashboard-panel]')];
+      if (!panels.length) return;
+      if (!isOwner()) {
+        if (nav) nav.classList.add('hidden');
+        panels.forEach(panel => panel.classList.remove('hidden'));
+        return;
+      }
+      if (nav) nav.classList.remove('hidden');
+      const available = new Set(panels.map(panel => panel.getAttribute('data-owner-dashboard-panel')));
+      if (!available.has(ownerPanelPrefs.dashboard)) {
+        ownerPanelPrefs.dashboard = String(panels[0]?.getAttribute('data-owner-dashboard-panel') || 'overview');
+      }
+      panels.forEach(panel => {
+        const key = String(panel.getAttribute('data-owner-dashboard-panel') || '');
+        panel.classList.toggle('hidden', key !== ownerPanelPrefs.dashboard);
+      });
+      if (nav) {
+        nav.querySelectorAll('[data-owner-dashboard-panel-target]').forEach(btn => {
+          const key = String(btn.getAttribute('data-owner-dashboard-panel-target') || '');
+          const active = key === ownerPanelPrefs.dashboard;
+          btn.classList.toggle('bg-slate-900', active);
+          btn.classList.toggle('text-white', active);
+          btn.classList.toggle('border-slate-900', active);
+        });
+      }
+    }
+
+    function applyOwnerSettingsPanel() {
+      const nav = document.getElementById('ownerSettingsPanelNav');
+      const panels = [...document.querySelectorAll('[data-owner-settings-panel]')];
+      if (!panels.length) return;
+      if (!isOwner()) {
+        if (nav) nav.classList.add('hidden');
+        panels.forEach(panel => panel.classList.remove('hidden'));
+        return;
+      }
+      if (nav) nav.classList.remove('hidden');
+      const available = new Set(panels.map(panel => panel.getAttribute('data-owner-settings-panel')));
+      if (!available.has(ownerPanelPrefs.settings)) {
+        ownerPanelPrefs.settings = String(panels[0]?.getAttribute('data-owner-settings-panel') || 'general');
+      }
+      panels.forEach(panel => {
+        const key = String(panel.getAttribute('data-owner-settings-panel') || '');
+        panel.classList.toggle('hidden', key !== ownerPanelPrefs.settings);
+      });
+      if (nav) {
+        nav.querySelectorAll('[data-owner-settings-panel-target]').forEach(btn => {
+          const key = String(btn.getAttribute('data-owner-settings-panel-target') || '');
+          const active = key === ownerPanelPrefs.settings;
+          btn.classList.toggle('bg-slate-900', active);
+          btn.classList.toggle('text-white', active);
+          btn.classList.toggle('border-slate-900', active);
+        });
+      }
+    }
+
+    function setOwnerDashboardPanel(panel) {
+      const next = String(panel || '').trim();
+      if (!next || ownerPanelPrefs.dashboard === next) return;
+      ownerPanelPrefs.dashboard = next;
+      saveOwnerPanelPrefs();
+      applyOwnerDashboardPanel();
+    }
+
+    function setOwnerSettingsPanel(panel) {
+      const next = String(panel || '').trim();
+      if (!next || ownerPanelPrefs.settings === next) return;
+      ownerPanelPrefs.settings = next;
+      saveOwnerPanelPrefs();
+      applyOwnerSettingsPanel();
+    }
+
+    function setupOwnerPanelNavigation() {
+      loadOwnerPanelPrefs();
+      const dashboardNav = document.getElementById('ownerDashboardPanelNav');
+      if (dashboardNav && dashboardNav.dataset.bound !== '1') {
+        dashboardNav.dataset.bound = '1';
+        dashboardNav.querySelectorAll('[data-owner-dashboard-panel-target]').forEach(btn => {
+          btn.onclick = () => setOwnerDashboardPanel(btn.getAttribute('data-owner-dashboard-panel-target'));
+        });
+      }
+      const settingsNav = document.getElementById('ownerSettingsPanelNav');
+      if (settingsNav && settingsNav.dataset.bound !== '1') {
+        settingsNav.dataset.bound = '1';
+        settingsNav.querySelectorAll('[data-owner-settings-panel-target]').forEach(btn => {
+          btn.onclick = () => setOwnerSettingsPanel(btn.getAttribute('data-owner-settings-panel-target'));
+        });
+      }
+      applyOwnerDashboardPanel();
+      applyOwnerSettingsPanel();
+    }
+
     function renderStudentPortal() {
       const student = tourMode ? getTourStudent() : getStudentProfileBySession();
       const sessionsUl = document.getElementById('portalSessions');
@@ -8911,6 +9065,8 @@
           switchView('parent-portal');
         }
       }
+      applyOwnerDashboardPanel();
+      applyOwnerSettingsPanel();
       renderMaintenanceUI();
     }
 
@@ -10258,6 +10414,8 @@
       if (parentMode) renderParentPortal();
       renderSessionAlerts();
       renderMaintenanceUI();
+      applyOwnerDashboardPanel();
+      applyOwnerSettingsPanel();
     }
 
     function renderAllViews() {
