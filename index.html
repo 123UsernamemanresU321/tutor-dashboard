@@ -6698,6 +6698,22 @@
       return [uid, roleHint, parentId, studentId].join('|');
     }
 
+    const SUPPORT_FUNCTION_NAMES = ['support-ticket-api', 'support-ticket'];
+
+    function isSupportFunctionMissing(error, data) {
+      const status = Number(
+        error?.context?.status ||
+        error?.status ||
+        error?.response?.status ||
+        0
+      );
+      const text = `${String(error?.message || '')} ${String(data?.error || '')}`.toLowerCase();
+      if (status === 404) return true;
+      return text.includes('404') ||
+        text.includes('not found') ||
+        text.includes('no route matched');
+    }
+
     async function invokeSupportTicketApi(action, payload = {}) {
       if (!isSupabaseReady()) throw new Error('Please sign in first.');
       const accessToken = requireAccessToken(t('alert.sign_in_first'));
@@ -6707,15 +6723,28 @@
         ...(payload || {})
       };
       if (roleHint && !body.role) body.role = roleHint;
-      const { data, error } = await supabaseClient.functions.invoke('support-ticket-api', {
-        body,
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      if (error || data?.success === false) {
+      let lastMissing = false;
+      let lastMessage = '';
+      for (const fnName of SUPPORT_FUNCTION_NAMES) {
+        const { data, error } = await supabaseClient.functions.invoke(fnName, {
+          body,
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (!error && data?.success !== false) {
+          return data || {};
+        }
         const msg = data?.error || error?.message || 'Support request failed';
-        throw new Error(msg);
+        const missing = isSupportFunctionMissing(error, data);
+        if (!missing) {
+          throw new Error(msg);
+        }
+        lastMissing = true;
+        lastMessage = msg;
       }
-      return data || {};
+      if (lastMissing) {
+        throw new Error('Support service is not deployed. Please deploy the "support-ticket-api" edge function.');
+      }
+      throw new Error(lastMessage || 'Support request failed');
     }
 
     async function fetchSupportTickets({ force = false, status = 'all', limit = 60 } = {}) {
