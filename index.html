@@ -8916,22 +8916,68 @@
 	      });
 	    }
 
+	    function renderPopupState(win, { title = '', message = '', url = '' } = {}) {
+	      if (!win || win.closed) return;
+	      const safeTitle = title || t('common.link');
+	      const safeMessage = message || 'Opening...';
+	      const safeUrl = String(url || '').trim();
+	      try {
+	        win.document.title = safeTitle;
+	        win.document.body.innerHTML = `
+	          <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; padding: 18px; color: #0f172a;">
+	            <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">${esc(safeTitle)}</div>
+	            <div style="font-size: 12px; color: #475569;">${esc(safeMessage)}</div>
+	            ${safeUrl ? `
+	              <a href="${esc(safeUrl)}" target="_self" rel="noopener noreferrer"
+	                 style="display:inline-block;margin-top:12px;padding:8px 12px;border-radius:10px;background:#4f46e5;color:#fff;text-decoration:none;font-size:12px;font-weight:600;">
+	                ${esc(t('common.open'))}
+	              </a>
+	              <div style="margin-top:8px;font-size:10px;color:#64748b;word-break:break-all;">${esc(safeUrl)}</div>
+	            ` : ''}
+	          </div>
+	        `;
+	      } catch {}
+	    }
+
 	    // Important: must be called synchronously from a user gesture (e.g. click) or the browser will block it.
 	    function openPopupPlaceholder(label = '') {
 	      const win = window.open('about:blank', '_blank');
 	      if (!win) return null;
-	      // Equivalent to "noopener" but keeps a usable handle so we can navigate after async work.
 	      try { win.opener = null; } catch {}
-	      try {
-	        const title = label || t('common.link');
-	        win.document.title = title;
-	        win.document.body.innerHTML = `
-	          <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; padding: 18px; color: #0f172a;">
-	            <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">${esc(title)}</div>
-	            <div style="font-size: 12px; color: #475569;">Opening...</div>
-	          </div>`;
-	      } catch {}
+	      renderPopupState(win, {
+	        title: label || t('common.link'),
+	        message: 'Opening...'
+	      });
 	      return win;
+	    }
+
+	    function navigatePopupToUrl(popup, url, label = '') {
+	      const targetUrl = String(url || '').trim();
+	      if (!targetUrl) return false;
+	      const safeLabel = label || t('common.link');
+	      if (popup && !popup.closed) {
+	        try {
+	          popup.location.replace(targetUrl);
+	          popup.focus();
+	          return true;
+	        } catch (err) {
+	          console.warn('Popup navigation failed', err);
+	          renderPopupState(popup, {
+	            title: safeLabel,
+	            message: 'Tap below to continue.',
+	            url: targetUrl
+	          });
+	          return true;
+	        }
+	      }
+	      const win = window.open(targetUrl, '_blank');
+	      if (win) {
+	        try { win.opener = null; } catch {}
+	        try { win.focus(); } catch {}
+	        return true;
+	      }
+	      showPopupBlockedModal(targetUrl, safeLabel);
+	      return false;
 	    }
 
 	    async function openMeetingForSession(sessionId) {
@@ -8944,22 +8990,12 @@
 	        // Open a placeholder tab immediately so pop-up blockers don't block the final join URL.
 	        popup = openPopupPlaceholder(t('meeting.label_online_session'));
 	        const joinUrl = await fetchMeetingJoinUrl(sessionId);
-	        if (popup) {
-	          try {
-	            popup.location.replace(joinUrl);
-	            popup.focus();
-	          } catch {
-	            try { popup.close(); } catch {}
-	            window.location.href = joinUrl;
-	          }
-	        } else {
-	          // Pop-up blocked: fall back to opening in the current tab (avoids confusing copy/paste flows).
-	          window.location.href = joinUrl;
-	        }
+	        navigatePopupToUrl(popup, joinUrl, t('meeting.label_online_session'));
 	      } catch (err) {
-	        if (popup && !popup.closed) {
-	          try { popup.close(); } catch {}
-	        }
+	        renderPopupState(popup, {
+	          title: t('meeting.label_online_session'),
+	          message: err?.message || t('alert.unable_open_meeting')
+	        });
 	        console.error('Meeting launch failed', err);
 	        alert(err?.message || t('alert.unable_open_meeting'));
 	      }
@@ -8971,19 +9007,7 @@
 	      const ok = confirm(t('confirm.open_new_tab', { label: safeLabel }));
 	      if (!ok) return false;
 	      const popup = openPopupPlaceholder(safeLabel);
-	      if (!popup) {
-	        showPopupBlockedModal(url, safeLabel);
-	        return false;
-	      }
-	      try {
-	        popup.location.href = url;
-	        popup.focus();
-	        return true;
-	      } catch {
-	        try { popup.close(); } catch {}
-	        showPopupBlockedModal(url, safeLabel);
-	        return false;
-	      }
+	      return navigatePopupToUrl(popup, url, safeLabel);
 	    }
 
     function applyTourUI() {
@@ -10367,24 +10391,15 @@
 	        // Open a placeholder tab immediately so pop-up blockers don't block the tokenized link.
 	        popup = openPopupPlaceholder(t('contract.signing_page'));
 	        const link = await buildContractSigningLink(studentId);
-	        if (popup) {
-	          try {
-	            popup.location.replace(link);
-	            popup.focus();
-	          } catch {
-	            try { popup.close(); } catch {}
-	            window.location.href = link;
-	          }
-	        } else {
-	          window.location.href = link;
-	        }
+	        navigatePopupToUrl(popup, link, t('contract.signing_page'));
 	        navigator.clipboard?.writeText(link).catch(() => {});
 	        // If we stayed on this page, watch for the contract to be signed.
-	        if (popup) startContractStatusWatch([studentId], { maxMs: 180000 });
+	        startContractStatusWatch([studentId], { maxMs: 180000 });
 	      } catch (err) {
-	        if (popup && !popup.closed) {
-	          try { popup.close(); } catch {}
-	        }
+	        renderPopupState(popup, {
+	          title: t('contract.signing_page'),
+	          message: err?.message || t('alert.contract_link_failed')
+	        });
 	        console.warn('issue-contract-sign-token failed', err);
 	        alert(err?.message || t('alert.contract_link_failed'));
 	      }
@@ -10888,9 +10903,10 @@
       try {
         const fileUrl = await getFreshContractUrl(contractId);
         if (!fileUrl) {
-          if (popup && !popup.closed) {
-            try { popup.close(); } catch {}
-          }
+          renderPopupState(popup, {
+            title: t('contract.view_signed_copy'),
+            message: t('contract.signed_missing')
+          });
           if (signature?.contractTextSnapshot) {
             openContractSnapshotModal(contractId);
             return;
@@ -10898,16 +10914,12 @@
           alert(t('contract.signed_missing'));
           return;
         }
-        if (popup) {
-          popup.location.replace(fileUrl);
-          popup.focus();
-        } else {
-          window.location.href = fileUrl;
-        }
+        navigatePopupToUrl(popup, fileUrl, t('contract.view_signed_copy'));
       } catch (err) {
-        if (popup && !popup.closed) {
-          try { popup.close(); } catch {}
-        }
+        renderPopupState(popup, {
+          title: t('contract.view_signed_copy'),
+          message: t('contract.signed_missing')
+        });
         console.warn('Contract open failed', err);
         alert(t('contract.signed_missing'));
       }
@@ -10944,12 +10956,7 @@
         }
         if (fileUrl) {
           const popup = openPopupPlaceholder(t('common.download'));
-          if (popup) {
-            popup.location.replace(fileUrl);
-            popup.focus();
-          } else {
-            window.location.href = fileUrl;
-          }
+          navigatePopupToUrl(popup, fileUrl, t('common.download'));
           return;
         }
         alert(t('contract.signed_missing'));
