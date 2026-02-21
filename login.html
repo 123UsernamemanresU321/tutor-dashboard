@@ -262,13 +262,23 @@
     const SUPABASE_URL = 'https://wdsqnbebutuhwckjpwqf.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkc3FuYmVidXR1aHdja2pwd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxMDE1NzcsImV4cCI6MjA3OTY3NzU3N30.pJglpTaZouSQFUVCbQONHK1UsB9CgWewKQCIV13NOEM';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Login page does not use realtime channels; disconnect to avoid noisy suspended websocket logs.
+    try { supabaseClient.realtime.disconnect(); } catch (_) { }
     const CODE_EMAIL_SUFFIX = '@codes.tutor';
 
 
     // Silence noisy "output" reference errors some browsers surface
-    const suppressOutputError = (msg = '') => String(msg).toLowerCase().includes('output');
+    const suppressConsoleNoise = (msg = '') => {
+      const text = String(msg || '').toLowerCase();
+      return (
+        text.includes('output') ||
+        text.includes("resp.payload") ||
+        text.includes("reading 'payload'") ||
+        text.includes("evaluating 'resp.payload'")
+      );
+    };
     window.addEventListener('error', (event) => {
-      if (suppressOutputError(event.message)) {
+      if (suppressConsoleNoise(event.message)) {
         event.preventDefault();
         return true;
       }
@@ -276,7 +286,7 @@
     });
     window.addEventListener('unhandledrejection', (event) => {
       const reason = String(event.reason?.message || event.reason || '').toLowerCase();
-      if (suppressOutputError(reason)) {
+      if (suppressConsoleNoise(reason)) {
         event.preventDefault();
         return true;
       }
