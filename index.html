@@ -3877,14 +3877,14 @@
     function shouldAttemptFullSync() {
       if (tourMode || readOnlyMode) return false;
       if (!isSupabaseReady()) return false;
-      if (!isOwner()) return false;
+      if (!isPrimaryOwnerSession()) return false;
       if (Date.now() < supabaseSyncBackoffUntil) return false;
       return true;
     }
 
     async function syncStateToSupabase() {
       if (readOnlyMode) return;
-      if (!isOwner()) return;
+      if (!isPrimaryOwnerSession()) return;
       if (Date.now() < supabaseSyncBackoffUntil) return;
       normalizeIdsToUuid();
       enforceUuidFields();
@@ -4007,6 +4007,7 @@
         await upsertAndPrune('lesson_sessions', sessions, 'id');
       } catch (err) {
         console.warn('Sessions sync failed (check schema for invoice_id column):', err?.message || err);
+        if (isNetworkLoadFailure(err)) throw err;
       }
 
       const sessionStudents = [];
@@ -4053,6 +4054,7 @@
           await upsertAndPrune('session_cancellations', cancellations, 'id');
         } catch (err) {
           console.warn('Session cancellations sync skipped', err);
+          if (isNetworkLoadFailure(err)) throw err;
         }
       }
 
@@ -4070,6 +4072,7 @@
           await upsertAndPrune('busy_days', busyDays, 'id');
         } catch (err) {
           console.warn('Busy days sync skipped', err);
+          if (isNetworkLoadFailure(err)) throw err;
         }
       }
 
@@ -4110,6 +4113,7 @@
             .from('owner_settings')
             .upsert(settingsRowFull, { onConflict: 'user_id' });
           if (settingsErr) {
+            if (isNetworkLoadFailure(settingsErr)) throw settingsErr;
             const msg = String(settingsErr.message || settingsErr).toLowerCase();
             if (
               msg.includes('maintenance_mode') ||
@@ -4120,6 +4124,7 @@
                 .from('owner_settings')
                 .upsert(settingsRowMid, { onConflict: 'user_id' });
               settingsErr = mid.error;
+              if (settingsErr && isNetworkLoadFailure(settingsErr)) throw settingsErr;
             }
             if (settingsErr) {
               const nextMsg = String(settingsErr.message || settingsErr).toLowerCase();
@@ -4128,6 +4133,7 @@
                   .from('owner_settings')
                   .upsert(settingsRowLegacy, { onConflict: 'user_id' });
                 if (legacyErr) {
+                  if (isNetworkLoadFailure(legacyErr)) throw legacyErr;
                   console.warn('Owner settings sync failed', legacyErr);
                 }
               } else {
@@ -4139,6 +4145,7 @@
           }
         } catch (err) {
           console.warn('Owner settings sync skipped', err);
+          if (isNetworkLoadFailure(err)) throw err;
         }
       }
 
@@ -4163,6 +4170,7 @@
         await upsertAndPrune('resources', resources, 'id');
       } catch (err) {
         console.error('Resources upsert failed (check RLS on table "resources")', err);
+        if (isNetworkLoadFailure(err)) throw err;
       }
 
       const activity = state.activityLog.map(a => ({
@@ -4176,6 +4184,7 @@
         await upsertAndPrune('activity_log', activity, 'id');
       } catch (err) {
         console.warn('Activity log sync skipped', err);
+        if (isNetworkLoadFailure(err)) throw err;
       }
 
       const homework = state.homework
@@ -4196,6 +4205,7 @@
         await upsertAndPrune('homework', homework, 'id');
       } catch (err) {
         console.warn('Homework sync skipped', err);
+        if (isNetworkLoadFailure(err)) throw err;
       }
 
       const documents = state.documents.map(d => ({
@@ -4294,6 +4304,7 @@
         await upsertAndPrune('messages', messages, 'id');
       } catch (err) {
         console.warn('Messages sync skipped', err);
+        if (isNetworkLoadFailure(err)) throw err;
       }
     }
 
@@ -4310,6 +4321,14 @@
         }
       }
       // Prune skipped to avoid accidental deletions; Supabase is source of truth.
+    }
+
+    function isPrimaryOwnerSession() {
+      if (!supabaseAvailable) return true;
+      if (!supabaseSession) return false;
+      const ownerEmail = (OWNER_EMAIL || '').trim().toLowerCase();
+      if (!ownerEmail) return false;
+      return getSessionEmail() === ownerEmail;
     }
 
     function collectOrphanInvoiceIds() {
