@@ -2516,6 +2516,7 @@
     let announcementAdminTicker = null;
     let overdueReminderSendInFlight = false;
     let overdueReminderTestSendInFlight = false;
+    const SUPABASE_NETWORK_BACKOFF_MS = 2 * 60 * 1000;
     const SUPPORT_CACHE_TTL_MS = 15000;
     const OWNER_PANEL_PREFS_KEY = 'ownerPanelPrefs_v1';
     const ownerPanelPrefs = {
@@ -3852,6 +3853,7 @@
             console.error('Supabase sync failed', err);
             if (isNetworkLoadFailure(err)) {
               supabaseSyncBackoffUntil = Date.now() + 60 * 1000;
+              registerSupabaseNetworkIssue('Cannot reach Supabase right now (network/CORS). Changes are saved locally and will retry automatically.');
               setSupabaseStatusBanner('Supabase sync is temporarily blocked by network/CORS settings. Changes are saved locally and sync will retry in about 1 minute.');
             }
           });
@@ -3863,10 +3865,17 @@
     }
 
     let supabaseSyncBackoffUntil = 0;
+    let supabaseNetworkBackoffUntil = 0;
 
     function isNetworkLoadFailure(err) {
       const msg = String(err?.message || err || '').toLowerCase();
-      return msg.includes('load failed') || msg.includes('failed to fetch') || msg.includes('networkerror');
+      return (
+        msg.includes('load failed') ||
+        msg.includes('failed to fetch') ||
+        msg.includes('networkerror') ||
+        msg.includes('access control checks') ||
+        msg.includes('failed to send a request to the edge function')
+      );
     }
 
     function isMissingColumnErrorMessage(err) {
@@ -3878,13 +3887,20 @@
       if (tourMode || readOnlyMode) return false;
       if (!isSupabaseReady()) return false;
       if (!isPrimaryOwnerSession()) return false;
+      if (Date.now() < supabaseNetworkBackoffUntil) return false;
       if (Date.now() < supabaseSyncBackoffUntil) return false;
       return true;
+    }
+
+    function registerSupabaseNetworkIssue(message = '') {
+      supabaseNetworkBackoffUntil = Date.now() + SUPABASE_NETWORK_BACKOFF_MS;
+      if (message) setSupabaseStatusBanner(message);
     }
 
     async function syncStateToSupabase() {
       if (readOnlyMode) return;
       if (!isPrimaryOwnerSession()) return;
+      if (Date.now() < supabaseNetworkBackoffUntil) return;
       if (Date.now() < supabaseSyncBackoffUntil) return;
       normalizeIdsToUuid();
       enforceUuidFields();
@@ -6507,6 +6523,7 @@
 
     async function getPendingAnnouncementsForCurrentUser() {
       if (!isSupabaseReady()) return [];
+      if (Date.now() < supabaseNetworkBackoffUntil) return [];
       const userId = cleanId(supabaseSession?.user?.id || '');
       if (!userId) return [];
       const nowIso = new Date().toISOString();
@@ -6582,6 +6599,9 @@
           announcementShownInThisSession = true;
           showAnnouncementOverlay(next);
         } catch (err) {
+          if (isNetworkLoadFailure(err)) {
+            registerSupabaseNetworkIssue('Cannot reach Supabase right now (network/CORS). Non-critical checks are temporarily paused.');
+          }
           console.warn('Announcement check failed', err);
         }
       })();
@@ -9284,7 +9304,11 @@
           return;
         } catch (e) {
           console.error('Failed to load from Supabase, falling back to local', e);
-          setSupabaseStatusBanner('Supabase connection issue or maintenance detected. Some actions may be temporarily unavailable.');
+          if (isNetworkLoadFailure(e)) {
+            registerSupabaseNetworkIssue('Cannot reach Supabase right now (network/CORS). Using local data until connection recovers.');
+          } else {
+            setSupabaseStatusBanner('Supabase connection issue or maintenance detected. Some actions may be temporarily unavailable.');
+          }
           state = loadState(); // keep local data instead of wiping to defaults
           updateReadOnlyUI();
           return;
@@ -10467,6 +10491,10 @@
         accountEmails = [];
         return;
       }
+      if (Date.now() < supabaseNetworkBackoffUntil) {
+        accountEmails = [];
+        return;
+      }
       try {
         const accessToken = requireAccessToken(t('alert.sign_in_first'));
         const { data, error } = await supabaseClient.functions.invoke('list-account-emails', {
@@ -10479,6 +10507,9 @@
         if (meta.status === 401 || meta.status === 403) {
           accountEmails = [];
           return;
+        }
+        if (isNetworkLoadFailure(meta.message || err)) {
+          registerSupabaseNetworkIssue('Cannot reach Supabase right now (network/CORS). Account email lookup is paused temporarily.');
         }
         console.warn('Account emails fetch failed', meta.message || err);
       }
@@ -10497,6 +10528,7 @@
      ******************/
     async function refreshPresence() {
       if (!isSupabaseReady() || !isOwner()) return;
+      if (Date.now() < supabaseNetworkBackoffUntil) return;
       try {
         const { data, error } = await supabaseClient.from('presence').select('*');
         if (error) throw error;
@@ -10510,6 +10542,9 @@
           presenceMap.set(keyEmail, { email: row.email, role: row.role, fresh });
         });
       } catch (err) {
+        if (isNetworkLoadFailure(err)) {
+          registerSupabaseNetworkIssue('Cannot reach Supabase right now (network/CORS). Presence updates are paused temporarily.');
+        }
         console.warn('Presence fetch failed', err);
       }
     }
@@ -10518,6 +10553,7 @@
       if (!isSupabaseReady() || !isOwner()) return;
       stopPresence();
       const run = async () => {
+        if (Date.now() < supabaseNetworkBackoffUntil) return;
         try {
           const sessionRole = getSessionRole() || (isOwner() ? 'owner' : parentMode ? 'parent' : 'student');
           await supabaseClient.from('presence').upsert({
@@ -10529,6 +10565,9 @@
           await refreshPresence();
           renderStudentsView();
         } catch (err) {
+          if (isNetworkLoadFailure(err)) {
+            registerSupabaseNetworkIssue('Cannot reach Supabase right now (network/CORS). Presence updates are paused temporarily.');
+          }
           console.warn('Presence heartbeat failed', err);
         }
       };
