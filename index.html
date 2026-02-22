@@ -2531,6 +2531,7 @@
     const REALTIME_REFRESH_DEBOUNCE_MS = 900;
     const REALTIME_SELF_WRITE_SUPPRESS_MS = 5000;
     const PRESENCE_HEARTBEAT_MS = 60000;
+    const PRESENCE_FRESH_MS = 130000;
     const PRESENCE_REFRESH_MIN_INTERVAL_MS = 45000;
     const SUPABASE_NETWORK_BACKOFF_MS = 2 * 60 * 1000;
     const SUPPORT_CACHE_TTL_MS = 15000;
@@ -10673,7 +10674,7 @@
           (data || []).forEach(row => {
             const keyUser = cleanId(row.user_id || row.id || row.email);
             const keyEmail = (row.email || '').toLowerCase();
-            const fresh = now - new Date(row.updated_at).getTime() < 65000;
+            const fresh = now - new Date(row.updated_at).getTime() < PRESENCE_FRESH_MS;
             presenceMap.set(keyUser, { email: row.email, role: row.role, fresh });
             presenceMap.set(keyEmail, { email: row.email, role: row.role, fresh });
           });
@@ -10691,7 +10692,7 @@
     }
 
     function startPresence() {
-      if (!isSupabaseReady() || !isOwner()) return;
+      if (!isSupabaseReady()) return;
       stopPresence();
       const run = async () => {
         if (Date.now() < supabaseNetworkBackoffUntil) return;
@@ -10703,9 +10704,11 @@
             email: getSessionEmail(),
             role: sessionRole,
             updated_at: new Date().toISOString()
-          });
-          await refreshPresence();
-          renderStudentsView();
+          }, { onConflict: 'user_id' });
+          if (isOwner()) {
+            await refreshPresence();
+            renderStudentsView();
+          }
         } catch (err) {
           if (isNetworkLoadFailure(err)) {
             registerSupabaseNetworkIssue('Cannot reach Supabase right now (network/CORS). Presence updates are paused temporarily.');
@@ -11148,7 +11151,9 @@
           const daysSince = last ? Math.floor((now - last) / (1000 * 60 * 60 * 24)) : null;
           const next = getNextSessionForStudent(s.id);
           const nextLabel = next ? `${next.date} ${next.startTime || ''}` : t('schedule.unscheduled');
-          const presence = presenceMap.get((s.studentEmail || '').toLowerCase()) || presenceMap.get(cleanId(s.id));
+          const studentEmailKey = (s.studentEmail || s.student_email || '').toLowerCase();
+          const studentAuthUserId = cleanId(s.authUserId || s.auth_user_id || '');
+          const presence = presenceMap.get(studentEmailKey) || presenceMap.get(studentAuthUserId) || presenceMap.get(cleanId(s.id));
           const online = !!presence?.fresh;
           const safeStudentId = cleanId(s.id);
           const lastLabel = daysSince != null
@@ -11456,6 +11461,16 @@
         const kids = getParentLinkedStudents(p.id);
         const kidNames = kids.map(k => k.name).join(', ') || t('parents.no_students_linked');
         const codeChip = p.loginCode ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-mono text-[10px] border border-indigo-100">${esc(p.loginCode)}</span>` : '';
+        const parentEmailKey = (p.email || '').toLowerCase();
+        const parentAuthUserId = cleanId(p.authUserId || p.auth_user_id || '');
+        const parentPresence = presenceMap.get(parentEmailKey) || presenceMap.get(parentAuthUserId) || presenceMap.get(cleanId(p.id));
+        const parentOnline = !!parentPresence?.fresh;
+        const statusChip = `
+          <span class="inline-flex items-center gap-1 text-[10px] ${parentOnline ? 'text-emerald-600' : 'text-slate-500'}">
+            <span class="h-2.5 w-2.5 rounded-full ${parentOnline ? 'bg-emerald-500' : 'bg-slate-400'}"></span>
+            ${parentOnline ? t('schedule.online') : t('status.offline')}
+          </span>
+        `;
         const safeParentId = cleanId(p.id);
         return `<li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80 flex items-start justify-between gap-2">
           <div>
@@ -11467,7 +11482,10 @@
             <div class="text-[10px] text-slate-500">${esc(kidNames)}</div>
             ${codeChip ? `<div class="mt-1">${codeChip}</div>` : ''}
           </div>
-          <button data-parent-id="${safeParentId}" class="px-2 py-1 text-[10px] rounded-lg border border-slate-300 hover:bg-slate-50">${t('common.edit')}</button>
+          <div class="flex flex-col items-end gap-1">
+            ${statusChip}
+            <button data-parent-id="${safeParentId}" class="px-2 py-1 text-[10px] rounded-lg border border-slate-300 hover:bg-slate-50">${t('common.edit')}</button>
+          </div>
         </li>`;
       }).join('');
       list.querySelectorAll('[data-parent-id]').forEach(btn => {
