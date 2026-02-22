@@ -3996,15 +3996,6 @@
         await upsertAndPrune('parents', legacyParents, 'id');
       }
 
-      const parentLinks = state.parentLinks.map(pl => ({
-        id: cleanId(pl.id),
-        user_id: uid,
-        parent_id: cleanId(pl.parentId),
-        student_id: cleanId(pl.studentId),
-        relationship: pl.relationship
-      }));
-      await upsertAndPrune('parent_students', parentLinks, 'id');
-
       // prepare rows with user_id
       const students = state.students.map(s => {
         const slots = getScheduleSlots(s);
@@ -4038,7 +4029,63 @@
           schedule_notes: s.scheduleNotes || null
         };
       });
-      await upsertAndPrune('students', students, 'id');
+      try {
+        await upsertAndPrune('students', students, 'id');
+      } catch (err) {
+        if (!isMissingColumnErrorMessage(err)) throw err;
+        const studentsMid = students.map(s => ({
+          id: s.id,
+          user_id: s.user_id,
+          name: s.name,
+          grade_level: s.grade_level,
+          rate: s.rate,
+          subjects: s.subjects,
+          notes: s.notes,
+          student_email: s.student_email,
+          created_at: s.created_at,
+          contract_signed: s.contract_signed,
+          contract_signed_at: s.contract_signed_at,
+          contract_version: s.contract_version,
+          contract_signer_name: s.contract_signer_name,
+          contract_signer_email: s.contract_signer_email,
+          last_contract_id: s.last_contract_id,
+          login_code: s.login_code,
+          schedule_slots: s.schedule_slots,
+          schedule_days: s.schedule_days,
+          preferred_time: s.preferred_time,
+          schedule_timezone: s.schedule_timezone
+        }));
+        try {
+          await upsertAndPrune('students', studentsMid, 'id');
+        } catch (midErr) {
+          if (!isMissingColumnErrorMessage(midErr)) throw midErr;
+          const studentsLegacy = studentsMid.map(s => ({
+            id: s.id,
+            user_id: s.user_id,
+            name: s.name,
+            grade_level: s.grade_level,
+            rate: s.rate,
+            subjects: s.subjects,
+            notes: s.notes,
+            student_email: s.student_email,
+            created_at: s.created_at,
+            contract_signed: s.contract_signed,
+            contract_signed_at: s.contract_signed_at,
+            contract_signer_name: s.contract_signer_name,
+            contract_signer_email: s.contract_signer_email,
+            login_code: s.login_code
+          }));
+          await upsertAndPrune('students', studentsLegacy, 'id');
+        }
+      }
+      const parentLinks = state.parentLinks.map(pl => ({
+        id: cleanId(pl.id),
+        user_id: uid,
+        parent_id: cleanId(pl.parentId),
+        student_id: cleanId(pl.studentId),
+        relationship: pl.relationship
+      }));
+      await upsertAndPrune('parent_students', parentLinks, 'id');
       const studentIdSet = new Set(students.map(s => cleanId(s.id)));
 
       const sessionsClean = state.sessions
