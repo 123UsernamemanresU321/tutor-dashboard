@@ -2507,6 +2507,13 @@
     let privacyRead = false;
     let tosRead = false;
     let presenceHeartbeat = null;
+    let ownerRealtimeChannel = null;
+    let ownerRealtimeRefreshTimer = null;
+    let ownerRealtimeRefreshInFlight = false;
+    let supportRealtimeRefreshTimer = null;
+    let supportRealtimeRefreshInFlight = false;
+    let presenceRefreshInFlight = null;
+    let lastPresenceRefreshAt = 0;
     let maintenanceTicker = null;
     let presenceMap = new Map();
     let ownerAnnouncements = [];
@@ -2516,6 +2523,15 @@
     let announcementAdminTicker = null;
     let overdueReminderSendInFlight = false;
     let overdueReminderTestSendInFlight = false;
+    let syncDebounceTimer = null;
+    let syncInFlight = false;
+    let syncQueued = false;
+    let realtimeSuppressedUntil = 0;
+    const SUPABASE_SYNC_DEBOUNCE_MS = 1200;
+    const REALTIME_REFRESH_DEBOUNCE_MS = 900;
+    const REALTIME_SELF_WRITE_SUPPRESS_MS = 5000;
+    const PRESENCE_HEARTBEAT_MS = 60000;
+    const PRESENCE_REFRESH_MIN_INTERVAL_MS = 45000;
     const SUPABASE_NETWORK_BACKOFF_MS = 2 * 60 * 1000;
     const SUPPORT_CACHE_TTL_MS = 15000;
     const OWNER_PANEL_PREFS_KEY = 'ownerPanelPrefs_v1';
@@ -3835,28 +3851,62 @@
       });
     }
 
-    function saveState() {
+    function saveState(opts = {}) {
       if (readOnlyMode) {
         console.warn('Read-only mode: changes are not saved.');
         return;
       }
+      const skipSync = !!opts.skipSync;
+      const requestedDelay = Number(opts.syncDelayMs);
+      const syncDelayMs = Number.isFinite(requestedDelay) ? Math.max(0, requestedDelay) : SUPABASE_SYNC_DEBOUNCE_MS;
       normalizeIdsToUuid();
       enforceUuidFields();
       localStorage.setItem(getStorageKey(), JSON.stringify(state));
       updateKPIsAndCharts();
-      if (shouldAttemptFullSync()) {
-        syncStateToSupabase()
-          .then(() => {
-            supabaseSyncBackoffUntil = 0;
-          })
-          .catch(err => {
-            console.error('Supabase sync failed', err);
-            if (isNetworkLoadFailure(err)) {
-              supabaseSyncBackoffUntil = Date.now() + 60 * 1000;
-              registerSupabaseNetworkIssue('Cannot reach Supabase right now (network/CORS). Changes are saved locally and will retry automatically.');
-              setSupabaseStatusBanner('Supabase sync is temporarily blocked by network/CORS settings. Changes are saved locally and sync will retry in about 1 minute.');
-            }
-          });
+      if (!skipSync && shouldAttemptFullSync()) {
+        queueSupabaseSync(syncDelayMs);
+      }
+    }
+
+    function queueSupabaseSync(delayMs = SUPABASE_SYNC_DEBOUNCE_MS) {
+      if (!shouldAttemptFullSync()) return;
+      const safeDelay = Number.isFinite(delayMs) ? Math.max(0, delayMs) : SUPABASE_SYNC_DEBOUNCE_MS;
+      if (syncInFlight) {
+        syncQueued = true;
+        return;
+      }
+      if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
+      syncDebounceTimer = setTimeout(() => {
+        syncDebounceTimer = null;
+        runSupabaseSync();
+      }, safeDelay);
+    }
+
+    async function runSupabaseSync() {
+      if (syncInFlight) {
+        syncQueued = true;
+        return;
+      }
+      if (!shouldAttemptFullSync()) return;
+      syncInFlight = true;
+      syncQueued = false;
+      realtimeSuppressedUntil = Date.now() + REALTIME_SELF_WRITE_SUPPRESS_MS;
+      try {
+        await syncStateToSupabase();
+        supabaseSyncBackoffUntil = 0;
+      } catch (err) {
+        console.error('Supabase sync failed', err);
+        if (isNetworkLoadFailure(err)) {
+          supabaseSyncBackoffUntil = Date.now() + 60 * 1000;
+          registerSupabaseNetworkIssue('Cannot reach Supabase right now (network/CORS). Changes are saved locally and will retry automatically.');
+          setSupabaseStatusBanner('Supabase sync is temporarily blocked by network/CORS settings. Changes are saved locally and sync will retry in about 1 minute.');
+        }
+      } finally {
+        syncInFlight = false;
+        if (syncQueued) {
+          syncQueued = false;
+          queueSupabaseSync(400);
+        }
       }
     }
 
@@ -3902,6 +3952,7 @@
       if (!isPrimaryOwnerSession()) return;
       if (Date.now() < supabaseNetworkBackoffUntil) return;
       if (Date.now() < supabaseSyncBackoffUntil) return;
+      realtimeSuppressedUntil = Math.max(realtimeSuppressedUntil, Date.now() + REALTIME_SELF_WRITE_SUPPRESS_MS);
       normalizeIdsToUuid();
       enforceUuidFields();
       const uid = supabaseSession?.user?.id;
@@ -5109,30 +5160,104 @@
     /***********************
      * REALTIME UPDATES
      ***********************/
+    function teardownRealtime() {
+      if (ownerRealtimeRefreshTimer) clearTimeout(ownerRealtimeRefreshTimer);
+      ownerRealtimeRefreshTimer = null;
+      ownerRealtimeRefreshInFlight = false;
+      if (supportRealtimeRefreshTimer) clearTimeout(supportRealtimeRefreshTimer);
+      supportRealtimeRefreshTimer = null;
+      supportRealtimeRefreshInFlight = false;
+      if (ownerRealtimeChannel && supabaseClient) {
+        try {
+          supabaseClient.removeChannel(ownerRealtimeChannel);
+        } catch (_) {
+          // ignore cleanup failures
+        }
+      }
+      ownerRealtimeChannel = null;
+    }
+
+    function scheduleOwnerRealtimeRefresh() {
+      if (!isSupabaseReady() || !isOwner()) return;
+      if (Date.now() < supabaseNetworkBackoffUntil) return;
+      if (Date.now() < realtimeSuppressedUntil) return;
+      if (ownerRealtimeRefreshTimer) clearTimeout(ownerRealtimeRefreshTimer);
+      ownerRealtimeRefreshTimer = setTimeout(async () => {
+        ownerRealtimeRefreshTimer = null;
+        if (ownerRealtimeRefreshInFlight) return;
+        ownerRealtimeRefreshInFlight = true;
+        try {
+          await tryLoadRemoteThenLocal();
+          renderAllViews();
+        } catch (err) {
+          console.error('Realtime refresh failed', err);
+        } finally {
+          ownerRealtimeRefreshInFlight = false;
+        }
+      }, REALTIME_REFRESH_DEBOUNCE_MS);
+    }
+
+    function scheduleSupportRealtimeRefresh() {
+      supportTicketsCache.loadedAt = 0;
+      if (!isSupabaseReady() || !isOwner()) return;
+      if (Date.now() < supabaseNetworkBackoffUntil) return;
+      if (Date.now() < realtimeSuppressedUntil) return;
+      if (supportRealtimeRefreshTimer) clearTimeout(supportRealtimeRefreshTimer);
+      supportRealtimeRefreshTimer = setTimeout(async () => {
+        supportRealtimeRefreshTimer = null;
+        if (supportRealtimeRefreshInFlight) return;
+        supportRealtimeRefreshInFlight = true;
+        try {
+          await renderOwnerSupportCard({ force: true });
+        } catch (err) {
+          console.error('Support realtime refresh failed', err);
+        } finally {
+          supportRealtimeRefreshInFlight = false;
+        }
+      }, REALTIME_REFRESH_DEBOUNCE_MS);
+    }
+
+    function schedulePresenceRealtimeRefresh() {
+      if (!isSupabaseReady() || !isOwner()) return;
+      if (Date.now() < supabaseNetworkBackoffUntil) return;
+      if (Date.now() < realtimeSuppressedUntil) return;
+      refreshPresence({ force: true })
+        .then(() => renderStudentsView())
+        .catch(err => console.error('Presence realtime refresh failed', err));
+    }
+
     function setupRealtime() {
-      if (!supabaseClient || !supabaseSession || !isOwner()) return;
-      const tables = ['students', 'lesson_sessions', 'session_cancellations', 'homework', 'invoices', 'messages', 'resources', 'documents', 'contracts', 'student_todos', 'student_checkins', 'parent_contract_signatures', 'support_tickets', 'support_ticket_messages', 'presence'];
-      tables.forEach(table => {
-        supabaseClient
-          .channel(`${table}-changes`)
-          .on('postgres_changes', { event: '*', schema: 'public', table }, async () => {
-            try {
-              if (table === 'presence') {
-                await refreshPresence();
-                renderStudentsView();
-              } else if (table === 'support_tickets' || table === 'support_ticket_messages') {
-                supportTicketsCache.loadedAt = 0;
-                await renderOwnerSupportCard({ force: true });
-              } else {
-                await tryLoadRemoteThenLocal();
-                renderAllViews();
-              }
-            } catch (err) {
-              console.error('Realtime refresh failed', err);
-            }
-          })
-          .subscribe();
+      if (!supabaseClient || !supabaseSession || !isOwner()) {
+        teardownRealtime();
+        return;
+      }
+      if (ownerRealtimeChannel) return;
+      const ownerRealtimeTables = ['students', 'lesson_sessions', 'session_cancellations', 'homework', 'invoices', 'messages', 'resources', 'documents', 'contracts', 'student_todos', 'student_checkins', 'parent_contract_signatures'];
+      const channelSuffix = cleanId(supabaseSession.user.id || '').slice(0, 8) || 'owner';
+      const channel = supabaseClient.channel(`owner-realtime-${channelSuffix}`);
+      ownerRealtimeTables.forEach(table => {
+        channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => {
+          scheduleOwnerRealtimeRefresh();
+        });
       });
+      channel
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'support_tickets' }, () => {
+          scheduleSupportRealtimeRefresh();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'support_ticket_messages' }, () => {
+          scheduleSupportRealtimeRefresh();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'presence' }, (payload) => {
+          const changedUserId = cleanId(payload?.new?.user_id || payload?.old?.user_id || '');
+          if (changedUserId && changedUserId === cleanId(supabaseSession?.user?.id || '')) return;
+          schedulePresenceRealtimeRefresh();
+        })
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.warn('Owner realtime channel error', status);
+          }
+        });
+      ownerRealtimeChannel = channel;
     }
 
     function switchView(viewName) {
@@ -8763,6 +8888,7 @@
           privacyRead = false;
           tosRead = false;
           resetAnnouncementSessionState();
+          teardownRealtime();
           stopPresence();
         }
         updateReadOnlyUI();
@@ -9294,7 +9420,7 @@
           if (isOwner()) {
             await pruneOrphanInvoices({ persistRemote: true, skipSave: true });
           }
-          if (!readOnlyMode) saveState(); // persist locally as cache
+          if (!readOnlyMode) saveState({ skipSync: true }); // persist locally as cache
           if (isSupabaseReady()) {
             await refreshPresence().catch(() => { });
           }
@@ -9395,6 +9521,11 @@
       // Owner: load everything (existing behaviour)
       if (isOwnerUser) {
         const fetchTable = (table, cols = '*') => supabaseClient.from(table).select(cols);
+        const fetchRecentActivity = () => supabaseClient
+          .from('activity_log')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(500);
         const [
           studentsRes,
           parentsRes,
@@ -9430,7 +9561,7 @@
           fetchTable('invoices'),
           fetchTable('student_todos'),
           fetchTable('student_checkins'),
-          fetchTable('activity_log'),
+          fetchRecentActivity(),
           fetchTable('messages'),
           fetchTable('parent_contract_signatures')
         ]);
@@ -9661,7 +9792,7 @@
           action: a.action,
           detail: a.detail,
           created_at: a.created_at
-        }));
+        })).reverse();
         merged.settings = loadState().settings; // keep local settings
         const ownerSettings = (ownerSettingsRes?.data || [])[0];
         if (ownerSettings) {
@@ -10526,27 +10657,37 @@
     /******************
      * PRESENCE       *
      ******************/
-    async function refreshPresence() {
+    async function refreshPresence(opts = {}) {
+      const force = !!opts.force;
       if (!isSupabaseReady() || !isOwner()) return;
       if (Date.now() < supabaseNetworkBackoffUntil) return;
-      try {
-        const { data, error } = await supabaseClient.from('presence').select('*');
-        if (error) throw error;
-        const now = Date.now();
-        presenceMap = new Map();
-        (data || []).forEach(row => {
-          const keyUser = cleanId(row.user_id || row.id || row.email);
-          const keyEmail = (row.email || '').toLowerCase();
-          const fresh = now - new Date(row.updated_at).getTime() < 65000;
-          presenceMap.set(keyUser, { email: row.email, role: row.role, fresh });
-          presenceMap.set(keyEmail, { email: row.email, role: row.role, fresh });
-        });
-      } catch (err) {
-        if (isNetworkLoadFailure(err)) {
-          registerSupabaseNetworkIssue('Cannot reach Supabase right now (network/CORS). Presence updates are paused temporarily.');
+      const nowMs = Date.now();
+      if (!force && (nowMs - lastPresenceRefreshAt) < PRESENCE_REFRESH_MIN_INTERVAL_MS) return;
+      if (presenceRefreshInFlight) return presenceRefreshInFlight;
+      presenceRefreshInFlight = (async () => {
+        try {
+          const { data, error } = await supabaseClient.from('presence').select('*');
+          if (error) throw error;
+          const now = Date.now();
+          presenceMap = new Map();
+          (data || []).forEach(row => {
+            const keyUser = cleanId(row.user_id || row.id || row.email);
+            const keyEmail = (row.email || '').toLowerCase();
+            const fresh = now - new Date(row.updated_at).getTime() < 65000;
+            presenceMap.set(keyUser, { email: row.email, role: row.role, fresh });
+            presenceMap.set(keyEmail, { email: row.email, role: row.role, fresh });
+          });
+          lastPresenceRefreshAt = Date.now();
+        } catch (err) {
+          if (isNetworkLoadFailure(err)) {
+            registerSupabaseNetworkIssue('Cannot reach Supabase right now (network/CORS). Presence updates are paused temporarily.');
+          }
+          console.warn('Presence fetch failed', err);
         }
-        console.warn('Presence fetch failed', err);
-      }
+      })().finally(() => {
+        presenceRefreshInFlight = null;
+      });
+      return presenceRefreshInFlight;
     }
 
     function startPresence() {
@@ -10554,6 +10695,7 @@
       stopPresence();
       const run = async () => {
         if (Date.now() < supabaseNetworkBackoffUntil) return;
+        if (document.visibilityState === 'hidden') return;
         try {
           const sessionRole = getSessionRole() || (isOwner() ? 'owner' : parentMode ? 'parent' : 'student');
           await supabaseClient.from('presence').upsert({
@@ -10572,12 +10714,14 @@
         }
       };
       run();
-      presenceHeartbeat = setInterval(run, 30000);
+      presenceHeartbeat = setInterval(run, PRESENCE_HEARTBEAT_MS);
     }
 
     function stopPresence() {
       if (presenceHeartbeat) clearInterval(presenceHeartbeat);
       presenceHeartbeat = null;
+      lastPresenceRefreshAt = 0;
+      presenceRefreshInFlight = null;
       presenceMap = new Map();
     }
 
