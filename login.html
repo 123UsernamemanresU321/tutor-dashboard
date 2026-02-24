@@ -91,6 +91,12 @@
       color: #94a3b8;
     }
 
+    .success {
+      color: #065f46;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+
     .error {
       color: #b91c1c;
       font-size: 12px;
@@ -218,6 +224,13 @@
         </div>
         <button type="submit" class="primary mt-4" data-i18n="auth.enter">Enter</button>
       </form>
+      <button id="parentForgotToggleBtn" type="button" class="secondary mt-2">Forgot login code?</button>
+      <div id="parentForgotPanel" class="hidden mt-3">
+        <label for="parentRecoveryEmail">Parent email</label>
+        <input id="parentRecoveryEmail" type="email" autocomplete="email" placeholder="you@example.com">
+        <button id="parentForgotSubmitBtn" type="button" class="secondary mt-2">Send login code</button>
+        <div id="parentRecoveryMsg" class="success hidden"></div>
+      </div>
     </div>
 
     <!-- Student Login -->
@@ -265,6 +278,7 @@
     // Login page does not use realtime channels; disconnect to avoid noisy suspended websocket logs.
     try { supabaseClient.realtime.disconnect(); } catch (_) { }
     const CODE_EMAIL_SUFFIX = '@codes.tutor';
+    const FORGOT_CODE_GENERIC_MESSAGE = 'If an account is associated with this email, we have sent your login code to it.';
 
 
     // Silence noisy "output" reference errors some browsers surface
@@ -419,6 +433,37 @@
       e.preventDefault();
       handleCodeLogin(e.target.code.value, 'parent');
     };
+
+    const parentForgotToggleBtn = document.getElementById('parentForgotToggleBtn');
+    const parentForgotPanel = document.getElementById('parentForgotPanel');
+    const parentForgotSubmitBtn = document.getElementById('parentForgotSubmitBtn');
+    const parentRecoveryEmail = document.getElementById('parentRecoveryEmail');
+    const parentRecoveryMsg = document.getElementById('parentRecoveryMsg');
+
+    if (parentForgotToggleBtn && parentForgotPanel) {
+      parentForgotToggleBtn.onclick = () => {
+        parentForgotPanel.classList.toggle('hidden');
+        if (parentRecoveryMsg) parentRecoveryMsg.classList.add('hidden');
+      };
+    }
+
+    if (parentForgotSubmitBtn && parentRecoveryEmail && parentRecoveryMsg) {
+      parentForgotSubmitBtn.onclick = async () => {
+        const email = String(parentRecoveryEmail.value || '').trim().toLowerCase();
+        parentForgotSubmitBtn.disabled = true;
+        try {
+          await supabaseClient.functions.invoke('recover-login-code', {
+            body: { email }
+          });
+        } catch (_) {
+          // Anti-enumeration flow: always show the same message.
+        } finally {
+          parentRecoveryMsg.textContent = FORGOT_CODE_GENERIC_MESSAGE;
+          parentRecoveryMsg.classList.remove('hidden');
+          parentForgotSubmitBtn.disabled = false;
+        }
+      };
+    }
 
     document.getElementById('forgotBtn').onclick = async () => {
       alert(t('auth.forgot_alert'));
