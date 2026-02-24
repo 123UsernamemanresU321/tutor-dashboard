@@ -2155,6 +2155,39 @@
                 </button>
               </div>
             </div>
+            <div id="parentLoginCodeCard" class="card p-4 space-y-2">
+              <div class="flex items-center justify-between gap-2">
+                <h3 class="text-sm font-semibold">Login codes</h3>
+                <button id="parentRefreshCodeTargetsBtn" class="portal-cta-btn portal-cta-subtle text-[11px]">Refresh</button>
+              </div>
+              <p class="text-[11px] text-slate-500">Regenerate your parent login code or any linked student code.</p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <select id="parentCodeTargetSelect" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]"></select>
+                <button id="parentRegenerateCodeBtn" class="portal-cta-btn portal-cta-pay">Regenerate code</button>
+              </div>
+              <div id="parentCodeResultWrap" class="hidden p-2 rounded-lg border border-emerald-200 bg-emerald-50">
+                <div class="text-[10px] text-emerald-800 mb-1">New login code</div>
+                <div class="flex items-center gap-2">
+                  <code id="parentCodeResultValue" class="font-mono text-base font-semibold text-emerald-900"></code>
+                  <button id="parentCodeCopyBtn" class="text-[11px] text-emerald-700 underline decoration-dotted">Copy</button>
+                </div>
+              </div>
+              <div id="parentCodeStatus" class="text-[11px] text-slate-500 hidden"></div>
+            </div>
+            <div id="parentBulkRescheduleCard" class="card p-4 space-y-2">
+              <h3 class="text-sm font-semibold">Recurring slot change</h3>
+              <p class="text-[11px] text-slate-500">Move all upcoming lessons in one recurring slot to a new weekday/time. Past and completed lessons stay untouched.</p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <select id="parentBulkRescheduleStudent" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]"></select>
+                <select id="parentBulkRescheduleOldSlot" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]"></select>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <select id="parentBulkRescheduleNewDay" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]"></select>
+                <input id="parentBulkRescheduleNewTime" type="time" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">
+              </div>
+              <button id="parentBulkRescheduleApplyBtn" class="portal-cta-btn portal-cta-contract">Apply recurring change</button>
+              <div id="parentBulkRescheduleStatus" class="text-[11px] text-slate-500 hidden"></div>
+            </div>
             <div id="parentGuideCard" class="card p-4 hidden">
               <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div>
@@ -8192,6 +8225,308 @@
       card.classList.remove('hidden');
     }
 
+    function getParentCodeTargets(parent, students) {
+      const targets = [];
+      if (parent?.id) {
+        targets.push({
+          key: `parent:${cleanId(parent.id)}`,
+          role: 'parent',
+          id: cleanId(parent.id),
+          label: `${parent.name || 'Parent account'} (Parent)`,
+          code: normalizeCode(parent.loginCode || parent.login_code || '')
+        });
+      }
+      (students || []).forEach(student => {
+        if (!student?.id) return;
+        targets.push({
+          key: `student:${cleanId(student.id)}`,
+          role: 'student',
+          id: cleanId(student.id),
+          label: `${student.name || 'Student'} (Student)`,
+          code: normalizeCode(student.loginCode || student.login_code || '')
+        });
+      });
+      return targets;
+    }
+
+    function setParentCodeStatus(message, tone = 'slate') {
+      const statusEl = document.getElementById('parentCodeStatus');
+      if (!statusEl) return;
+      statusEl.textContent = message || '';
+      statusEl.classList.remove('hidden', 'text-slate-500', 'text-rose-600', 'text-emerald-700');
+      if (tone === 'error') statusEl.classList.add('text-rose-600');
+      else if (tone === 'success') statusEl.classList.add('text-emerald-700');
+      else statusEl.classList.add('text-slate-500');
+    }
+
+    function renderParentCodeTools(parent, students) {
+      const selectEl = document.getElementById('parentCodeTargetSelect');
+      const regenerateBtn = document.getElementById('parentRegenerateCodeBtn');
+      const refreshBtn = document.getElementById('parentRefreshCodeTargetsBtn');
+      const resultWrap = document.getElementById('parentCodeResultWrap');
+      const resultValue = document.getElementById('parentCodeResultValue');
+      const copyBtn = document.getElementById('parentCodeCopyBtn');
+      const writeLocked = isMaintenanceGracefulWriteBlocked() || isMaintenanceHardStopForViewer();
+
+      if (!selectEl || !regenerateBtn) return;
+      const targets = getParentCodeTargets(parent, students);
+      const previousValue = selectEl.value;
+      selectEl.innerHTML = targets.length
+        ? targets.map(target => `<option value="${esc(target.key)}">${esc(target.label)}${target.code ? ` • ${esc(target.code)}` : ''}</option>`).join('')
+        : `<option value="">No linked accounts</option>`;
+      if (targets.some(target => target.key === previousValue)) {
+        selectEl.value = previousValue;
+      }
+
+      if (refreshBtn) refreshBtn.onclick = () => renderParentCodeTools(parent, students);
+
+      regenerateBtn.disabled = !targets.length || writeLocked;
+      regenerateBtn.title = writeLocked ? 'Temporarily disabled during maintenance restricted mode.' : '';
+      selectEl.disabled = !targets.length || writeLocked;
+
+      if (copyBtn && resultValue) {
+        copyBtn.onclick = () => {
+          const code = String(resultValue.textContent || '').trim();
+          if (!code) return;
+          navigator.clipboard?.writeText(code).then(() => {
+            copyBtn.textContent = t('common.copied');
+            setTimeout(() => copyBtn.textContent = t('common.copy'), 1500);
+          }).catch(() => prompt(t('prompt.copy_link'), code));
+        };
+      }
+
+      regenerateBtn.onclick = async () => {
+        if (!guardMaintenanceWrite('Login code update')) return;
+        if (!isSupabaseReady() || !supabaseSession?.access_token) {
+          setParentCodeStatus(t('alert.sign_in_again'), 'error');
+          return;
+        }
+        const selected = String(selectEl.value || '');
+        if (!selected.includes(':')) {
+          setParentCodeStatus('Select an account first.', 'error');
+          return;
+        }
+        const [role, id] = selected.split(':');
+        const body = {
+          role: role === 'student' ? 'student' : 'parent',
+          studentId: role === 'student' ? id : null,
+          parentId: role === 'parent' ? id : null,
+          generate: true
+        };
+
+        regenerateBtn.disabled = true;
+        setParentCodeStatus('Generating code...');
+        try {
+          const { data, error } = await supabaseClient.functions.invoke('issue-login-code', {
+            body,
+            headers: { Authorization: `Bearer ${supabaseSession.access_token}` }
+          });
+          if (error) {
+            const meta = await getEdgeInvokeErrorMeta(error, 'Unable to regenerate login code');
+            throw new Error(meta.message || 'Unable to regenerate login code');
+          }
+          if (!data?.success || !data?.code) {
+            throw new Error(data?.error || 'Unable to regenerate login code');
+          }
+          const newCode = normalizeCode(data.code);
+          if (role === 'parent' && parent?.id === id) {
+            parent.loginCode = newCode;
+            parent.login_code = newCode;
+            if (data.userId) {
+              parent.authUserId = data.userId;
+              parent.auth_user_id = data.userId;
+            }
+          }
+          if (role === 'student') {
+            const student = (students || []).find(s => cleanId(s.id) === cleanId(id));
+            if (student) {
+              student.loginCode = newCode;
+              student.login_code = newCode;
+              if (data.userId) {
+                student.authUserId = data.userId;
+                student.auth_user_id = data.userId;
+              }
+            }
+          }
+          if (resultWrap && resultValue) {
+            resultValue.textContent = newCode;
+            resultWrap.classList.remove('hidden');
+          }
+          setParentCodeStatus('Login code updated. If email opt-in is enabled, a notification email has been sent.', 'success');
+          renderParentPortal();
+        } catch (err) {
+          console.warn('Parent login code regeneration failed', err);
+          setParentCodeStatus(err?.message || 'Unable to regenerate login code.', 'error');
+        } finally {
+          regenerateBtn.disabled = !targets.length || writeLocked;
+        }
+      };
+    }
+
+    function parseScheduleSlotSelection(value) {
+      const [dayRaw, timeRaw] = String(value || '').split('|');
+      const day = Number(dayRaw);
+      const time = normalizeTimeValue(timeRaw || '');
+      if (!Number.isFinite(day) || day < 0 || day > 6 || !time) return null;
+      return { day, time };
+    }
+
+    function renderParentBulkRescheduleTools(parent, students) {
+      const studentSelect = document.getElementById('parentBulkRescheduleStudent');
+      const oldSlotSelect = document.getElementById('parentBulkRescheduleOldSlot');
+      const newDaySelect = document.getElementById('parentBulkRescheduleNewDay');
+      const newTimeInput = document.getElementById('parentBulkRescheduleNewTime');
+      const applyBtn = document.getElementById('parentBulkRescheduleApplyBtn');
+      const statusEl = document.getElementById('parentBulkRescheduleStatus');
+      const writeLocked = isMaintenanceGracefulWriteBlocked() || isMaintenanceHardStopForViewer();
+
+      if (!studentSelect || !oldSlotSelect || !newDaySelect || !newTimeInput || !applyBtn || !statusEl) return;
+
+      const setStatus = (text, tone = 'slate') => {
+        statusEl.textContent = text || '';
+        statusEl.classList.remove('hidden', 'text-slate-500', 'text-rose-600', 'text-emerald-700');
+        if (tone === 'error') statusEl.classList.add('text-rose-600');
+        else if (tone === 'success') statusEl.classList.add('text-emerald-700');
+        else statusEl.classList.add('text-slate-500');
+      };
+
+      const safeStudents = Array.isArray(students) ? students.filter(Boolean) : [];
+      const previousStudentId = cleanId(studentSelect.value || '');
+      studentSelect.innerHTML = safeStudents.length
+        ? safeStudents.map(s => `<option value="${cleanId(s.id)}">${esc(s.name || 'Student')}</option>`).join('')
+        : `<option value="">No linked students</option>`;
+      if (previousStudentId && safeStudents.some(s => cleanId(s.id) === previousStudentId)) {
+        studentSelect.value = previousStudentId;
+      }
+
+      newDaySelect.innerHTML = WEEKDAY_KEYS.map((key, idx) => `<option value="${idx}">${esc(t(key))}</option>`).join('');
+
+      const refreshSlotOptions = () => {
+        const studentId = cleanId(studentSelect.value || '');
+        const student = safeStudents.find(s => cleanId(s.id) === studentId);
+        const slots = student ? getScheduleSlots(student) : [];
+        const uniqueSlotMap = new Map();
+        slots.forEach(slot => {
+          const day = Number(slot.dayOfWeek);
+          const time = normalizeTimeValue(slot.startTime || '');
+          if (!Number.isFinite(day) || !time) return;
+          const key = `${day}|${time}`;
+          if (!uniqueSlotMap.has(key)) uniqueSlotMap.set(key, slot);
+        });
+        const slotOptions = [...uniqueSlotMap.entries()];
+        oldSlotSelect.innerHTML = slotOptions.length
+          ? slotOptions.map(([key, slot]) => `<option value="${esc(key)}">${esc(formatScheduleSlotLabel(slot))}</option>`).join('')
+          : `<option value="">No recurring slots configured</option>`;
+        const selected = parseScheduleSlotSelection(oldSlotSelect.value);
+        if (selected) {
+          newDaySelect.value = String(selected.day);
+          newTimeInput.value = selected.time;
+        } else {
+          newDaySelect.value = '1';
+          newTimeInput.value = '16:00';
+        }
+      };
+
+      refreshSlotOptions();
+
+      studentSelect.onchange = () => {
+        refreshSlotOptions();
+        setStatus('', 'slate');
+      };
+      oldSlotSelect.onchange = () => {
+        const selected = parseScheduleSlotSelection(oldSlotSelect.value);
+        if (!selected) return;
+        newDaySelect.value = String(selected.day);
+        newTimeInput.value = selected.time;
+      };
+
+      studentSelect.disabled = !safeStudents.length || writeLocked;
+      oldSlotSelect.disabled = !safeStudents.length || writeLocked;
+      newDaySelect.disabled = !safeStudents.length || writeLocked;
+      newTimeInput.disabled = !safeStudents.length || writeLocked;
+      applyBtn.disabled = !safeStudents.length || writeLocked;
+      applyBtn.title = writeLocked ? 'Temporarily disabled during maintenance restricted mode.' : '';
+
+      applyBtn.onclick = async () => {
+        if (!guardMaintenanceWrite('Recurring schedule update')) return;
+        if (!isSupabaseReady() || !supabaseSession?.access_token) {
+          setStatus(t('alert.sign_in_again'), 'error');
+          return;
+        }
+        const studentId = cleanId(studentSelect.value || '');
+        const slot = parseScheduleSlotSelection(oldSlotSelect.value);
+        const newDay = Number(newDaySelect.value);
+        const newTime = normalizeTimeValue(newTimeInput.value || '');
+
+        if (!studentId || !slot || !Number.isFinite(newDay) || newDay < 0 || newDay > 6 || !newTime) {
+          setStatus('Select a valid student, old slot, and new day/time.', 'error');
+          return;
+        }
+
+        applyBtn.disabled = true;
+        setStatus('Applying recurring slot change...');
+        try {
+          const { data, error } = await supabaseClient.functions.invoke('bulk-reschedule-sessions', {
+            body: {
+              student_id: studentId,
+              old_day_of_week: slot.day,
+              old_start_time: slot.time,
+              new_day_of_week: newDay,
+              new_start_time: newTime
+            },
+            headers: { Authorization: `Bearer ${supabaseSession.access_token}` }
+          });
+          if (error) {
+            const meta = await getEdgeInvokeErrorMeta(error, 'Bulk reschedule failed');
+            throw new Error(meta.message || 'Bulk reschedule failed');
+          }
+          if (!data?.success) throw new Error(data?.error || 'Bulk reschedule failed');
+
+          const updates = Array.isArray(data.updated_sessions) ? data.updated_sessions : [];
+          updates.forEach(update => {
+            const sess = state.sessions.find(s => cleanId(s.id) === cleanId(update.id));
+            if (!sess) return;
+            sess.date = update.date || sess.date;
+            sess.startTime = normalizeTimeValue(update.start_time || sess.startTime || '');
+            sess.status = normalizeSessionStatus(update.status || sess.status || '', getSessionStatus(sess));
+            sess.pendingReviewStartedAt = update.pending_review_started_at || '';
+            if (sess.status === SESSION_STATUS.SCHEDULED || sess.status === SESSION_STATUS.RESTORED) {
+              sess.completed = false;
+              sess.attended = false;
+            }
+          });
+
+          const student = state.students.find(s => cleanId(s.id) === studentId);
+          if (student && Array.isArray(data.updated_schedule_slots)) {
+            const fallbackTimezone = student.scheduleTimezone || student.schedule_timezone || DEFAULT_TIMEZONE;
+            const normalizedSlots = normalizeScheduleSlots(data.updated_schedule_slots || [], fallbackTimezone);
+            if (normalizedSlots.length) {
+              student.scheduleSlots = normalizedSlots;
+              student.schedule_slots = serializeScheduleSlots(normalizedSlots, fallbackTimezone);
+              const days = getScheduleDaysFromSlots(normalizedSlots);
+              student.scheduleDays = days;
+              student.schedule_days = days;
+              student.preferredTime = normalizedSlots[0]?.startTime || student.preferredTime || '';
+              student.preferred_time = student.preferredTime;
+            }
+          }
+
+          const movedCount = Number(data.moved_count || 0) || 0;
+          const conflictPushes = Number(data.conflict_pushes || 0) || 0;
+          const summary = movedCount
+            ? `Updated ${movedCount} upcoming lesson${movedCount === 1 ? '' : 's'}${conflictPushes ? ` (pushed ${conflictPushes} week${conflictPushes === 1 ? '' : 's'} due to conflicts)` : ''}.`
+            : (data.message || 'No upcoming lessons in the selected slot were found.');
+          setStatus(summary, 'success');
+          renderParentPortal();
+        } catch (err) {
+          console.warn('Bulk reschedule failed', err);
+          setStatus(err?.message || 'Bulk reschedule failed.', 'error');
+        } finally {
+          applyBtn.disabled = !safeStudents.length || writeLocked;
+        }
+      };
+    }
+
     function renderParentPortal() {
       const parent = tourMode ? getTourParent() : getParentProfileBySession();
       const maintenanceWriteLocked = isMaintenanceGracefulWriteBlocked();
@@ -8209,6 +8544,8 @@
       }
       updateParentProfilePrompt(parent);
       updateParentEmailOptInCard(parent);
+      renderParentCodeTools(parent, students);
+      renderParentBulkRescheduleTools(parent, students);
       const guideCard = document.getElementById('parentGuideCard');
       const guideSummary = document.getElementById('parentGuideSummary');
       const guideSteps = document.getElementById('parentGuideSteps');
