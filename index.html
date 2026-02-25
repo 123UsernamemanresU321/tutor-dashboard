@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <title>Tutor Control Center – Physics • Chemistry • Maths</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' https: data: blob:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://js.hcaptcha.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.deepseek.com; frame-src https://hcaptcha.com https://*.hcaptcha.com https://8x8.vc https://*.8x8.vc;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' https: data: blob:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://js.hcaptcha.com https://static.cloudflareinsights.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.deepseek.com https://cloudflareinsights.com https://*.cloudflareinsights.com; frame-src https://hcaptcha.com https://*.hcaptcha.com https://8x8.vc https://*.8x8.vc;">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -15613,10 +15613,16 @@
               ${esc(isEdit ? t('common.save_changes') : t('sessions.add_title'))}
             </button>
             ${isEdit ? `
-              <button type="button" id="deleteSessionBtn"
-                class="px-3 py-1.5 rounded-xl border border-rose-300 text-rose-700 text-xs">
-                ${esc(t('sessions.void'))}
-              </button>` : ''}
+              <div class="flex items-center gap-2">
+                <button type="button" id="voidSessionBtn"
+                  class="px-3 py-1.5 rounded-xl border border-amber-300 text-amber-700 text-xs">
+                  ${esc(t('sessions.void'))}
+                </button>
+                <button type="button" id="deleteSessionBtn"
+                  class="px-3 py-1.5 rounded-xl border border-rose-300 text-rose-700 text-xs">
+                  ${esc(t('common.delete'))}
+                </button>
+              </div>` : ''}
           </div>
           <div id="sessionClashWarning" class="mt-2 text-[10px] text-amber-600"></div>
         </form>
@@ -16035,7 +16041,7 @@
         };
 
         if (isEdit) {
-          document.getElementById('deleteSessionBtn').onclick = () => {
+          document.getElementById('voidSessionBtn').onclick = () => {
             if (!confirm(t('confirm.void_session'))) return;
             const idx = state.sessions.findIndex(s => s.id === session.id);
             if (idx >= 0) {
@@ -16082,6 +16088,21 @@
               closeModal();
               renderScheduleView();
               renderStudentsView();
+            }
+          };
+          document.getElementById('deleteSessionBtn').onclick = async () => {
+            if (!confirm(t('confirm.delete_session'))) return;
+            const currentSession = getSessionById(session.id);
+            if (!currentSession) return;
+            try {
+              await deleteSessionAndLinks(session.id, { skipCancellation: true });
+              logActivity('Deleted session', `${currentSession.date || ''} ${currentSession.startTime || ''}`.trim());
+              closeModal();
+              renderScheduleView();
+              renderStudentsView();
+            } catch (err) {
+              console.error('Session delete failed', err);
+              alert(t('alert.delete_failed_error', { error: err?.message || err }));
             }
           };
         }
@@ -16137,23 +16158,54 @@
       // remove locally
       const sess = getSessionById(sessionId);
       const linkedInvoiceId = cleanId(sess?.invoiceId || '');
+      const linkedInvoice = linkedInvoiceId ? getInvoiceById(linkedInvoiceId) : null;
+      const linkedInvoiceType = String(
+        linkedInvoice?.invoiceType || linkedInvoice?.invoice_type || '',
+      ).toLowerCase();
+      if (linkedInvoice && isInvoiceLocked(linkedInvoice)) {
+        throw new Error(
+          'This session is linked to a paid/locked invoice. Use "Void session" instead.',
+        );
+      }
       if (sess && !skipCancellation) {
-        const start = new Date(sess.date + 'T' + (sess.startTime || '00:00'));
         recordSessionCancellation(sess, 'cancelled');
       }
-      state.sessions = state.sessions.filter(s => s.id !== sessionId);
-      const deletedSessionId = cleanId(sessionId);
+      const remainingSessions = state.sessions.filter(s => s.id !== sessionId);
       const invoiceStillReferenced = new Set(
-        state.sessions
+        remainingSessions
           .map(s => cleanId(s.invoiceId || ''))
           .filter(Boolean)
       );
-      const shouldDeleteLinkedInvoice = !!linkedInvoiceId && !invoiceStillReferenced.has(linkedInvoiceId);
-      state.invoices = state.invoices.filter(inv => {
+      const removableInvoiceIds = new Set();
+      state.invoices.forEach(inv => {
         const invId = cleanId(inv.id || '');
         const relatedSessionId = cleanId(inv.relatedSessionId || inv.related_session_id || '');
-        if (relatedSessionId && relatedSessionId === deletedSessionId) return false;
-        if (shouldDeleteLinkedInvoice && invId === linkedInvoiceId) return false;
+        if (!invId || !relatedSessionId || relatedSessionId !== cleanId(sessionId)) return;
+        if (isInvoiceLocked(inv)) return;
+        removableInvoiceIds.add(invId);
+      });
+      const shouldDeleteLinkedInvoice = (
+        !!linkedInvoiceId &&
+        !invoiceStillReferenced.has(linkedInvoiceId) &&
+        linkedInvoiceType !== 'monthly'
+      );
+      if (shouldDeleteLinkedInvoice) {
+        const inv = getInvoiceById(linkedInvoiceId);
+        if (inv && !isInvoiceLocked(inv)) removableInvoiceIds.add(linkedInvoiceId);
+      }
+
+      state.sessions = state.sessions.filter(s => s.id !== sessionId);
+      const deletedSessionId = cleanId(sessionId);
+      state.sessionCancellations = state.sessionCancellations.filter(c => {
+        const cancelSessionId = cleanId(c.sessionId || c.session_id || '');
+        const cancelInvoiceId = cleanId(c.invoiceId || c.invoice_id || '');
+        if (cancelSessionId && cancelSessionId === deletedSessionId) return false;
+        if (linkedInvoiceId && cancelInvoiceId && cancelInvoiceId === linkedInvoiceId) return false;
+        return true;
+      });
+      state.invoices = state.invoices.filter(inv => {
+        const invId = cleanId(inv.id || '');
+        if (removableInvoiceIds.has(invId)) return false;
         return true;
       });
       saveState();
@@ -16175,11 +16227,10 @@
         throwIfError(linkErr, 'Delete failed for session_students');
         const { error: sessErr } = await supabaseClient.from('lesson_sessions').delete().eq('id', sessionId);
         throwIfError(sessErr, 'Delete failed for lesson_sessions');
-        const { error: invByRelatedErr } = await supabaseClient.from('invoices').delete().eq('related_session_id', sessionId);
-        throwIfError(invByRelatedErr, 'Delete failed for invoices by related_session_id');
-        if (shouldDeleteLinkedInvoice) {
-          const { error: invByIdErr } = await supabaseClient.from('invoices').delete().eq('id', linkedInvoiceId);
-          throwIfError(invByIdErr, 'Delete failed for invoices by id');
+        const removableIds = Array.from(removableInvoiceIds).filter(Boolean);
+        if (removableIds.length) {
+          const { error: invErr } = await supabaseClient.from('invoices').delete().in('id', removableIds);
+          throwIfError(invErr, 'Delete failed for invoices');
         }
       }
       await pruneOrphanInvoices({ persistRemote: isSupabaseReady() && isOwner(), skipSave: true });
