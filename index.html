@@ -1596,11 +1596,13 @@
                 <ul id="overdueInvoicesList" class="space-y-2 text-[11px]"></ul>
                 <div class="mt-3 space-y-2" data-owner-only>
                   <button id="sendOverdueReminderEmailsBtn"
-                    class="portal-cta-btn portal-cta-pay portal-cta-btn-block text-[11px]">
+                    class="portal-cta-btn portal-cta-pay portal-cta-btn-block text-[11px]"
+                    data-i18n="finance.send_overdue_emails">
                     Send overdue reminder emails
                   </button>
                   <button id="sendOverdueReminderTestEmailBtn"
-                    class="portal-cta-btn portal-cta-subtle portal-cta-btn-block text-[11px]">
+                    class="portal-cta-btn portal-cta-subtle portal-cta-btn-block text-[11px]"
+                    data-i18n="finance.send_test_overdue_email">
                     Send test reminder email (eh8125809@gmail.com)
                   </button>
                   <div id="sendOverdueReminderEmailsStatus" class="hidden text-[10px] rounded-lg border px-2 py-1"></div>
@@ -1977,6 +1979,27 @@
                 <div class="text-[10px] text-slate-500" data-i18n="profile.refunds_notice">Refunds and cancellations are covered in the Terms.</div>
               </div>
 
+              <div id="profileStudentEmailCard" class="card p-5 space-y-3 hidden">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-sm font-semibold" data-i18n="profile.student_contact_email">Student contact email</h3>
+                  <span class="text-[10px] px-2 py-0.5 rounded-full bg-sky-100 text-sky-700" data-i18n="profile.student_notifications">Invoice reminders</span>
+                </div>
+                <p class="text-[11px] text-slate-600" data-i18n="profile.student_contact_email_hint">
+                  Add an email to receive overdue invoice reminders when your parent/guardian enables student payment delegation.
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 items-end">
+                  <div>
+                    <div class="text-[11px] text-slate-500" data-i18n="profile.current_student_email">Current student email</div>
+                    <div id="profileStudentEmailValue" class="text-[12px] font-semibold">—</div>
+                  </div>
+                  <button id="profileStudentEmailEditBtn"
+                    class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-[11px]">
+                    <span data-i18n="profile.update_student_email">Update email</span>
+                  </button>
+                </div>
+                <div id="profileStudentEmailStatus" class="text-[11px] text-slate-600 hidden"></div>
+              </div>
+
               <div class="card p-5 space-y-3 border border-rose-200 bg-rose-50">
                 <div class="flex items-center justify-between">
                   <h3 class="text-sm font-semibold text-rose-700" data-i18n="profile.delete_account">Delete account</h3>
@@ -2018,11 +2041,11 @@
               <ul id="portalBusyList" class="mt-2 space-y-1 text-[11px]"></ul>
             </div>
             <div id="studentPortalPanelNav" class="card p-3 space-y-2">
-              <div class="text-[11px] font-semibold text-slate-700">Quick navigation</div>
+              <div class="text-[11px] font-semibold text-slate-700" data-i18n="portal.quick_navigation">Quick navigation</div>
               <div class="flex flex-wrap gap-2">
-                <button data-student-portal-panel-target="learning" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Learning</button>
-                <button data-student-portal-panel-target="billing" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Billing</button>
-                <button data-student-portal-panel-target="support" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Support</button>
+                <button data-student-portal-panel-target="learning" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]" data-i18n="panel.learning">Learning</button>
+                <button data-student-portal-panel-target="billing" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]" data-i18n="panel.billing">Billing</button>
+                <button data-student-portal-panel-target="support" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]" data-i18n="panel.support">Support</button>
               </div>
             </div>
 
@@ -2147,12 +2170,12 @@
               </button>
             </div>
             <div id="parentPortalPanelNav" class="card p-3 space-y-2">
-              <div class="text-[11px] font-semibold text-slate-700">Quick navigation</div>
+              <div class="text-[11px] font-semibold text-slate-700" data-i18n="portal.quick_navigation">Quick navigation</div>
               <div class="flex flex-wrap gap-2">
-                <button data-parent-portal-panel-target="overview" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Overview</button>
-                <button data-parent-portal-panel-target="learning" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Learning</button>
-                <button data-parent-portal-panel-target="billing" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Billing</button>
-                <button data-parent-portal-panel-target="support" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Support</button>
+                <button data-parent-portal-panel-target="overview" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]" data-i18n="panel.overview">Overview</button>
+                <button data-parent-portal-panel-target="learning" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]" data-i18n="panel.learning">Learning</button>
+                <button data-parent-portal-panel-target="billing" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]" data-i18n="panel.billing">Billing</button>
+                <button data-parent-portal-panel-target="support" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]" data-i18n="panel.support">Support</button>
               </div>
             </div>
             <div id="parentProfilePrompt" class="card p-4 hidden" data-parent-portal-panel="overview">
@@ -2183,14 +2206,14 @@
               <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div>
                   <div class="text-sm font-semibold text-sky-900 flex items-center gap-2">
-                    <span>Student payment delegation</span>
+                    <span data-i18n="parent.student_payment_delegation">Student payment delegation</span>
                     <span id="parentStudentPaymentsState" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">—</span>
                   </div>
                   <div id="parentStudentPaymentsText" class="text-[11px] text-sky-800"></div>
                 </div>
                 <button id="parentStudentPaymentsBtn"
                   class="portal-cta-btn portal-cta-subtle text-[11px] w-full sm:w-auto">
-                  Manage
+                  <span data-i18n="common.edit">Manage</span>
                 </button>
               </div>
             </div>
@@ -6928,8 +6951,12 @@
       const sessMeta = document.getElementById('profileSessionMeta');
       const businessEmailEl = document.getElementById('businessContactEmail');
       const businessPaymentEl = document.getElementById('businessPaymentProvider');
+      const studentCard = document.getElementById('profileStudentEmailCard');
+      const studentEmailValue = document.getElementById('profileStudentEmailValue');
+      const studentEditBtn = document.getElementById('profileStudentEmailEditBtn');
       if (businessEmailEl) businessEmailEl.textContent = SUPPORT_EMAIL || '—';
       if (businessPaymentEl) businessPaymentEl.textContent = 'PayFast';
+      if (studentCard) studentCard.classList.add('hidden');
       if (!user) {
         if (tourMode) {
           if (emailEl) emailEl.textContent = 'tour@demo.local';
@@ -6980,6 +7007,21 @@
         } else {
           badge.textContent = t('profile.unverified');
           badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700';
+        }
+      }
+
+      if (studentMode) {
+        const student = getStudentProfileBySession();
+        if (studentCard) studentCard.classList.remove('hidden');
+        if (studentEmailValue) {
+          const email = String(student?.studentEmail || student?.student_email || '').trim();
+          studentEmailValue.textContent = email || t('common.na');
+        }
+        if (studentEditBtn) {
+          const writeLocked = isMaintenanceGracefulWriteBlocked();
+          studentEditBtn.disabled = writeLocked;
+          studentEditBtn.title = writeLocked ? t('maintenance.write_locked_hint') : '';
+          studentEditBtn.onclick = () => openStudentSelfProfileModal(student);
         }
       }
     }
@@ -8030,10 +8072,10 @@
           paymentStatusEl.textContent = '';
           paymentStatusEl.className = 'text-[10px] text-slate-500';
         } else if (!paymentDelegation.allowed) {
-          paymentStatusEl.textContent = 'Student payments are currently disabled by your parent/guardian. Ask them to enable student payment delegation in the parent portal.';
+          paymentStatusEl.textContent = t('portal.student_payment_disabled');
           paymentStatusEl.className = 'text-[10px] text-rose-700';
         } else {
-          paymentStatusEl.textContent = 'You can pay unpaid invoices directly from this list.';
+          paymentStatusEl.textContent = t('portal.student_payment_enabled');
           paymentStatusEl.className = 'text-[10px] text-emerald-700';
         }
       }
@@ -8045,9 +8087,9 @@
           const canPayThisInvoice = invoiceRequiresPayment(inv);
           const payAction = canPayThisInvoice
             ? (!paymentDelegation.allowed
-              ? `<button class="portal-cta-btn portal-cta-subtle portal-cta-btn-block cursor-not-allowed opacity-70" disabled title="Parent/guardian approval required for student payments.">Parent approval required</button>`
+              ? `<button class="portal-cta-btn portal-cta-subtle portal-cta-btn-block cursor-not-allowed opacity-70" disabled title="${esc(t('portal.parent_approval_required_hint'))}">${esc(t('portal.parent_approval_required_short'))}</button>`
               : maintenanceWriteLocked
-                ? `<button class="portal-cta-btn portal-cta-subtle portal-cta-btn-block cursor-not-allowed opacity-70" disabled title="Temporarily disabled during maintenance restricted mode.">${esc(t('invoice.pay_now'))}</button>`
+                ? `<button class="portal-cta-btn portal-cta-subtle portal-cta-btn-block cursor-not-allowed opacity-70" disabled title="${esc(t('maintenance.restricted_mode_hint'))}">${esc(t('invoice.pay_now'))}</button>`
                 : `<button class="portal-cta-btn portal-cta-pay portal-cta-btn-block" onclick="startPayfastPayment('${safeInvId}')" aria-label="Pay invoice ${esc(inv.id)} now">${esc(t('invoice.pay_now'))}</button>`)
             : '';
           return `
@@ -8207,8 +8249,103 @@
       } catch { }
     }
 
+    function setProfileStudentEmailStatus(message = '', tone = 'info') {
+      const statusEl = document.getElementById('profileStudentEmailStatus');
+      if (!statusEl) return;
+      if (!message) {
+        statusEl.textContent = '';
+        statusEl.className = 'text-[11px] text-slate-600 hidden';
+        return;
+      }
+      statusEl.textContent = message;
+      statusEl.className = 'text-[11px]';
+      if (tone === 'success') statusEl.classList.add('text-emerald-700');
+      else if (tone === 'error') statusEl.classList.add('text-rose-700');
+      else statusEl.classList.add('text-slate-600');
+      statusEl.classList.remove('hidden');
+    }
+
+    function openStudentSelfProfileModal(initialStudent = null) {
+      if (!guardMaintenanceWrite(t('profile.student_email_title'))) return;
+      const student = initialStudent || getStudentProfileBySession();
+      if (!student) {
+        alert(t('portal.no_student_linked'));
+        return;
+      }
+      const currentEmail = normalizePersonValue(student.studentEmail || student.student_email || '').toLowerCase();
+      const html = `
+        <h2 class="text-sm font-semibold mb-1">${esc(t('profile.student_email_title'))}</h2>
+        <p class="text-[11px] text-slate-500 mb-3">${esc(t('profile.student_email_hint'))}</p>
+        <form id="studentSelfProfileForm" class="space-y-2 text-xs">
+          <div>
+            <label class="block text-[11px] mb-1">${esc(t('form.email_optional'))}</label>
+            <input name="email" value="${esc(currentEmail)}" placeholder="${esc(t('form.email_placeholder'))}" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+          </div>
+          <div id="studentSelfProfileStatus" class="text-[10px] text-rose-600"></div>
+          <div class="flex justify-end gap-2 mt-3">
+            <button type="button" id="studentSelfProfileCancelBtn" class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs">${esc(t('common.dismiss'))}</button>
+            <button id="studentSelfProfileSaveBtn" type="submit" class="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-medium">${esc(t('common.save'))}</button>
+          </div>
+        </form>
+      `;
+      openModal(html, () => {
+        const form = document.getElementById('studentSelfProfileForm');
+        const status = document.getElementById('studentSelfProfileStatus');
+        const saveBtn = document.getElementById('studentSelfProfileSaveBtn');
+        const cancelBtn = document.getElementById('studentSelfProfileCancelBtn');
+        if (cancelBtn) cancelBtn.onclick = () => closeModal();
+        if (!form) return;
+        form.onsubmit = async (e) => {
+          e.preventDefault();
+          if (status) status.textContent = '';
+          const email = normalizePersonValue(form.email.value).toLowerCase();
+          if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+            if (status) status.textContent = t('form.error_valid_email');
+            return;
+          }
+          if (email && email.endsWith(CODE_EMAIL_SUFFIX)) {
+            if (status) status.textContent = t('profile.student_email_invalid_domain');
+            return;
+          }
+          if (!supabaseSession?.access_token || !isSupabaseReady()) {
+            if (status) status.textContent = t('alert.sign_in_first');
+            return;
+          }
+          if (saveBtn) saveBtn.disabled = true;
+          try {
+            const { data, error } = await supabaseClient.functions.invoke('update-student-profile', {
+              body: { student_email: email || null },
+              headers: { Authorization: `Bearer ${supabaseSession.access_token}` }
+            });
+            if (error) {
+              const meta = await getEdgeInvokeErrorMeta(error, t('profile.student_email_update_failed'));
+              throw new Error(meta.message || t('profile.student_email_update_failed'));
+            }
+            const updated = data?.student || {};
+            const nextEmail = String(updated.student_email || email || '').trim().toLowerCase();
+            student.studentEmail = nextEmail;
+            student.student_email = nextEmail;
+            closeModal();
+            setProfileStudentEmailStatus(t('profile.student_email_update_success'), 'success');
+            renderProfileView();
+            renderStudentPortal();
+          } catch (err) {
+            console.warn('Student profile update failed', err);
+            const rawMessage = String(err?.message || '');
+            let message = rawMessage || t('profile.student_email_update_failed');
+            if (/invalid email/i.test(rawMessage)) message = t('form.error_valid_email');
+            else if (/@codes\.tutor/i.test(rawMessage)) message = t('profile.student_email_invalid_domain');
+            if (status) status.textContent = message;
+            setProfileStudentEmailStatus(message, 'error');
+          } finally {
+            if (saveBtn) saveBtn.disabled = false;
+          }
+        };
+      });
+    }
+
     function openParentSelfProfileModal(parent, opts = {}) {
-      if (!opts?.allowMaintenanceBypass && !guardMaintenanceWrite('Profile updates')) return;
+      if (!opts?.allowMaintenanceBypass && !guardMaintenanceWrite(t('profile.account'))) return;
       if (!parent) {
         alert(t('parent.profile_not_found'));
         return;
@@ -8240,8 +8377,8 @@
             <label class="flex items-start gap-3 text-[12px] text-slate-800 cursor-pointer">
               <input type="checkbox" name="emailNotificationsOptIn" ${currentEmailOptIn ? 'checked' : ''} class="mt-0.5 h-5 w-5 accent-indigo-600">
               <span>
-                <span class="font-semibold">Enable service email notices</span>
-                <span class="block text-[11px] text-slate-600 mt-0.5">Receive invoices, overdue reminders, lesson/schedule updates, and policy/domain notices.</span>
+                <span class="font-semibold">${t('parent.email_notices_enable')}</span>
+                <span class="block text-[11px] text-slate-600 mt-0.5">${t('parent.email_notices_enable_hint')}</span>
               </span>
             </label>
           </div>
@@ -8249,8 +8386,8 @@
             <label class="flex items-start gap-3 text-[12px] text-slate-800 cursor-pointer">
               <input type="checkbox" name="allowStudentPayments" ${currentAllowStudentPayments ? 'checked' : ''} class="mt-0.5 h-5 w-5 accent-indigo-600">
               <span>
-                <span class="font-semibold">Allow linked students to pay invoices</span>
-                <span class="block text-[11px] text-slate-600 mt-0.5">When enabled, your linked student account can open PayFast checkout for their own invoices.</span>
+                <span class="font-semibold">${t('parent.allow_student_payments')}</span>
+                <span class="block text-[11px] text-slate-600 mt-0.5">${t('parent.allow_student_payments_hint')}</span>
               </span>
             </label>
           </div>
@@ -8297,7 +8434,7 @@
           const emailNotificationsOptIn = !!form.emailNotificationsOptIn?.checked;
           const allowStudentPayments = !!form.allowStudentPayments?.checked;
           if (email && !emailNotificationsOptIn) {
-            if (status) status.textContent = 'Please confirm email consent to receive service emails.';
+            if (status) status.textContent = t('parent.email_consent_required');
             return;
           }
           const phone = buildPhoneValue(form.phoneCode.value, form.phoneLocal.value);
@@ -8388,7 +8525,7 @@
       if (completeBtn) {
         completeBtn.onclick = () => openParentSelfProfileModal(parent);
         completeBtn.disabled = writeLocked;
-        completeBtn.title = writeLocked ? 'Temporarily disabled during maintenance restricted mode.' : '';
+        completeBtn.title = writeLocked ? t('maintenance.write_locked_hint') : '';
       }
       if (!promptCard) return;
       if (!parent) {
@@ -8419,7 +8556,7 @@
       if (btn) {
         btn.onclick = () => openParentSelfProfileModal(parent);
         btn.disabled = writeLocked;
-        btn.title = writeLocked ? 'Temporarily disabled during maintenance restricted mode.' : '';
+        btn.title = writeLocked ? t('maintenance.write_locked_hint') : '';
       }
       if (!card) return;
       if (!parent) {
@@ -8434,11 +8571,11 @@
       }
       if (textEl) {
         textEl.textContent = email
-          ? 'Enable service email notices to receive invoice reminders, schedule updates, and policy/domain notices.'
-          : 'Add an email address and enable service email notices so you do not miss invoice or schedule updates.';
+          ? t('parent.email_notices_enable_hint')
+          : t('parent.email_notices_add_email_hint');
       }
       if (btn) {
-        btn.textContent = email ? 'Enable now' : 'Add email';
+        btn.textContent = email ? t('parent.enable_now') : t('parent.add_email');
       }
       card.classList.remove('hidden');
     }
@@ -8452,7 +8589,7 @@
       if (btn) {
         btn.onclick = () => openParentSelfProfileModal(parent);
         btn.disabled = writeLocked;
-        btn.title = writeLocked ? 'Temporarily disabled during maintenance restricted mode.' : '';
+        btn.title = writeLocked ? t('maintenance.write_locked_hint') : '';
       }
       if (!card) return;
       if (!parent) {
@@ -8461,18 +8598,18 @@
       }
       const allowStudentPayments = parent.allowStudentPayments !== false;
       if (stateEl) {
-        stateEl.textContent = allowStudentPayments ? 'Enabled' : 'Disabled';
+        stateEl.textContent = allowStudentPayments ? t('common.enabled') : t('common.disabled');
         stateEl.className = allowStudentPayments
           ? 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700'
           : 'text-[10px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-700';
       }
       if (textEl) {
         textEl.textContent = allowStudentPayments
-          ? 'Linked students can pay unpaid invoices from the student portal.'
-          : 'Linked students currently cannot pay invoices. Enable delegation if you want them to pay their own invoices from the student portal.';
+          ? t('parent.student_payments_enabled_summary')
+          : t('parent.student_payments_disabled_summary');
       }
       if (btn) {
-        btn.textContent = allowStudentPayments ? 'Review setting' : 'Enable delegation';
+        btn.textContent = allowStudentPayments ? t('parent.review_setting') : t('parent.enable_delegation');
       }
       card.classList.remove('hidden');
     }
@@ -8484,7 +8621,7 @@
           key: `parent:${cleanId(parent.id)}`,
           role: 'parent',
           id: cleanId(parent.id),
-          label: `${parent.name || 'Parent account'} (Parent)`,
+          label: `${parent.name || t('role.parent')} (${t('role.parent')})`,
           code: normalizeCode(parent.loginCode || parent.login_code || '')
         });
       }
@@ -8494,7 +8631,7 @@
           key: `student:${cleanId(student.id)}`,
           role: 'student',
           id: cleanId(student.id),
-          label: `${student.name || 'Student'} (Student)`,
+          label: `${student.name || t('role.student')} (${t('role.student')})`,
           code: normalizeCode(student.loginCode || student.login_code || '')
         });
       });
@@ -8525,7 +8662,7 @@
       const previousValue = selectEl.value;
       selectEl.innerHTML = targets.length
         ? targets.map(target => `<option value="${esc(target.key)}">${esc(target.label)}${target.code ? ` • ${esc(target.code)}` : ''}</option>`).join('')
-        : `<option value="">No linked accounts</option>`;
+        : `<option value="">${esc(t('parent.no_linked_students'))}</option>`;
       if (targets.some(target => target.key === previousValue)) {
         selectEl.value = previousValue;
       }
@@ -8533,7 +8670,7 @@
       if (refreshBtn) refreshBtn.onclick = () => renderParentCodeTools(parent, students);
 
       regenerateBtn.disabled = !targets.length || writeLocked;
-      regenerateBtn.title = writeLocked ? 'Temporarily disabled during maintenance restricted mode.' : '';
+      regenerateBtn.title = writeLocked ? t('maintenance.write_locked_hint') : '';
       selectEl.disabled = !targets.length || writeLocked;
 
       if (copyBtn && resultValue) {
@@ -8548,14 +8685,14 @@
       }
 
       regenerateBtn.onclick = async () => {
-        if (!guardMaintenanceWrite('Login code update')) return;
+        if (!guardMaintenanceWrite(t('students.copy_code'))) return;
         if (!isSupabaseReady() || !supabaseSession?.access_token) {
           setParentCodeStatus(t('alert.sign_in_again'), 'error');
           return;
         }
         const selected = String(selectEl.value || '');
         if (!selected.includes(':')) {
-          setParentCodeStatus('Select an account first.', 'error');
+          setParentCodeStatus(t('alert.select_student_first'), 'error');
           return;
         }
         const [role, id] = selected.split(':');
@@ -8567,18 +8704,18 @@
         };
 
         regenerateBtn.disabled = true;
-        setParentCodeStatus('Generating code...');
+        setParentCodeStatus(t('sessions.ai_generating'));
         try {
           const { data, error } = await supabaseClient.functions.invoke('issue-login-code', {
             body,
             headers: { Authorization: `Bearer ${supabaseSession.access_token}` }
           });
           if (error) {
-            const meta = await getEdgeInvokeErrorMeta(error, 'Unable to regenerate login code');
-            throw new Error(meta.message || 'Unable to regenerate login code');
+            const meta = await getEdgeInvokeErrorMeta(error, t('alert.profile_update_failed_generic'));
+            throw new Error(meta.message || t('alert.profile_update_failed_generic'));
           }
           if (!data?.success || !data?.code) {
-            throw new Error(data?.error || 'Unable to regenerate login code');
+            throw new Error(data?.error || t('alert.profile_update_failed_generic'));
           }
           const newCode = normalizeCode(data.code);
           if (role === 'parent' && parent?.id === id) {
@@ -15043,11 +15180,11 @@
         return;
       }
       if (!isOwner()) {
-        alert('Only the owner account can send overdue reminder emails.');
+        alert(t('finance.owner_only_send_overdue'));
         return;
       }
 
-      const confirmSend = confirm('Send overdue reminder emails now to opted-in parents with valid emails?');
+      const confirmSend = confirm(t('finance.confirm_send_overdue_emails'));
       if (!confirmSend) return;
 
       const btn = document.getElementById('sendOverdueReminderEmailsBtn');
@@ -15055,9 +15192,9 @@
       overdueReminderSendInFlight = true;
       if (btn) {
         btn.disabled = true;
-        btn.textContent = 'Sending reminders...';
+        btn.textContent = t('finance.sending_overdue_emails');
       }
-      setOverdueReminderEmailStatus('Sending overdue reminders...', 'info');
+      setOverdueReminderEmailStatus(t('finance.sending_overdue_emails_status'), 'info');
 
       try {
         const { data, error } = await supabaseClient.functions.invoke('send-overdue-invoice-reminders', {
@@ -15066,7 +15203,7 @@
         });
         if (error) {
           const ctx = error?.context || {};
-          let message = error?.message || 'Failed to send overdue reminders.';
+          let message = error?.message || t('finance.send_overdue_failed');
           if (ctx.body) {
             try {
               const parsed = typeof ctx.body === 'string' ? JSON.parse(ctx.body) : ctx.body;
@@ -15083,17 +15220,21 @@
           + Number(skipped?.invalid_email || 0)
           + Number(skipped?.opt_out || 0)
           + Number(skipped?.cooldown || 0);
-        const summary = `Done. Sent: ${sent}. Failed: ${failed}. Skipped: ${skippedTotal}.`;
+        const summary = t('finance.send_overdue_summary', {
+          sent,
+          failed,
+          skipped: skippedTotal
+        });
         setOverdueReminderEmailStatus(summary, failed > 0 ? 'error' : 'success');
-        logActivity('Sent overdue reminder emails', summary);
+        logActivity(t('finance.activity_sent_overdue_emails'), summary);
       } catch (err) {
         console.error('Overdue reminder send failed', err);
-        setOverdueReminderEmailStatus(err?.message || 'Failed to send overdue reminders.', 'error');
+        setOverdueReminderEmailStatus(err?.message || t('finance.send_overdue_failed'), 'error');
       } finally {
         overdueReminderSendInFlight = false;
         if (btn) {
           btn.disabled = false;
-          btn.textContent = 'Send overdue reminder emails';
+          btn.textContent = t('finance.send_overdue_emails');
         }
       }
     }
@@ -15106,11 +15247,11 @@
         return;
       }
       if (!isOwner()) {
-        alert('Only the owner account can send test reminder emails.');
+        alert(t('finance.owner_only_send_test_overdue'));
         return;
       }
 
-      const confirmSend = confirm('Send a test overdue reminder email to eh8125809@gmail.com now?');
+      const confirmSend = confirm(t('finance.confirm_send_test_overdue_email'));
       if (!confirmSend) return;
 
       const btn = document.getElementById('sendOverdueReminderTestEmailBtn');
@@ -15118,9 +15259,9 @@
       overdueReminderTestSendInFlight = true;
       if (btn) {
         btn.disabled = true;
-        btn.textContent = 'Sending test email...';
+        btn.textContent = t('finance.sending_test_overdue_email');
       }
-      setOverdueReminderEmailStatus('Sending test reminder email...', 'info');
+      setOverdueReminderEmailStatus(t('finance.sending_test_overdue_status'), 'info');
 
       try {
         const { data, error } = await supabaseClient.functions.invoke('send-overdue-invoice-reminders', {
@@ -15129,7 +15270,7 @@
         });
         if (error) {
           const ctx = error?.context || {};
-          let message = error?.message || 'Failed to send test reminder email.';
+          let message = error?.message || t('finance.send_test_overdue_failed');
           if (ctx.body) {
             try {
               const parsed = typeof ctx.body === 'string' ? JSON.parse(ctx.body) : ctx.body;
@@ -15141,18 +15282,18 @@
         const debugEmail = String(data?.debug_target_email || 'eh8125809@gmail.com');
         const invoiceId = String(data?.invoice_id || '');
         const summary = invoiceId
-          ? `Test email sent to ${debugEmail} (invoice ${invoiceId}).`
-          : `Test email sent to ${debugEmail}.`;
+          ? t('finance.send_test_overdue_summary_with_invoice', { email: debugEmail, invoice: invoiceId })
+          : t('finance.send_test_overdue_summary', { email: debugEmail });
         setOverdueReminderEmailStatus(summary, 'success');
-        logActivity('Sent test overdue reminder email', summary);
+        logActivity(t('finance.activity_sent_test_overdue_email'), summary);
       } catch (err) {
         console.error('Overdue reminder test send failed', err);
-        setOverdueReminderEmailStatus(err?.message || 'Failed to send test reminder email.', 'error');
+        setOverdueReminderEmailStatus(err?.message || t('finance.send_test_overdue_failed'), 'error');
       } finally {
         overdueReminderTestSendInFlight = false;
         if (btn) {
           btn.disabled = false;
-          btn.textContent = 'Send test reminder email (eh8125809@gmail.com)';
+          btn.textContent = t('finance.send_test_overdue_email');
         }
       }
     }
@@ -15177,14 +15318,16 @@
       const reminderBtn = document.getElementById('sendOverdueReminderEmailsBtn');
       if (reminderBtn) {
         reminderBtn.disabled = readOnlyMode || overdueReminderSendInFlight || overdueReminderTestSendInFlight;
-        reminderBtn.textContent = overdueReminderSendInFlight ? 'Sending reminders...' : 'Send overdue reminder emails';
+        reminderBtn.textContent = overdueReminderSendInFlight
+          ? t('finance.sending_overdue_emails')
+          : t('finance.send_overdue_emails');
       }
       const reminderTestBtn = document.getElementById('sendOverdueReminderTestEmailBtn');
       if (reminderTestBtn) {
         reminderTestBtn.disabled = readOnlyMode || overdueReminderSendInFlight || overdueReminderTestSendInFlight;
         reminderTestBtn.textContent = overdueReminderTestSendInFlight
-          ? 'Sending test email...'
-          : 'Send test reminder email (eh8125809@gmail.com)';
+          ? t('finance.sending_test_overdue_email')
+          : t('finance.send_test_overdue_email');
       }
       const tbody = document.getElementById('financeStudentTable');
       if (!state.students.length) {
@@ -15477,7 +15620,6 @@
         await loadAccountEmails().catch(err => console.warn('Account email fetch failed', err));
       }
       const isEdit = !!student;
-      const emailOptions = getAvailableStudentEmails(student?.studentEmail).map(e => `<option value="${esc(e)}">${esc(e)}</option>`).join('');
 
       const existingCode = normalizeCode(student?.loginCode);
       const scheduleSlots = getScheduleSlots(student || {});
@@ -15519,6 +15661,13 @@
                    class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
           </div>
           <input type="hidden" name="loginCode" id="hiddenLoginCode" value="${esc(existingCode || '')}">
+          <div>
+            <label class="block text-[11px] mb-1">${esc(t('profile.student_contact_email'))}</label>
+            <input name="studentEmail" type="email" value="${esc(student?.studentEmail || student?.student_email || '')}"
+                   placeholder="${esc(t('form.email_optional'))}"
+                   class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            <div class="text-[10px] text-slate-500 mt-1">${esc(t('profile.student_contact_email_hint'))}</div>
+          </div>
           
           <div class="grid grid-cols-2 gap-2">
             <div>
@@ -15682,6 +15831,15 @@
         document.getElementById('studentForm').onsubmit = (e) => {
           e.preventDefault();
           const form = e.target;
+          const studentEmail = normalizePersonValue(form.studentEmail?.value || '').toLowerCase();
+          if (studentEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(studentEmail)) {
+            alert(t('form.error_valid_email'));
+            return;
+          }
+          if (studentEmail && studentEmail.endsWith(CODE_EMAIL_SUFFIX)) {
+            alert(t('profile.student_email_invalid_domain'));
+            return;
+          }
           const slotRows = [...form.querySelectorAll('.schedule-slot-row')];
           const scheduleTimezoneValue = (form.scheduleTimezone.value || DEFAULT_TIMEZONE).trim() || DEFAULT_TIMEZONE;
           const collectedSlots = [];
@@ -15709,7 +15867,7 @@
             rate: Number(form.rate.value || 0),
             subjects: form.subjects.value.split(',').map(s => s.trim()).filter(Boolean),
             notes: form.notes.value.trim(),
-            studentEmail: '', // No longer using explicit email linking here
+            studentEmail,
             loginCode: normalizeCode(form.loginCode?.value || student?.loginCode || ''), // Save the Code
             contractSigned: student?.contractSigned || false,
             contractSignedAt: student?.contractSignedAt || null,
