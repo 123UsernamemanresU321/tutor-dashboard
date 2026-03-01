@@ -1600,6 +1600,11 @@
                     data-i18n="finance.send_overdue_emails">
                     Send overdue reminder emails
                   </button>
+                  <button id="sendDueTodayReminderEmailsBtn"
+                    class="portal-cta-btn portal-cta-subtle portal-cta-btn-block text-[11px]"
+                    data-i18n="finance.send_due_today_emails">
+                    Send due-today reminder emails
+                  </button>
                   <button id="sendOverdueReminderTestEmailBtn"
                     class="portal-cta-btn portal-cta-subtle portal-cta-btn-block text-[11px]"
                     data-i18n="finance.send_test_overdue_email">
@@ -2617,6 +2622,7 @@
     let announcementShownInThisSession = false;
     let announcementAdminTicker = null;
     let overdueReminderSendInFlight = false;
+    let dueTodayReminderSendInFlight = false;
     let overdueReminderTestSendInFlight = false;
     let syncDebounceTimer = null;
     let syncInFlight = false;
@@ -5742,6 +5748,12 @@
       if (sendOverdueReminderEmailsBtn) {
         sendOverdueReminderEmailsBtn.addEventListener('click', () => {
           sendOverdueReminderEmails();
+        });
+      }
+      const sendDueTodayReminderEmailsBtn = document.getElementById('sendDueTodayReminderEmailsBtn');
+      if (sendDueTodayReminderEmailsBtn) {
+        sendDueTodayReminderEmailsBtn.addEventListener('click', () => {
+          sendDueTodayReminderEmails();
         });
       }
       const sendOverdueReminderTestEmailBtn = document.getElementById('sendOverdueReminderTestEmailBtn');
@@ -15197,7 +15209,7 @@
     }
 
     async function sendOverdueReminderEmails() {
-      if (overdueReminderSendInFlight) return;
+      if (overdueReminderSendInFlight || dueTodayReminderSendInFlight) return;
       if (!guardEdit()) return;
       if (!supabaseAvailable || !isSupabaseReady()) {
         alert(t('alert.sign_in_first'));
@@ -15263,8 +15275,75 @@
       }
     }
 
+    async function sendDueTodayReminderEmails() {
+      if (dueTodayReminderSendInFlight || overdueReminderSendInFlight) return;
+      if (!guardEdit()) return;
+      if (!supabaseAvailable || !isSupabaseReady()) {
+        alert(t('alert.sign_in_first'));
+        return;
+      }
+      if (!isOwner()) {
+        alert(t('finance.owner_only_send_due_today'));
+        return;
+      }
+
+      const confirmSend = confirm(t('finance.confirm_send_due_today_emails'));
+      if (!confirmSend) return;
+
+      const btn = document.getElementById('sendDueTodayReminderEmailsBtn');
+      const accessToken = requireAccessToken(t('alert.sign_in_first'));
+      dueTodayReminderSendInFlight = true;
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = t('finance.sending_due_today_emails');
+      }
+      setOverdueReminderEmailStatus(t('finance.sending_due_today_emails_status'), 'info');
+
+      try {
+        const { data, error } = await supabaseClient.functions.invoke('send-overdue-invoice-reminders', {
+          body: { dry_run: false, reminder_scope: 'due_today' },
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (error) {
+          const ctx = error?.context || {};
+          let message = error?.message || t('finance.send_due_today_failed');
+          if (ctx.body) {
+            try {
+              const parsed = typeof ctx.body === 'string' ? JSON.parse(ctx.body) : ctx.body;
+              message = parsed?.error || parsed?.message || message;
+            } catch (_) { }
+          }
+          throw new Error(message);
+        }
+
+        const sent = Number(data?.sent_count || 0);
+        const failed = Number(data?.failed_count || 0);
+        const skipped = data?.skipped || {};
+        const skippedTotal = Number(skipped?.no_email || 0)
+          + Number(skipped?.invalid_email || 0)
+          + Number(skipped?.opt_out || 0)
+          + Number(skipped?.cooldown || 0);
+        const summary = t('finance.send_due_today_summary', {
+          sent,
+          failed,
+          skipped: skippedTotal
+        });
+        setOverdueReminderEmailStatus(summary, failed > 0 ? 'error' : 'success');
+        logActivity(t('finance.activity_sent_due_today_emails'), summary);
+      } catch (err) {
+        console.error('Due-today reminder send failed', err);
+        setOverdueReminderEmailStatus(err?.message || t('finance.send_due_today_failed'), 'error');
+      } finally {
+        dueTodayReminderSendInFlight = false;
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = t('finance.send_due_today_emails');
+        }
+      }
+    }
+
     async function sendOverdueReminderTestEmail() {
-      if (overdueReminderTestSendInFlight) return;
+      if (overdueReminderTestSendInFlight || overdueReminderSendInFlight || dueTodayReminderSendInFlight) return;
       if (!guardEdit()) return;
       if (!supabaseAvailable || !isSupabaseReady()) {
         alert(t('alert.sign_in_first'));
@@ -15341,14 +15420,21 @@
       }
       const reminderBtn = document.getElementById('sendOverdueReminderEmailsBtn');
       if (reminderBtn) {
-        reminderBtn.disabled = readOnlyMode || overdueReminderSendInFlight || overdueReminderTestSendInFlight;
+        reminderBtn.disabled = readOnlyMode || overdueReminderSendInFlight || dueTodayReminderSendInFlight || overdueReminderTestSendInFlight;
         reminderBtn.textContent = overdueReminderSendInFlight
           ? t('finance.sending_overdue_emails')
           : t('finance.send_overdue_emails');
       }
+      const reminderDueTodayBtn = document.getElementById('sendDueTodayReminderEmailsBtn');
+      if (reminderDueTodayBtn) {
+        reminderDueTodayBtn.disabled = readOnlyMode || overdueReminderSendInFlight || dueTodayReminderSendInFlight || overdueReminderTestSendInFlight;
+        reminderDueTodayBtn.textContent = dueTodayReminderSendInFlight
+          ? t('finance.sending_due_today_emails')
+          : t('finance.send_due_today_emails');
+      }
       const reminderTestBtn = document.getElementById('sendOverdueReminderTestEmailBtn');
       if (reminderTestBtn) {
-        reminderTestBtn.disabled = readOnlyMode || overdueReminderSendInFlight || overdueReminderTestSendInFlight;
+        reminderTestBtn.disabled = readOnlyMode || overdueReminderSendInFlight || dueTodayReminderSendInFlight || overdueReminderTestSendInFlight;
         reminderTestBtn.textContent = overdueReminderTestSendInFlight
           ? t('finance.sending_test_overdue_email')
           : t('finance.send_test_overdue_email');
