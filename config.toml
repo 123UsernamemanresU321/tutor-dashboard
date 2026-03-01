@@ -1,2 +1,8 @@
 [functions.payfast-ipn]
 verify_jwt = false
+
+[functions.send-overdue-invoice-reminders]
+verify_jwt = false
+
+[functions.payfast-email-link]
+verify_jwt = false
