@@ -11778,6 +11778,7 @@
 
       const reflection = (state.settings.reflection || '').trim();
       document.getElementById('reflectionText').textContent = reflection || 'Add a short intention in Settings to keep this week focused.';
+      const todayStart = parseDateOnly(todayIso) || new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
       const upcomingSoon = [...state.sessions]
         .filter(s => {
@@ -11801,7 +11802,7 @@
         if (!hw.dueDate) return false;
         const due = new Date(hw.dueDate);
         const fiveDays = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
-        return due >= today && due <= fiveDays;
+        return due >= todayStart && due <= fiveDays;
       });
       document.getElementById('focusHomework').textContent = homeworkDueSoon.length;
       document.getElementById('focusInvoices').textContent = overdueCount;
