@@ -6,3 +6,9 @@ verify_jwt = false
 
 [functions.payfast-email-link]
 verify_jwt = false
+
+[functions.request-parent-magic-link]
+verify_jwt = false
+
+[functions.redeem-parent-magic-link]
+verify_jwt = false
