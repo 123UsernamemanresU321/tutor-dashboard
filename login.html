@@ -224,11 +224,13 @@
         </div>
         <button type="submit" class="primary mt-4" data-i18n="auth.enter">Enter</button>
       </form>
-      <button id="parentForgotToggleBtn" type="button" class="secondary mt-2">Forgot login code?</button>
+      <button id="parentForgotToggleBtn" type="button" class="secondary mt-2" data-i18n="auth.parent_forgot_toggle">Forgot login code?</button>
       <div id="parentForgotPanel" class="hidden mt-3">
-        <label for="parentRecoveryEmail">Parent email</label>
-        <input id="parentRecoveryEmail" type="email" autocomplete="email" placeholder="you@example.com">
-        <button id="parentForgotSubmitBtn" type="button" class="secondary mt-2">Send login code</button>
+        <label for="parentRecoveryEmail" data-i18n="auth.parent_recovery_email_label">Parent email</label>
+        <input id="parentRecoveryEmail" type="email" autocomplete="email" placeholder="you@example.com"
+          data-i18n-attr="placeholder:auth.parent_recovery_email_placeholder">
+        <button id="parentForgotSubmitBtn" type="button" class="secondary mt-2" data-i18n="auth.parent_send_login_code">Send login code</button>
+        <button id="parentMagicSubmitBtn" type="button" class="secondary mt-2" data-i18n="auth.parent_send_magic_link">Email one-time sign-in link</button>
         <div id="parentRecoveryMsg" class="success hidden"></div>
       </div>
     </div>
@@ -278,7 +280,8 @@
     // Login page does not use realtime channels; disconnect to avoid noisy suspended websocket logs.
     try { supabaseClient.realtime.disconnect(); } catch (_) { }
     const CODE_EMAIL_SUFFIX = '@codes.tutor';
-    const FORGOT_CODE_GENERIC_MESSAGE = 'If an account is associated with this email, we have sent your login code to it.';
+    const forgotCodeGenericMessage = () => t('auth.parent_code_generic_message');
+    const forgotMagicGenericMessage = () => t('auth.parent_magic_generic_message');
 
 
     // Silence noisy "output" reference errors some browsers surface
@@ -439,6 +442,7 @@
     const parentForgotSubmitBtn = document.getElementById('parentForgotSubmitBtn');
     const parentRecoveryEmail = document.getElementById('parentRecoveryEmail');
     const parentRecoveryMsg = document.getElementById('parentRecoveryMsg');
+    const parentMagicSubmitBtn = document.getElementById('parentMagicSubmitBtn');
 
     if (parentForgotToggleBtn && parentForgotPanel) {
       parentForgotToggleBtn.onclick = () => {
@@ -458,12 +462,70 @@
         } catch (_) {
           // Anti-enumeration flow: always show the same message.
         } finally {
-          parentRecoveryMsg.textContent = FORGOT_CODE_GENERIC_MESSAGE;
+          parentRecoveryMsg.textContent = forgotCodeGenericMessage();
           parentRecoveryMsg.classList.remove('hidden');
+          parentRecoveryMsg.classList.remove('error');
+          parentRecoveryMsg.classList.add('success');
           parentForgotSubmitBtn.disabled = false;
         }
       };
     }
+
+    if (parentMagicSubmitBtn && parentRecoveryEmail && parentRecoveryMsg) {
+      parentMagicSubmitBtn.onclick = async () => {
+        const email = String(parentRecoveryEmail.value || '').trim().toLowerCase();
+        parentMagicSubmitBtn.disabled = true;
+        try {
+          await supabaseClient.functions.invoke('request-parent-magic-link', {
+            body: { email }
+          });
+        } catch (_) {
+          // Anti-enumeration flow: always show the same message.
+        } finally {
+          parentRecoveryMsg.textContent = forgotMagicGenericMessage();
+          parentRecoveryMsg.classList.remove('hidden');
+          parentRecoveryMsg.classList.remove('error');
+          parentRecoveryMsg.classList.add('success');
+          parentMagicSubmitBtn.disabled = false;
+        }
+      };
+    }
+
+    async function consumeParentMagicTokenFromUrl() {
+      const url = new URL(window.location.href);
+      const token = String(url.searchParams.get('parent_magic_token') || '').trim();
+      if (!token) return;
+
+      const parentTabBtn = document.querySelector('.tab-btn[data-tab="parent"]');
+      if (parentTabBtn) parentTabBtn.click();
+
+      msg.textContent = t('auth.magic_link_verifying');
+      try {
+        const { data, error } = await supabaseClient.functions.invoke('redeem-parent-magic-link', {
+          body: { token }
+        });
+
+        if (error || data?.success === false || !data?.access_token || !data?.refresh_token) {
+          throw new Error(data?.error || error?.message || 'invalid_or_expired');
+        }
+
+        const { error: setErr } = await supabaseClient.auth.setSession({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token
+        });
+        if (setErr) throw setErr;
+
+        url.searchParams.delete('parent_magic_token');
+        window.history.replaceState({}, document.title, url.toString());
+        window.location.href = appUrl('/index.html');
+      } catch (_) {
+        url.searchParams.delete('parent_magic_token');
+        window.history.replaceState({}, document.title, url.toString());
+        msg.textContent = t('auth.magic_link_failed');
+      }
+    }
+
+    consumeParentMagicTokenFromUrl();
 
     document.getElementById('forgotBtn').onclick = async () => {
       alert(t('auth.forgot_alert'));
