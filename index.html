@@ -13798,8 +13798,12 @@
         const inRange = isDateWithinRange(s.date, startStr, endStr);
         if (inRange) {
           if (!s.invoiceId) {
-            s.invoiceId = inv.id;
-            changed = true;
+            // Never auto-link newly created sessions to paid/locked invoices.
+            // This avoids accidental duplicate sessions inheriting paid invoice links after manual reschedules.
+            if (!locked) {
+              s.invoiceId = inv.id;
+              changed = true;
+            }
           }
           return;
         }
@@ -14194,13 +14198,12 @@
 
     function isCancelledOccurrence(studentId, dateStr, startTime, durationHours) {
       const targetTime = normalizeTimeValue(startTime || '');
-      const targetDuration = Number(durationHours || 0) || 0;
       return state.sessionCancellations.some(c => {
         if (cleanId(c.studentId) !== cleanId(studentId)) return false;
         if ((c.date || '') !== dateStr) return false;
         if (normalizeTimeValue(c.startTime || '') !== targetTime) return false;
-        const cancelledDuration = Number(c.durationHours || 0) || 0;
-        if (cancelledDuration && targetDuration && Math.abs(cancelledDuration - targetDuration) > 0.01) return false;
+        // Duration mismatches are ignored intentionally. The cancellation marker
+        // is used to prevent re-creating a moved occurrence at its old slot.
         return true;
       });
     }
