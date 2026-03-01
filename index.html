@@ -8767,7 +8767,7 @@
             resultValue.textContent = newCode;
             resultWrap.classList.remove('hidden');
           }
-          setParentCodeStatus('Login code updated. If email opt-in is enabled, a notification email has been sent.', 'success');
+          setParentCodeStatus(t('parent.login_code_updated_notice'), 'success');
           renderParentPortal();
         } catch (err) {
           console.warn('Parent login code regeneration failed', err);
