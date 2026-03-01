@@ -2946,6 +2946,27 @@
       return parsed;
     }
 
+    function compareDateOnly(a, b) {
+      const left = parseDateOnly(a);
+      const right = parseDateOnly(b);
+      if (!left && !right) return 0;
+      if (!left) return 1;
+      if (!right) return -1;
+      return left.getTime() - right.getTime();
+    }
+
+    function isDateBeforeDateOnly(value, baseline) {
+      return compareDateOnly(value, baseline) < 0;
+    }
+
+    function isDateOnOrAfterDateOnly(value, baseline) {
+      return compareDateOnly(value, baseline) >= 0;
+    }
+
+    function isDateOnOrBeforeDateOnly(value, baseline) {
+      return compareDateOnly(value, baseline) <= 0;
+    }
+
     function endOfMonth(d) {
       return new Date(d.getFullYear(), d.getMonth() + 1, 0);
     }
@@ -9005,11 +9026,16 @@
       const invoiceStatusDetail = document.getElementById('parentInvoiceStatusDetail');
       if (invoiceStatus && invoiceStatusTitle && invoiceStatusDetail) {
         const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const soonCutoff = new Date(today);
+        const todayIso = toDateOnly(today);
+        const soonCutoff = new Date(todayIso);
         soonCutoff.setDate(soonCutoff.getDate() + 7);
-        const overdue = pendingInvoices.filter(inv => inv.dueDate && new Date(inv.dueDate) < today);
-        const dueSoon = pendingInvoices.filter(inv => inv.dueDate && new Date(inv.dueDate) >= today && new Date(inv.dueDate) <= soonCutoff);
+        const soonCutoffIso = toDateOnly(soonCutoff);
+        const overdue = pendingInvoices.filter(inv => inv.dueDate && isDateBeforeDateOnly(inv.dueDate, todayIso));
+        const dueSoon = pendingInvoices.filter(inv =>
+          inv.dueDate &&
+          isDateOnOrAfterDateOnly(inv.dueDate, todayIso) &&
+          isDateOnOrBeforeDateOnly(inv.dueDate, soonCutoffIso)
+        );
         const showStatus = overdue.length || dueSoon.length;
         invoiceStatus.classList.toggle('hidden', !showStatus);
         if (showStatus) {
@@ -11687,7 +11713,7 @@
     function updateKPIsAndCharts() {
       const now = new Date();
       const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const today = new Date();
+      const todayIso = toDateOnly(now);
       const knownStudentIds = new Set((state.students || []).map(s => cleanId(s.id)).filter(Boolean));
       const financeInvoices = (state.invoices || []).filter(inv =>
         knownStudentIds.has(cleanId(inv.studentId || inv.student_id || ''))
@@ -11730,7 +11756,13 @@
         document.getElementById('kpiExpectedIncome').textContent = 'R ' + expected.toFixed(2);
       }
 
-      const overdueCount = studentMode ? 0 : financeInvoices.filter(inv => invoiceRequiresPayment(inv) && inv.dueDate && new Date(inv.dueDate) < today).length;
+      const overdueCount = studentMode
+        ? 0
+        : financeInvoices.filter(inv =>
+          invoiceRequiresPayment(inv) &&
+          inv.dueDate &&
+          isDateBeforeDateOnly(inv.dueDate, todayIso)
+        ).length;
       document.getElementById('kpiOverdue').textContent = studentMode ? 'N/A' : overdueCount;
 
       // Goals & focus
@@ -15345,9 +15377,14 @@
       }
 
       const overdueList = document.getElementById('overdueInvoicesList');
-      const today = new Date();
-      const overdue = financeInvoices.filter(inv => invoiceRequiresPayment(inv) && inv.dueDate && new Date(inv.dueDate) < today)
-        .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+      const todayIso = toDateOnly(new Date());
+      const overdue = financeInvoices
+        .filter(inv =>
+          invoiceRequiresPayment(inv) &&
+          inv.dueDate &&
+          isDateBeforeDateOnly(inv.dueDate, todayIso)
+        )
+        .sort((a, b) => compareDateOnly(a.dueDate, b.dueDate));
 
       if (!overdue.length) {
         overdueList.innerHTML = `<li class="text-slate-500">${esc(t('finance.no_overdue'))}</li>`;
@@ -15424,12 +15461,22 @@
       const forecastList = document.getElementById('forecastList');
       const forecastSummary = document.getElementById('forecastSummary');
       if (forecastList && forecastSummary) {
-        const soonCutoff = new Date();
+        const soonCutoff = parseDateOnly(todayIso) || new Date();
         soonCutoff.setDate(soonCutoff.getDate() + 14);
-        const overdueInvoices = financeInvoices.filter(inv => invoiceRequiresPayment(inv) && inv.dueDate && new Date(inv.dueDate) < today);
+        const soonCutoffIso = toDateOnly(soonCutoff);
+        const overdueInvoices = financeInvoices.filter(inv =>
+          invoiceRequiresPayment(inv) &&
+          inv.dueDate &&
+          isDateBeforeDateOnly(inv.dueDate, todayIso)
+        );
         const dueSoon = financeInvoices
-          .filter(inv => invoiceRequiresPayment(inv) && inv.dueDate && new Date(inv.dueDate) >= today && new Date(inv.dueDate) <= soonCutoff)
-          .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+          .filter(inv =>
+            invoiceRequiresPayment(inv) &&
+            inv.dueDate &&
+            isDateOnOrAfterDateOnly(inv.dueDate, todayIso) &&
+            isDateOnOrBeforeDateOnly(inv.dueDate, soonCutoffIso)
+          )
+          .sort((a, b) => compareDateOnly(a.dueDate, b.dueDate));
         const overdueTotal = overdueInvoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
         const dueSoonTotal = dueSoon.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
         forecastSummary.textContent = t('finance.forecast_summary', { due: dueSoonTotal.toFixed(0), overdue: overdueTotal.toFixed(0) });
