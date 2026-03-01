@@ -613,6 +613,10 @@
       display: flex;
     }
 
+    .portal-panel-hidden {
+      display: none !important;
+    }
+
     /* AUTH OVERLAY */
     .auth-overlay {
       position: fixed;
@@ -2013,9 +2017,17 @@
               <div class="font-semibold" data-i18n="portal.busy_notice_title">Tutor unavailable on the dates below (not a live status)</div>
               <ul id="portalBusyList" class="mt-2 space-y-1 text-[11px]"></ul>
             </div>
+            <div id="studentPortalPanelNav" class="card p-3 space-y-2">
+              <div class="text-[11px] font-semibold text-slate-700">Quick navigation</div>
+              <div class="flex flex-wrap gap-2">
+                <button data-student-portal-panel-target="learning" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Learning</button>
+                <button data-student-portal-panel-target="billing" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Billing</button>
+                <button data-student-portal-panel-target="support" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Support</button>
+              </div>
+            </div>
 
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
-              <div class="card p-4 space-y-2">
+              <div class="card p-4 space-y-2" data-student-portal-panel="learning">
                 <div class="flex items-center justify-between">
                   <h3 class="text-sm font-semibold" data-i18n="portal.upcoming_sessions">Upcoming sessions</h3>
                   <span class="hint" data-i18n="portal.all_upcoming">All upcoming</span>
@@ -2023,36 +2035,37 @@
                 <div id="portalSessionReminder" class="hidden rounded-lg border px-2 py-1 text-[11px]"></div>
                 <ul id="portalSessions" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
               </div>
-              <div class="card p-4 space-y-2">
+              <div class="card p-4 space-y-2" data-student-portal-panel="learning">
                 <div class="flex items-center justify-between">
                   <h3 class="text-sm font-semibold" data-i18n="portal.homework">Homework</h3>
                   <span class="hint" data-i18n="portal.open_items">Open items</span>
                 </div>
                 <ul id="portalHomework" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
               </div>
-              <div class="card p-4 space-y-2">
+              <div class="card p-4 space-y-2" data-student-portal-panel="billing">
                 <div class="flex items-center justify-between">
                   <h3 class="text-sm font-semibold" data-i18n="portal.invoices">Invoices</h3>
                   <span class="hint" data-i18n="portal.unpaid_first">Unpaid first</span>
                 </div>
+                <div id="portalStudentPaymentStatus" class="text-[10px] text-slate-500"></div>
                 <ul id="portalInvoices" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
                 <p id="portalInvoiceDisclosure" class="text-[10px] text-slate-500" data-merchant-receipt></p>
               </div>
-              <div class="card p-4 space-y-2">
+              <div class="card p-4 space-y-2" data-student-portal-panel="learning">
                 <div class="flex items-center justify-between">
                   <h3 class="text-sm font-semibold" data-i18n="portal.resources">Resources</h3>
                   <span class="hint" data-i18n="portal.assigned_to_you">Assigned to you</span>
                 </div>
                 <ul id="portalResources" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
               </div>
-              <div class="card p-4 space-y-2">
+              <div class="card p-4 space-y-2" data-student-portal-panel="support">
                 <div class="flex items-center justify-between">
                   <h3 class="text-sm font-semibold" data-i18n="portal.messages">Messages</h3>
                   <span class="hint" data-i18n="portal.tutor_student">Tutor ↔ Student</span>
                 </div>
                 <ul id="portalMessages" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
               </div>
-              <div class="card p-4 space-y-2">
+              <div class="card p-4 space-y-2" data-student-portal-panel="support">
                 <div class="flex items-center justify-between">
                   <h3 class="text-sm font-semibold">Support</h3>
                   <button id="portalSupportNewBtn" class="portal-cta-btn portal-cta-subtle text-[11px]">New ticket</button>
@@ -2060,7 +2073,7 @@
                 <div id="portalSupportStatus" class="text-[11px] text-slate-500 hidden"></div>
                 <ul id="portalSupportTickets" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
               </div>
-              <div id="portalAiCard" class="card p-4 space-y-2">
+              <div id="portalAiCard" class="card p-4 space-y-2" data-student-portal-panel="support">
                 <div class="flex items-center justify-between">
                   <h3 class="text-sm font-semibold" data-i18n="portal.ai_helper">AI Study Helper</h3>
                   <span class="hint" data-i18n="portal.ai_helper_hint">Uses recent lessons/resources</span>
@@ -2133,7 +2146,16 @@
                 <span data-i18n="parent.edit_profile">Edit profile</span>
               </button>
             </div>
-            <div id="parentProfilePrompt" class="card p-4 hidden">
+            <div id="parentPortalPanelNav" class="card p-3 space-y-2">
+              <div class="text-[11px] font-semibold text-slate-700">Quick navigation</div>
+              <div class="flex flex-wrap gap-2">
+                <button data-parent-portal-panel-target="overview" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Overview</button>
+                <button data-parent-portal-panel-target="learning" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Learning</button>
+                <button data-parent-portal-panel-target="billing" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Billing</button>
+                <button data-parent-portal-panel-target="support" class="owner-panel-btn px-3 py-1.5 rounded-xl border border-slate-300 text-[11px]">Support</button>
+              </div>
+            </div>
+            <div id="parentProfilePrompt" class="card p-4 hidden" data-parent-portal-panel="overview">
               <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div>
                   <div class="text-sm font-semibold" data-i18n="parent.complete_profile_title">Complete your profile</div>
@@ -2145,7 +2167,7 @@
                 </button>
               </div>
             </div>
-            <div id="parentEmailOptInCard" class="card p-4 hidden border border-amber-200 bg-amber-50/70">
+            <div id="parentEmailOptInCard" class="card p-4 hidden border border-amber-200 bg-amber-50/70" data-parent-portal-panel="overview">
               <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div>
                   <div class="text-sm font-semibold text-amber-900">Email notices</div>
@@ -2157,10 +2179,13 @@
                 </button>
               </div>
             </div>
-            <div id="parentStudentPaymentsCard" class="card p-4 hidden border border-sky-200 bg-sky-50/70">
+            <div id="parentStudentPaymentsCard" class="card p-4 hidden border border-sky-200 bg-sky-50/70" data-parent-portal-panel="overview">
               <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div>
-                  <div class="text-sm font-semibold text-sky-900">Student payment delegation</div>
+                  <div class="text-sm font-semibold text-sky-900 flex items-center gap-2">
+                    <span>Student payment delegation</span>
+                    <span id="parentStudentPaymentsState" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">—</span>
+                  </div>
                   <div id="parentStudentPaymentsText" class="text-[11px] text-sky-800"></div>
                 </div>
                 <button id="parentStudentPaymentsBtn"
@@ -2169,7 +2194,7 @@
                 </button>
               </div>
             </div>
-            <div id="parentLoginCodeCard" class="card p-4 space-y-2">
+            <div id="parentLoginCodeCard" class="card p-4 space-y-2" data-parent-portal-panel="overview">
               <div class="flex items-center justify-between gap-2">
                 <h3 class="text-sm font-semibold">Login codes</h3>
                 <button id="parentRefreshCodeTargetsBtn" class="portal-cta-btn portal-cta-subtle text-[11px]">Refresh</button>
@@ -2188,7 +2213,7 @@
               </div>
               <div id="parentCodeStatus" class="text-[11px] text-slate-500 hidden"></div>
             </div>
-            <div id="parentBulkRescheduleCard" class="card p-4 space-y-2">
+            <div id="parentBulkRescheduleCard" class="card p-4 space-y-2" data-parent-portal-panel="learning">
               <h3 class="text-sm font-semibold">Recurring slot change</h3>
               <p class="text-[11px] text-slate-500">Move all upcoming lessons in one recurring slot to a new weekday/time. Past and completed lessons stay untouched.</p>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -2202,7 +2227,7 @@
               <button id="parentBulkRescheduleApplyBtn" class="portal-cta-btn portal-cta-contract">Apply recurring change</button>
               <div id="parentBulkRescheduleStatus" class="text-[11px] text-slate-500 hidden"></div>
             </div>
-            <div id="parentGuideCard" class="card p-4 hidden">
+            <div id="parentGuideCard" class="card p-4 hidden" data-parent-portal-panel="overview">
               <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div>
                   <div class="text-sm font-semibold" data-i18n="parent.getting_started">Getting started</div>
@@ -2215,7 +2240,7 @@
               </div>
               <div id="parentGuideSteps" class="mt-3 space-y-2 text-[11px]"></div>
             </div>
-            <div id="parentBusyNotice" class="card p-4 hidden border border-rose-200 bg-rose-50 text-rose-800">
+            <div id="parentBusyNotice" class="card p-4 hidden border border-rose-200 bg-rose-50 text-rose-800" data-parent-portal-panel="learning">
               <div class="flex items-start justify-between gap-3">
                 <div>
                   <div class="text-sm font-semibold" data-i18n="parent.busy_notice_title">Tutor unavailable on these dates (not a live status)</div>
@@ -2225,16 +2250,16 @@
               <ul id="parentBusyList" class="mt-2 space-y-1 text-[11px]"></ul>
             </div>
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
-              <div class="card p-4 space-y-2">
+              <div class="card p-4 space-y-2" data-parent-portal-panel="overview">
                 <h3 class="text-sm font-semibold" data-i18n="parent.linked_students">Linked students</h3>
                 <ul id="parentStudentsList" class="space-y-2 max-h-72 overflow-y-auto scrollbar-thin"></ul>
               </div>
-              <div class="card p-4 space-y-2">
+              <div class="card p-4 space-y-2" data-parent-portal-panel="support">
                 <h3 class="text-sm font-semibold" data-i18n="parent.messages">Messages</h3>
                 <ul id="parentMessages" class="space-y-2 max-h-72 overflow-y-auto scrollbar-thin"></ul>
               </div>
             </div>
-            <div class="card p-4 space-y-2 text-xs">
+            <div class="card p-4 space-y-2 text-xs" data-parent-portal-panel="support">
               <div class="flex items-center justify-between">
                 <h3 class="text-sm font-semibold">Support</h3>
                 <div class="flex items-center gap-2">
@@ -2246,7 +2271,7 @@
               <ul id="parentSupportTickets" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
             </div>
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
-              <div class="card p-4 space-y-2">
+              <div class="card p-4 space-y-2" data-parent-portal-panel="learning">
                 <h3 class="text-sm font-semibold" data-i18n="parent.all_sessions">All sessions</h3>
                 <div id="parentSessionPaymentNotice" class="hidden rounded-lg border border-amber-200 bg-amber-50/70 p-2">
                   <div class="text-[11px] font-medium text-amber-900" data-i18n="parent.sessions_locked_title">Upcoming sessions appear after payment</div>
@@ -2254,13 +2279,13 @@
                 </div>
                 <ul id="parentSessions" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
               </div>
-              <div class="card p-4 space-y-2">
+              <div class="card p-4 space-y-2" data-parent-portal-panel="learning">
                 <h3 class="text-sm font-semibold" data-i18n="parent.homework_status">Homework status</h3>
                 <ul id="parentHomework" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
               </div>
             </div>
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 text-xs">
-              <div class="card p-4 space-y-2" id="parentInvoicesCard">
+              <div class="card p-4 space-y-2" id="parentInvoicesCard" data-parent-portal-panel="billing">
                 <h3 class="text-sm font-semibold" data-i18n="parent.invoices">Invoices</h3>
                 <div id="parentInvoiceAlert" class="hidden rounded-lg border border-amber-200 bg-amber-50/70 p-2">
                   <div class="text-[11px] font-medium text-amber-900" data-i18n="parent.invoice_alert_title">Payment needed to schedule lessons</div>
@@ -2276,7 +2301,7 @@
                 <ul id="parentInvoices" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
                 <p id="parentInvoiceDisclosure" class="text-[10px] text-slate-500" data-merchant-receipt></p>
               </div>
-              <div class="card p-4 space-y-2">
+              <div class="card p-4 space-y-2" data-parent-portal-panel="learning">
                 <h3 class="text-sm font-semibold" data-i18n="parent.resources">Resources</h3>
                 <ul id="parentResources" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin"></ul>
               </div>
@@ -2583,9 +2608,14 @@
     const SUPABASE_NETWORK_BACKOFF_MS = 2 * 60 * 1000;
     const SUPPORT_CACHE_TTL_MS = 15000;
     const OWNER_PANEL_PREFS_KEY = 'ownerPanelPrefs_v1';
+    const PORTAL_PANEL_PREFS_KEY = 'portalPanelPrefs_v1';
     const ownerPanelPrefs = {
       dashboard: 'overview',
       settings: 'general'
+    };
+    const portalPanelPrefs = {
+      student: 'learning',
+      parent: 'overview'
     };
     let supportTicketsCache = {
       cacheKey: '',
@@ -5184,6 +5214,7 @@
       setupNav();
       setupTopbar();
       setupOwnerPanelNavigation();
+      setupPortalPanelNavigation();
       document.querySelectorAll('[data-tour-trigger]').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.preventDefault();
@@ -5399,6 +5430,8 @@
       if (targetView === 'parent-portal') renderParentPortal();
       if (targetView === 'reports') renderReportsView();
       renderSessionAlerts();
+      applyStudentPortalPanel();
+      applyParentPortalPanel();
     }
 
     function setupTopbar() {
@@ -7728,6 +7761,114 @@
       applyOwnerSettingsPanel();
     }
 
+    function loadPortalPanelPrefs() {
+      try {
+        const raw = localStorage.getItem(PORTAL_PANEL_PREFS_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          const student = String(parsed.student || '').trim();
+          const parent = String(parsed.parent || '').trim();
+          if (student) portalPanelPrefs.student = student;
+          if (parent) portalPanelPrefs.parent = parent;
+        }
+      } catch {
+        // ignore invalid stored panel prefs
+      }
+    }
+
+    function savePortalPanelPrefs() {
+      try {
+        localStorage.setItem(PORTAL_PANEL_PREFS_KEY, JSON.stringify(portalPanelPrefs));
+      } catch {
+        // ignore storage failures
+      }
+    }
+
+    function applyStudentPortalPanel() {
+      const nav = document.getElementById('studentPortalPanelNav');
+      const panels = [...document.querySelectorAll('[data-student-portal-panel]')];
+      if (!panels.length) return;
+      if (nav) nav.classList.remove('hidden');
+      const available = new Set(panels.map(panel => panel.getAttribute('data-student-portal-panel')));
+      if (!available.has(portalPanelPrefs.student)) {
+        portalPanelPrefs.student = String(panels[0]?.getAttribute('data-student-portal-panel') || 'learning');
+      }
+      panels.forEach(panel => {
+        const key = String(panel.getAttribute('data-student-portal-panel') || '');
+        panel.classList.toggle('portal-panel-hidden', key !== portalPanelPrefs.student);
+      });
+      if (nav) {
+        nav.querySelectorAll('[data-student-portal-panel-target]').forEach(btn => {
+          const key = String(btn.getAttribute('data-student-portal-panel-target') || '');
+          const active = key === portalPanelPrefs.student;
+          btn.classList.toggle('bg-slate-900', active);
+          btn.classList.toggle('text-white', active);
+          btn.classList.toggle('border-slate-900', active);
+        });
+      }
+    }
+
+    function applyParentPortalPanel() {
+      const nav = document.getElementById('parentPortalPanelNav');
+      const panels = [...document.querySelectorAll('[data-parent-portal-panel]')];
+      if (!panels.length) return;
+      if (nav) nav.classList.remove('hidden');
+      const available = new Set(panels.map(panel => panel.getAttribute('data-parent-portal-panel')));
+      if (!available.has(portalPanelPrefs.parent)) {
+        portalPanelPrefs.parent = String(panels[0]?.getAttribute('data-parent-portal-panel') || 'overview');
+      }
+      panels.forEach(panel => {
+        const key = String(panel.getAttribute('data-parent-portal-panel') || '');
+        panel.classList.toggle('portal-panel-hidden', key !== portalPanelPrefs.parent);
+      });
+      if (nav) {
+        nav.querySelectorAll('[data-parent-portal-panel-target]').forEach(btn => {
+          const key = String(btn.getAttribute('data-parent-portal-panel-target') || '');
+          const active = key === portalPanelPrefs.parent;
+          btn.classList.toggle('bg-slate-900', active);
+          btn.classList.toggle('text-white', active);
+          btn.classList.toggle('border-slate-900', active);
+        });
+      }
+    }
+
+    function setStudentPortalPanel(panel) {
+      const next = String(panel || '').trim();
+      if (!next || portalPanelPrefs.student === next) return;
+      portalPanelPrefs.student = next;
+      savePortalPanelPrefs();
+      applyStudentPortalPanel();
+    }
+
+    function setParentPortalPanel(panel) {
+      const next = String(panel || '').trim();
+      if (!next || portalPanelPrefs.parent === next) return;
+      portalPanelPrefs.parent = next;
+      savePortalPanelPrefs();
+      applyParentPortalPanel();
+    }
+
+    function setupPortalPanelNavigation() {
+      loadPortalPanelPrefs();
+      const studentNav = document.getElementById('studentPortalPanelNav');
+      if (studentNav && studentNav.dataset.bound !== '1') {
+        studentNav.dataset.bound = '1';
+        studentNav.querySelectorAll('[data-student-portal-panel-target]').forEach(btn => {
+          btn.onclick = () => setStudentPortalPanel(btn.getAttribute('data-student-portal-panel-target'));
+        });
+      }
+      const parentNav = document.getElementById('parentPortalPanelNav');
+      if (parentNav && parentNav.dataset.bound !== '1') {
+        parentNav.dataset.bound = '1';
+        parentNav.querySelectorAll('[data-parent-portal-panel-target]').forEach(btn => {
+          btn.onclick = () => setParentPortalPanel(btn.getAttribute('data-parent-portal-panel-target'));
+        });
+      }
+      applyStudentPortalPanel();
+      applyParentPortalPanel();
+    }
+
     function renderStudentPortal() {
       const student = tourMode ? getTourStudent() : getStudentProfileBySession();
       const sessionsUl = document.getElementById('portalSessions');
@@ -7735,12 +7876,19 @@
       const invUl = document.getElementById('portalInvoices');
       const resUl = document.getElementById('portalResources');
       const portalBlocker = document.getElementById('portalBlocker');
+      const paymentStatusEl = document.getElementById('portalStudentPaymentStatus');
+      const maintenanceWriteLocked = isMaintenanceGracefulWriteBlocked();
+      applyStudentPortalPanel();
       if (!student) {
         const msg = `<li class="text-slate-500 text-xs">${esc(t('portal.no_student_linked'))}</li>`;
         if (sessionsUl) sessionsUl.innerHTML = msg;
         if (hwUl) hwUl.innerHTML = msg;
         if (invUl) invUl.innerHTML = msg;
         if (resUl) resUl.innerHTML = msg;
+        if (paymentStatusEl) {
+          paymentStatusEl.textContent = '';
+          paymentStatusEl.className = 'text-[10px] text-slate-500';
+        }
         void renderStudentSupportCard();
         return;
       }
@@ -7760,6 +7908,10 @@
         if (hwUl) hwUl.innerHTML = msg;
         if (invUl) invUl.innerHTML = msg;
         if (resUl) resUl.innerHTML = msg;
+        if (paymentStatusEl) {
+          paymentStatusEl.textContent = '';
+          paymentStatusEl.className = 'text-[10px] text-slate-500';
+        }
         const msgsList = document.getElementById('portalMessages');
         if (msgsList) msgsList.innerHTML = msg;
         void renderStudentSupportCard();
@@ -7871,10 +8023,33 @@
 
       const myInv = state.invoices.filter(inv => inv.studentId === student.id && !isInvoiceVoid(inv))
         .sort((a, b) => new Date(a.dueDate || 0) - new Date(b.dueDate || 0));
+      const unpaidPayableInvoices = myInv.filter(inv => invoiceRequiresPayment(inv));
+      const paymentDelegation = getStudentPaymentDelegationState(student.id);
+      if (paymentStatusEl) {
+        if (!unpaidPayableInvoices.length) {
+          paymentStatusEl.textContent = '';
+          paymentStatusEl.className = 'text-[10px] text-slate-500';
+        } else if (!paymentDelegation.allowed) {
+          paymentStatusEl.textContent = 'Student payments are currently disabled by your parent/guardian. Ask them to enable student payment delegation in the parent portal.';
+          paymentStatusEl.className = 'text-[10px] text-rose-700';
+        } else {
+          paymentStatusEl.textContent = 'You can pay unpaid invoices directly from this list.';
+          paymentStatusEl.className = 'text-[10px] text-emerald-700';
+        }
+      }
       if (invUl) {
         invUl.innerHTML = myInv.length ? myInv.map(inv => {
           const methodLabel = getInvoicePaymentLabel(inv);
           const sessionLabel = inv.numSessions === 1 ? t('common.session') : t('common.sessions');
+          const safeInvId = cleanId(inv.id);
+          const canPayThisInvoice = invoiceRequiresPayment(inv);
+          const payAction = canPayThisInvoice
+            ? (!paymentDelegation.allowed
+              ? `<button class="portal-cta-btn portal-cta-subtle portal-cta-btn-block cursor-not-allowed opacity-70" disabled title="Parent/guardian approval required for student payments.">Parent approval required</button>`
+              : maintenanceWriteLocked
+                ? `<button class="portal-cta-btn portal-cta-subtle portal-cta-btn-block cursor-not-allowed opacity-70" disabled title="Temporarily disabled during maintenance restricted mode.">${esc(t('invoice.pay_now'))}</button>`
+                : `<button class="portal-cta-btn portal-cta-pay portal-cta-btn-block" onclick="startPayfastPayment('${safeInvId}')" aria-label="Pay invoice ${esc(inv.id)} now">${esc(t('invoice.pay_now'))}</button>`)
+            : '';
           return `
           <li class="border border-slate-200 rounded-lg px-2 py-1 bg-white/80">
             <div class="font-medium">${esc(t('invoice.label', { id: inv.id }))}</div>
@@ -7887,6 +8062,7 @@
               ${(inv.invoiceType || inv.invoice_type) === 'adjustment' ? ` • ${esc(t('invoice.adjustment'))}` : ''}
               ${(inv.invoiceType || inv.invoice_type) === 'refund' ? ` • ${esc(t('invoice.refund'))}` : ''}
             </div>
+            ${payAction ? `<div class="mt-2">${payAction}</div>` : ''}
           </li>
         `;
         }).join('') : `<li class="text-slate-500 text-xs">${esc(t('portal.no_invoices'))}</li>`;
@@ -7956,6 +8132,7 @@
           }
         };
       }
+      applyStudentPortalPanel();
       void renderStudentSupportCard();
     }
 
@@ -8269,6 +8446,7 @@
     function updateParentStudentPaymentsCard(parent) {
       const card = document.getElementById('parentStudentPaymentsCard');
       const textEl = document.getElementById('parentStudentPaymentsText');
+      const stateEl = document.getElementById('parentStudentPaymentsState');
       const btn = document.getElementById('parentStudentPaymentsBtn');
       const writeLocked = isMaintenanceGracefulWriteBlocked();
       if (btn) {
@@ -8282,15 +8460,19 @@
         return;
       }
       const allowStudentPayments = parent.allowStudentPayments !== false;
-      if (allowStudentPayments) {
-        card.classList.add('hidden');
-        return;
+      if (stateEl) {
+        stateEl.textContent = allowStudentPayments ? 'Enabled' : 'Disabled';
+        stateEl.className = allowStudentPayments
+          ? 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700'
+          : 'text-[10px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-700';
       }
       if (textEl) {
-        textEl.textContent = 'Linked students currently cannot pay invoices. Enable delegation if you want them to pay their own invoices from the student portal.';
+        textEl.textContent = allowStudentPayments
+          ? 'Linked students can pay unpaid invoices from the student portal.'
+          : 'Linked students currently cannot pay invoices. Enable delegation if you want them to pay their own invoices from the student portal.';
       }
       if (btn) {
-        btn.textContent = 'Enable delegation';
+        btn.textContent = allowStudentPayments ? 'Review setting' : 'Enable delegation';
       }
       card.classList.remove('hidden');
     }
@@ -8964,6 +9146,7 @@
           </li>`;
         }).join('') : `<li class="text-slate-500 text-xs">${esc(t('parent.no_messages'))}</li>`;
       }
+      applyParentPortalPanel();
       void renderParentSupportCard();
     }
 
@@ -9850,6 +10033,8 @@
       }
       applyOwnerDashboardPanel();
       applyOwnerSettingsPanel();
+      applyStudentPortalPanel();
+      applyParentPortalPanel();
       renderMaintenanceUI();
     }
 
@@ -11268,6 +11453,8 @@
       renderMaintenanceUI();
       applyOwnerDashboardPanel();
       applyOwnerSettingsPanel();
+      applyStudentPortalPanel();
+      applyParentPortalPanel();
     }
 
     function renderAllViews() {
@@ -11672,6 +11859,36 @@
     function getParentLinkedStudents(parentId) {
       const links = state.parentLinks.filter(pl => pl.parentId === parentId);
       return links.map(pl => getStudentById(pl.studentId)).filter(Boolean);
+    }
+
+    function getLinkedParentsForStudent(studentId) {
+      const sid = cleanId(studentId);
+      if (!sid) return [];
+      const parentIds = state.parentLinks
+        .filter(pl => cleanId(pl.studentId || pl.student_id || '') === sid)
+        .map(pl => cleanId(pl.parentId || pl.parent_id || ''))
+        .filter(Boolean);
+      return Array.from(new Set(parentIds))
+        .map(parentId => getParentById(parentId))
+        .filter(Boolean);
+    }
+
+    function getStudentPaymentDelegationState(studentId) {
+      const sid = cleanId(studentId);
+      const links = state.parentLinks.filter(pl => cleanId(pl.studentId || pl.student_id || '') === sid);
+      if (!links.length) {
+        return { allowed: true, reason: 'no_linked_parent' };
+      }
+      const parents = getLinkedParentsForStudent(sid);
+      if (!parents.length) {
+        return { allowed: true, reason: 'parent_rows_unavailable' };
+      }
+      const allowed = parents.some(parent => parent.allowStudentPayments !== false);
+      return {
+        allowed,
+        reason: allowed ? 'enabled' : 'disabled_by_parent',
+        parents
+      };
     }
 
     function getLatestSignature(studentId) {
