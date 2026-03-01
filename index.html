@@ -552,6 +552,7 @@
 
       #parentProfilePrompt .flex,
       #parentEmailOptInCard .flex,
+      #parentStudentPaymentsCard .flex,
       #parentGuideCard .flex {
         flex-direction: column;
         align-items: stretch;
@@ -559,6 +560,7 @@
 
       #parentCompleteProfileBtn,
       #parentEmailOptInBtn,
+      #parentStudentPaymentsBtn,
       #parentInvoiceAlertActionBtn {
         width: 100%;
       }
@@ -2155,6 +2157,18 @@
                 </button>
               </div>
             </div>
+            <div id="parentStudentPaymentsCard" class="card p-4 hidden border border-sky-200 bg-sky-50/70">
+              <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div>
+                  <div class="text-sm font-semibold text-sky-900">Student payment delegation</div>
+                  <div id="parentStudentPaymentsText" class="text-[11px] text-sky-800"></div>
+                </div>
+                <button id="parentStudentPaymentsBtn"
+                  class="portal-cta-btn portal-cta-subtle text-[11px] w-full sm:w-auto">
+                  Manage
+                </button>
+              </div>
+            </div>
             <div id="parentLoginCodeCard" class="card p-4 space-y-2">
               <div class="flex items-center justify-between gap-2">
                 <h3 class="text-sm font-semibold">Login codes</h3>
@@ -3114,7 +3128,10 @@
           body: { invoice_id: inv.id },
           headers: { Authorization: `Bearer ${accessToken}` }
         });
-        if (error) throw error;
+        if (error) {
+          const meta = await getEdgeInvokeErrorMeta(error, t('alert.payfast_prepare_failed'));
+          throw new Error(meta.message || t('alert.payfast_prepare_failed'));
+        }
         if (!data?.fields || !data?.process_url) {
           throw new Error(data?.error || t('alert.payfast_prepare_failed'));
         }
@@ -3274,7 +3291,8 @@
           verified: true,
           loginCode: 'PRYA4K9Z',
           emailNotificationsOptIn: true,
-          emailNotificationsOptInAt: new Date().toISOString()
+          emailNotificationsOptInAt: new Date().toISOString(),
+          allowStudentPayments: true
         }
       ];
 
@@ -3637,6 +3655,7 @@
         p.loginCode = normalizeCode(p.loginCode || p.login_code || '');
         p.emailNotificationsOptIn = !!(p.emailNotificationsOptIn ?? p.email_notifications_opt_in);
         p.emailNotificationsOptInAt = p.emailNotificationsOptInAt || p.email_notifications_opt_in_at || '';
+        p.allowStudentPayments = (p.allowStudentPayments ?? p.allow_student_payments) !== false;
         if (!p.email || !p.emailNotificationsOptIn) p.emailNotificationsOptInAt = '';
       });
       st.parentLinks.forEach(pl => { pl.id = cleanId(pl.id); pl.parentId = cleanId(pl.parentId); pl.studentId = cleanId(pl.studentId); });
@@ -4009,7 +4028,8 @@
           verified: p.verified || false,
           login_code: loginCode || null,
           email_notifications_opt_in: emailNotificationsOptIn,
-          email_notifications_opt_in_at: emailNotificationsOptInAt
+          email_notifications_opt_in_at: emailNotificationsOptInAt,
+          allow_student_payments: p.allowStudentPayments !== false
         };
       });
       try {
@@ -4826,7 +4846,8 @@
           loginCode: parentCode,
           authUserId: '',
           emailNotificationsOptIn: false,
-          emailNotificationsOptInAt: ''
+          emailNotificationsOptInAt: '',
+          allowStudentPayments: true
         };
 
         state.students.push(testStudent);
@@ -8021,6 +8042,7 @@
       const phoneCode = phoneParts.code;
       const phoneLocal = phoneParts.local;
       const currentEmailOptIn = !!parent.emailNotificationsOptIn;
+      const currentAllowStudentPayments = parent.allowStudentPayments !== false;
       const allowSkip = !opts.forcePrompt;
       const html = `
         <h2 class="text-sm font-semibold mb-1">${title}</h2>
@@ -8043,6 +8065,15 @@
               <span>
                 <span class="font-semibold">Enable service email notices</span>
                 <span class="block text-[11px] text-slate-600 mt-0.5">Receive invoices, overdue reminders, lesson/schedule updates, and policy/domain notices.</span>
+              </span>
+            </label>
+          </div>
+          <div class="portal-consent-card">
+            <label class="flex items-start gap-3 text-[12px] text-slate-800 cursor-pointer">
+              <input type="checkbox" name="allowStudentPayments" ${currentAllowStudentPayments ? 'checked' : ''} class="mt-0.5 h-5 w-5 accent-indigo-600">
+              <span>
+                <span class="font-semibold">Allow linked students to pay invoices</span>
+                <span class="block text-[11px] text-slate-600 mt-0.5">When enabled, your linked student account can open PayFast checkout for their own invoices.</span>
               </span>
             </label>
           </div>
@@ -8087,6 +8118,7 @@
           const name = normalizePersonValue(form.name.value);
           const email = normalizePersonValue(form.email.value).toLowerCase();
           const emailNotificationsOptIn = !!form.emailNotificationsOptIn?.checked;
+          const allowStudentPayments = !!form.allowStudentPayments?.checked;
           if (email && !emailNotificationsOptIn) {
             if (status) status.textContent = 'Please confirm email consent to receive service emails.';
             return;
@@ -8114,6 +8146,7 @@
               phone: phone || '',
               notes: notes || '',
               emailNotificationsOptIn: !!(email && emailNotificationsOptIn),
+              allowStudentPayments,
               emailNotificationsOptInAt: (email && emailNotificationsOptIn)
                 ? ((parent.email === email && parent.emailNotificationsOptIn && parent.emailNotificationsOptInAt) ? parent.emailNotificationsOptInAt : new Date().toISOString())
                 : ''
@@ -8124,7 +8157,14 @@
                 throw new Error(t('alert.sign_in_again'));
               }
               const { data, error } = await supabaseClient.functions.invoke('update-parent-profile', {
-                body: { name, email, phone, notes, email_notifications_opt_in: updates.emailNotificationsOptIn },
+                body: {
+                  name,
+                  email,
+                  phone,
+                  notes,
+                  email_notifications_opt_in: updates.emailNotificationsOptIn,
+                  allow_student_payments: updates.allowStudentPayments
+                },
                 headers: { Authorization: `Bearer ${supabaseSession.access_token}` }
               });
               if (error) throw error;
@@ -8147,6 +8187,7 @@
               parent.emailNotificationsOptInAt = parent.emailNotificationsOptIn
                 ? (applied.email_notifications_opt_in_at || applied.emailNotificationsOptInAt || updates.emailNotificationsOptInAt || '')
                 : '';
+              parent.allowStudentPayments = (applied.allow_student_payments ?? applied.allowStudentPayments ?? updates.allowStudentPayments) !== false;
             }
             saveState();
             markParentProfilePrompted(parent);
@@ -8221,6 +8262,35 @@
       }
       if (btn) {
         btn.textContent = email ? 'Enable now' : 'Add email';
+      }
+      card.classList.remove('hidden');
+    }
+
+    function updateParentStudentPaymentsCard(parent) {
+      const card = document.getElementById('parentStudentPaymentsCard');
+      const textEl = document.getElementById('parentStudentPaymentsText');
+      const btn = document.getElementById('parentStudentPaymentsBtn');
+      const writeLocked = isMaintenanceGracefulWriteBlocked();
+      if (btn) {
+        btn.onclick = () => openParentSelfProfileModal(parent);
+        btn.disabled = writeLocked;
+        btn.title = writeLocked ? 'Temporarily disabled during maintenance restricted mode.' : '';
+      }
+      if (!card) return;
+      if (!parent) {
+        card.classList.add('hidden');
+        return;
+      }
+      const allowStudentPayments = parent.allowStudentPayments !== false;
+      if (allowStudentPayments) {
+        card.classList.add('hidden');
+        return;
+      }
+      if (textEl) {
+        textEl.textContent = 'Linked students currently cannot pay invoices. Enable delegation if you want them to pay their own invoices from the student portal.';
+      }
+      if (btn) {
+        btn.textContent = 'Enable delegation';
       }
       card.classList.remove('hidden');
     }
@@ -8544,6 +8614,7 @@
       }
       updateParentProfilePrompt(parent);
       updateParentEmailOptInCard(parent);
+      updateParentStudentPaymentsCard(parent);
       renderParentCodeTools(parent, students);
       renderParentBulkRescheduleTools(parent, students);
       const guideCard = document.getElementById('parentGuideCard');
@@ -10040,7 +10111,8 @@
           loginCode: normalizeCode(p.login_code),
           authUserId: cleanId(p.auth_user_id || ''),
           emailNotificationsOptIn: !!p.email_notifications_opt_in,
-          emailNotificationsOptInAt: p.email_notifications_opt_in_at || ''
+          emailNotificationsOptInAt: p.email_notifications_opt_in_at || '',
+          allowStudentPayments: p.allow_student_payments !== false
         }));
         merged.parentLinks = (parentLinksRes?.data || []).map(pl => ({
           id: pl.id,
@@ -10381,7 +10453,8 @@
           loginCode: normalizeCode(p.login_code),
           authUserId: cleanId(p.auth_user_id || ''),
           emailNotificationsOptIn: !!p.email_notifications_opt_in,
-          emailNotificationsOptInAt: p.email_notifications_opt_in_at || ''
+          emailNotificationsOptInAt: p.email_notifications_opt_in_at || '',
+          allowStudentPayments: p.allow_student_payments !== false
         }));
         out.parentLinks = (snap.parentLinks || []).map(pl => ({
           id: pl.id,
@@ -10773,7 +10846,8 @@
         loginCode: normalizeCode(p.login_code),
         authUserId: cleanId(p.auth_user_id || ''),
         emailNotificationsOptIn: !!p.email_notifications_opt_in,
-        emailNotificationsOptInAt: p.email_notifications_opt_in_at || ''
+        emailNotificationsOptInAt: p.email_notifications_opt_in_at || '',
+        allowStudentPayments: p.allow_student_payments !== false
       }));
       merged.parentLinks = parentLinksData.map(pl => ({
         id: pl.id,
@@ -12033,7 +12107,8 @@
             notes: form.notes.value.trim(),
             loginCode,
             emailNotificationsOptIn: !!(emailVal && emailNotificationsOptIn),
-            emailNotificationsOptInAt
+            emailNotificationsOptInAt,
+            allowStudentPayments: parent?.allowStudentPayments !== false
           };
           const taken = newParent.email && state.parents.some(p => p.email === newParent.email && p.id !== newParent.id);
           if (taken) {
