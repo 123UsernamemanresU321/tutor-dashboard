@@ -7291,7 +7291,7 @@
       if (!listEl || !newBtn || !refreshBtn) return;
       const blocked = isMaintenanceGracefulWriteBlocked() || isMaintenanceHardStopForViewer();
       newBtn.disabled = blocked;
-      newBtn.title = blocked ? 'Temporarily disabled during maintenance restricted mode.' : '';
+      newBtn.title = blocked ? t('maintenance.write_locked_hint') : '';
       newBtn.onclick = () => openSupportTicketComposer();
       refreshBtn.onclick = () => void renderParentSupportCard({ force: true });
       if (!isSupabaseReady() || !parentMode) {
@@ -7317,7 +7317,7 @@
       if (!listEl || !newBtn) return;
       const blocked = isMaintenanceGracefulWriteBlocked() || isMaintenanceHardStopForViewer();
       newBtn.disabled = blocked;
-      newBtn.title = blocked ? 'Temporarily disabled during maintenance restricted mode.' : '';
+      newBtn.title = blocked ? t('maintenance.write_locked_hint') : '';
       newBtn.onclick = () => openSupportTicketComposer();
       if (!isSupabaseReady() || !studentMode) {
         setSupportStatusText(statusElId, 'Sign in to view support tickets.');
@@ -8433,10 +8433,6 @@
           const email = normalizePersonValue(form.email.value).toLowerCase();
           const emailNotificationsOptIn = !!form.emailNotificationsOptIn?.checked;
           const allowStudentPayments = !!form.allowStudentPayments?.checked;
-          if (email && !emailNotificationsOptIn) {
-            if (status) status.textContent = t('parent.email_consent_required');
-            return;
-          }
           const phone = buildPhoneValue(form.phoneCode.value, form.phoneLocal.value);
           const notes = normalizePersonValue(form.notes.value);
           if (!name) {
@@ -8564,18 +8560,15 @@
         return;
       }
       const email = normalizePersonValue(parent.email || '').toLowerCase();
-      const optedIn = !!parent.emailNotificationsOptIn && !!email;
-      if (optedIn) {
+      if (email) {
         card.classList.add('hidden');
         return;
       }
       if (textEl) {
-        textEl.textContent = email
-          ? t('parent.email_notices_enable_hint')
-          : t('parent.email_notices_add_email_hint');
+        textEl.textContent = t('parent.email_notices_add_email_hint');
       }
       if (btn) {
-        btn.textContent = email ? t('parent.enable_now') : t('parent.add_email');
+        btn.textContent = t('parent.add_email');
       }
       card.classList.remove('hidden');
     }
@@ -8745,7 +8738,7 @@
           renderParentPortal();
         } catch (err) {
           console.warn('Parent login code regeneration failed', err);
-          setParentCodeStatus(err?.message || 'Unable to regenerate login code.', 'error');
+          setParentCodeStatus(err?.message || t('alert.profile_update_failed_generic'), 'error');
         } finally {
           regenerateBtn.disabled = !targets.length || writeLocked;
         }
@@ -8834,7 +8827,7 @@
       newDaySelect.disabled = !safeStudents.length || writeLocked;
       newTimeInput.disabled = !safeStudents.length || writeLocked;
       applyBtn.disabled = !safeStudents.length || writeLocked;
-      applyBtn.title = writeLocked ? 'Temporarily disabled during maintenance restricted mode.' : '';
+      applyBtn.title = writeLocked ? t('maintenance.write_locked_hint') : '';
 
       applyBtn.onclick = async () => {
         if (!guardMaintenanceWrite('Recurring schedule update')) return;
@@ -8929,7 +8922,7 @@
       if (editProfileBtn) {
         editProfileBtn.onclick = () => openParentSelfProfileModal(parent);
         editProfileBtn.disabled = maintenanceWriteLocked;
-        editProfileBtn.title = maintenanceWriteLocked ? 'Temporarily disabled during maintenance restricted mode.' : '';
+        editProfileBtn.title = maintenanceWriteLocked ? t('maintenance.write_locked_hint') : '';
       }
       updateParentProfilePrompt(parent);
       updateParentEmailOptInCard(parent);
@@ -8951,7 +8944,7 @@
           const contractAction = signed
             ? `<button class="portal-cta-btn portal-cta-subtle opacity-60 cursor-not-allowed" disabled>${t('parent.contract_signed_button')}</button>`
             : maintenanceWriteLocked
-              ? `<button class="portal-cta-btn portal-cta-subtle opacity-60 cursor-not-allowed" disabled title="Temporarily disabled during maintenance restricted mode.">${t('parent.sign_contract_button')}</button>`
+              ? `<button class="portal-cta-btn portal-cta-subtle opacity-60 cursor-not-allowed" disabled title="${esc(t('maintenance.write_locked_hint'))}">${t('parent.sign_contract_button')}</button>`
               : `<button class="portal-cta-btn portal-cta-contract" onclick="event.stopPropagation(); openContractLink('${safeStudentId}')" aria-label="Sign contract for ${esc(s.name)}">${t('parent.sign_contract_button')}</button>`;
           const aiSummaryBtn = isOwner()
             ? `<button id="btn-summary-${safeStudentId}" class="px-2 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50" onclick="parentSummaryAI('${safeStudentId}')">${t('parent.ai_summary_button')}</button>`
@@ -9057,7 +9050,7 @@
                     <li class="flex items-center justify-between gap-2">
                       <span>${esc(s.name)}</span>
                       ${maintenanceWriteLocked
-            ? `<button class="portal-cta-btn portal-cta-subtle opacity-60 cursor-not-allowed" disabled title="Temporarily disabled during maintenance restricted mode.">${t('parent.guide_sign_button')}</button>`
+            ? `<button class="portal-cta-btn portal-cta-subtle opacity-60 cursor-not-allowed" disabled title="${esc(t('maintenance.write_locked_hint'))}">${t('parent.guide_sign_button')}</button>`
             : `<button class="portal-cta-btn portal-cta-contract"
                         onclick="openContractLink('${safeStudentId}')">${t('parent.guide_sign_button')}</button>`}
                     </li>
@@ -9083,7 +9076,7 @@
                     <li class="flex items-center justify-between gap-2">
                       <span>${esc(stu?.name || t('common.student'))} • ${esc(inv.dueDate || t('common.na'))} • R ${esc(Number(inv.total || 0).toFixed(2))}</span>
                       ${maintenanceWriteLocked
-            ? `<button class="portal-cta-btn portal-cta-subtle opacity-60 cursor-not-allowed" disabled title="Temporarily disabled during maintenance restricted mode.">${t('invoice.pay_now')}</button>`
+            ? `<button class="portal-cta-btn portal-cta-subtle opacity-60 cursor-not-allowed" disabled title="${esc(t('maintenance.write_locked_hint'))}">${t('invoice.pay_now')}</button>`
             : `<button class="portal-cta-btn portal-cta-pay"
                         onclick="startPayfastPayment('${safeInvId}')">${t('invoice.pay_now')}</button>`}
                     </li>
@@ -9259,7 +9252,7 @@
               ${aiBtn}
               ${!inv.paid && !isInvoiceVoid(inv) && (inv.invoiceType || inv.invoice_type) !== 'refund'
                 ? maintenanceWriteLocked
-                  ? `<button class="parent-pay-now-btn portal-cta-btn portal-cta-subtle opacity-60 cursor-not-allowed" disabled title="Temporarily disabled during maintenance restricted mode.">${t('invoice.pay_now')}</button>`
+                  ? `<button class="parent-pay-now-btn portal-cta-btn portal-cta-subtle opacity-60 cursor-not-allowed" disabled title="${esc(t('maintenance.write_locked_hint'))}">${t('invoice.pay_now')}</button>`
                   : `<button class="parent-pay-now-btn portal-cta-btn portal-cta-pay" onclick="startPayfastPayment('${safeInvId}')" aria-label="Pay invoice ${esc(inv.id)} now">${t('invoice.pay_now')}</button>`
                 : ''}
             </div>
@@ -12288,8 +12281,10 @@
           <div>
             <div class="font-semibold">${esc(p.name || p.email || '')}</div>
             <div class="text-[10px] text-slate-500">${esc(p.email || '')}</div>
-            <div class="text-[10px] ${p.emailNotificationsOptIn ? 'text-emerald-700' : 'text-amber-700'}">
-              ${p.email ? (p.emailNotificationsOptIn ? 'Email notifications: enabled' : 'Email notifications: consent missing') : 'Email notifications: no email'}
+            <div class="text-[10px] ${p.email ? 'text-emerald-700' : 'text-amber-700'}">
+              ${p.email
+          ? (p.emailNotificationsOptIn ? t('parent.email_status_marketing_enabled') : t('parent.email_status_service_only'))
+          : t('parent.email_status_no_email')}
             </div>
             <div class="text-[10px] text-slate-500">${esc(kidNames)}</div>
             ${codeChip ? `<div class="mt-1">${codeChip}</div>` : ''}
@@ -12443,10 +12438,6 @@
           e.preventDefault();
           const emailVal = form.email.value.trim().toLowerCase();
           const emailNotificationsOptIn = !!form.emailNotificationsOptIn?.checked;
-          if (emailVal && !emailNotificationsOptIn) {
-            alert('Please confirm email consent before saving this parent email.');
-            return;
-          }
           const previousEmail = String(parent?.email || '').trim().toLowerCase();
           const previousOptInAt = String(parent?.emailNotificationsOptInAt || '').trim();
           const emailNotificationsOptInAt = emailVal && emailNotificationsOptIn
