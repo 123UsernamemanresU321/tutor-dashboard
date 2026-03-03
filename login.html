@@ -206,6 +206,10 @@
           <label data-i18n="auth.password">Password</label>
           <input type="password" name="password" required autocomplete="current-password">
         </div>
+        <label class="mt-3" style="display:flex;align-items:center;gap:8px;">
+          <input id="ownerRememberMe" type="checkbox" checked style="width:auto;">
+          <span data-i18n="auth.remember_me">Remember me on this device</span>
+        </label>
         <button type="submit" class="primary mt-4" data-i18n="auth.sign_in">Sign in</button>
       </form>
       <button id="forgotBtn" class="secondary mt-2" data-i18n="auth.forgot_password">Forgot password</button>
@@ -222,14 +226,17 @@
           <input type="text" name="code" required class="font-mono text-center tracking-widest uppercase"
             placeholder="XXXXXX" data-i18n-attr="placeholder:auth.access_code">
         </div>
+        <label class="mt-3" style="display:flex;align-items:center;gap:8px;">
+          <input id="parentRememberMe" type="checkbox" checked style="width:auto;">
+          <span data-i18n="auth.remember_me">Remember me on this device</span>
+        </label>
         <button type="submit" class="primary mt-4" data-i18n="auth.enter">Enter</button>
       </form>
-      <button id="parentForgotToggleBtn" type="button" class="secondary mt-2" data-i18n="auth.parent_forgot_toggle">Forgot login code?</button>
-      <div id="parentForgotPanel" class="hidden mt-3">
+      <div class="mt-4 text-sm" style="color:#64748b;" data-i18n="auth.parent_magic_option_title">Or sign in with one-time email link</div>
+      <div id="parentMagicPanel" class="mt-2">
         <label for="parentRecoveryEmail" data-i18n="auth.parent_recovery_email_label">Parent email</label>
         <input id="parentRecoveryEmail" type="email" autocomplete="email" placeholder="you@example.com"
           data-i18n-attr="placeholder:auth.parent_recovery_email_placeholder">
-        <button id="parentForgotSubmitBtn" type="button" class="secondary mt-2" data-i18n="auth.parent_send_login_code">Send login code</button>
         <button id="parentMagicSubmitBtn" type="button" class="secondary mt-2" data-i18n="auth.parent_send_magic_link">Email one-time sign-in link</button>
         <div id="parentRecoveryMsg" class="success hidden"></div>
       </div>
@@ -246,6 +253,10 @@
           <input type="text" name="code" required class="font-mono text-center tracking-widest uppercase"
             placeholder="XXXXXX" data-i18n-attr="placeholder:auth.student_code">
         </div>
+        <label class="mt-3" style="display:flex;align-items:center;gap:8px;">
+          <input id="studentRememberMe" type="checkbox" checked style="width:auto;">
+          <span data-i18n="auth.remember_me">Remember me on this device</span>
+        </label>
         <button type="submit" class="primary mt-4" data-i18n="auth.start_learning">Start Learning</button>
       </form>
     </div>
@@ -279,9 +290,38 @@
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     // Login page does not use realtime channels; disconnect to avoid noisy suspended websocket logs.
     try { supabaseClient.realtime.disconnect(); } catch (_) { }
-    const CODE_EMAIL_SUFFIX = '@codes.tutor';
-    const forgotCodeGenericMessage = () => t('auth.parent_code_generic_message');
     const forgotMagicGenericMessage = () => t('auth.parent_magic_generic_message');
+    const LOGIN_PREFS_KEY = 'tutor_login_prefs_v1';
+
+    function loadLoginPrefs() {
+      try {
+        const raw = localStorage.getItem(LOGIN_PREFS_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        return (parsed && typeof parsed === 'object') ? parsed : {};
+      } catch (_) {
+        return {};
+      }
+    }
+
+    function saveLoginPrefs(next) {
+      try {
+        localStorage.setItem(LOGIN_PREFS_KEY, JSON.stringify(next || {}));
+      } catch (_) { }
+    }
+
+    function updateRememberPrefs(role, rememberChecked, values = {}) {
+      const prefs = loadLoginPrefs();
+      prefs.lastTab = role;
+      prefs[`${role}Remember`] = !!rememberChecked;
+      Object.keys(values).forEach((key) => {
+        if (rememberChecked && values[key]) {
+          prefs[key] = values[key];
+        } else {
+          delete prefs[key];
+        }
+      });
+      saveLoginPrefs(prefs);
+    }
 
 
     // Silence noisy "output" reference errors some browsers surface
@@ -310,27 +350,52 @@
       return false;
     });
 
+    function activateTab(tabName) {
+      const targetTab = String(tabName || '').trim().toLowerCase();
+      if (!targetTab) return;
+      const btn = document.querySelector(`.tab-btn[data-tab="${targetTab}"]`);
+      if (!btn) return;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+      btn.classList.add('active');
+      const panel = document.getElementById(`${targetTab}-tab`);
+      if (panel) panel.classList.remove('hidden');
+      const msgEl = document.getElementById('msg');
+      if (msgEl) msgEl.textContent = '';
+    }
+
     // Tabs logic
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-        btn.classList.add('active');
-        document.getElementById(`${btn.dataset.tab}-tab`).classList.remove('hidden');
-        document.getElementById('msg').textContent = '';
+        activateTab(btn.dataset.tab);
+        const prefs = loadLoginPrefs();
+        prefs.lastTab = btn.dataset.tab || 'owner';
+        saveLoginPrefs(prefs);
       });
     });
 
     if (window.initLanguageUI) initLanguageUI();
 
+    const loginPrefs = loadLoginPrefs();
     const ownerForm = document.getElementById('ownerForm');
     const msg = document.getElementById('msg');
+    const ownerRememberMe = document.getElementById('ownerRememberMe');
+    const parentRememberMe = document.getElementById('parentRememberMe');
+    const studentRememberMe = document.getElementById('studentRememberMe');
+
+    if (ownerRememberMe) ownerRememberMe.checked = loginPrefs.ownerRemember !== false;
+    if (parentRememberMe) parentRememberMe.checked = loginPrefs.parentRemember !== false;
+    if (studentRememberMe) studentRememberMe.checked = loginPrefs.studentRemember !== false;
+    if (ownerForm?.email && loginPrefs.ownerRemember && loginPrefs.ownerEmail) {
+      ownerForm.email.value = String(loginPrefs.ownerEmail);
+    }
 
     ownerForm.onsubmit = async (e) => {
       e.preventDefault();
       msg.textContent = '';
       const email = ownerForm.email.value.trim();
       const password = ownerForm.password.value;
+      updateRememberPrefs('owner', !!ownerRememberMe?.checked, { ownerEmail: email });
 
       try {
         const { data, error } = await supabaseClient.functions.invoke('owner-password-login', {
@@ -429,51 +494,27 @@
 
     document.getElementById('studentForm').onsubmit = (e) => {
       e.preventDefault();
+      updateRememberPrefs('student', !!studentRememberMe?.checked);
       handleCodeLogin(e.target.code.value, 'student');
     };
 
     document.getElementById('parentForm').onsubmit = (e) => {
       e.preventDefault();
+      updateRememberPrefs('parent', !!parentRememberMe?.checked);
       handleCodeLogin(e.target.code.value, 'parent');
     };
-
-    const parentForgotToggleBtn = document.getElementById('parentForgotToggleBtn');
-    const parentForgotPanel = document.getElementById('parentForgotPanel');
-    const parentForgotSubmitBtn = document.getElementById('parentForgotSubmitBtn');
     const parentRecoveryEmail = document.getElementById('parentRecoveryEmail');
     const parentRecoveryMsg = document.getElementById('parentRecoveryMsg');
     const parentMagicSubmitBtn = document.getElementById('parentMagicSubmitBtn');
 
-    if (parentForgotToggleBtn && parentForgotPanel) {
-      parentForgotToggleBtn.onclick = () => {
-        parentForgotPanel.classList.toggle('hidden');
-        if (parentRecoveryMsg) parentRecoveryMsg.classList.add('hidden');
-      };
-    }
-
-    if (parentForgotSubmitBtn && parentRecoveryEmail && parentRecoveryMsg) {
-      parentForgotSubmitBtn.onclick = async () => {
-        const email = String(parentRecoveryEmail.value || '').trim().toLowerCase();
-        parentForgotSubmitBtn.disabled = true;
-        try {
-          await supabaseClient.functions.invoke('recover-login-code', {
-            body: { email }
-          });
-        } catch (_) {
-          // Anti-enumeration flow: always show the same message.
-        } finally {
-          parentRecoveryMsg.textContent = forgotCodeGenericMessage();
-          parentRecoveryMsg.classList.remove('hidden');
-          parentRecoveryMsg.classList.remove('error');
-          parentRecoveryMsg.classList.add('success');
-          parentForgotSubmitBtn.disabled = false;
-        }
-      };
+    if (parentRecoveryEmail && loginPrefs.parentRemember && loginPrefs.parentRecoveryEmail) {
+      parentRecoveryEmail.value = String(loginPrefs.parentRecoveryEmail);
     }
 
     if (parentMagicSubmitBtn && parentRecoveryEmail && parentRecoveryMsg) {
       parentMagicSubmitBtn.onclick = async () => {
         const email = String(parentRecoveryEmail.value || '').trim().toLowerCase();
+        updateRememberPrefs('parent', !!parentRememberMe?.checked, { parentRecoveryEmail: email });
         parentMagicSubmitBtn.disabled = true;
         try {
           await supabaseClient.functions.invoke('request-parent-magic-link', {
@@ -490,6 +531,8 @@
         }
       };
     }
+
+    activateTab(loginPrefs.lastTab || 'owner');
 
     async function consumeParentMagicTokenFromUrl() {
       const url = new URL(window.location.href);
