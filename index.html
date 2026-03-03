@@ -5558,6 +5558,7 @@
       if (maintenanceSaveBtn) {
         maintenanceSaveBtn.addEventListener('click', async () => {
           if (!isOwner()) return;
+          const previousSettings = { ...state.settings };
           const modeSelect = document.getElementById('maintenanceModeSelect');
           const warningStartInput = document.getElementById('maintenanceWarningStartInput');
           const retryAfterInput = document.getElementById('maintenanceRetryAfterInput');
@@ -5607,14 +5608,20 @@
           state.settings.maintenanceStart = toDateOnly(startDate);
           state.settings.maintenanceEnd = endDate ? toDateOnly(endDate) : '';
           state.settings.maintenanceMessage = (msgInput?.value || '').trim();
-          saveState();
+          saveState({ skipSync: true });
           applySettingsToUI();
           renderMaintenanceUI();
           try {
+            await persistOwnerMaintenanceSettingsNow();
             await syncHardStopEdgeGate('maintenance_schedule');
+            queueSupabaseSync(500);
           } catch (err) {
-            console.warn('Hard-stop sync failed after scheduling maintenance', err);
-            alert(`Maintenance saved, but Cloudflare hard-stop sync failed.\n${err?.message || err}`);
+            console.warn('Maintenance schedule sync failed', err);
+            state.settings = { ...previousSettings };
+            saveState({ skipSync: true });
+            applySettingsToUI();
+            renderMaintenanceUI();
+            alert(`Maintenance schedule failed and was rolled back.\n${err?.message || err}`);
           }
         });
       }
@@ -5622,6 +5629,7 @@
         maintenanceStartNowBtn.addEventListener('click', async () => {
           if (!isOwner()) return;
           if (!confirm(t('maintenance.confirm_start_now'))) return;
+          const previousSettings = { ...state.settings };
           const modeSelect = document.getElementById('maintenanceModeSelect');
           const warningStartInput = document.getElementById('maintenanceWarningStartInput');
           const retryAfterInput = document.getElementById('maintenanceRetryAfterInput');
@@ -5643,14 +5651,20 @@
           state.settings.maintenanceStart = toDateOnly(now);
           state.settings.maintenanceEnd = '';
           state.settings.maintenanceMessage = (msgInput?.value || '').trim();
-          saveState();
+          saveState({ skipSync: true });
           applySettingsToUI();
           renderMaintenanceUI();
           try {
+            await persistOwnerMaintenanceSettingsNow();
             await syncHardStopEdgeGate('maintenance_start_now');
+            queueSupabaseSync(500);
           } catch (err) {
-            console.warn('Hard-stop sync failed after maintenance start-now', err);
-            alert(`Maintenance started, but Cloudflare hard-stop sync failed.\n${err?.message || err}`);
+            console.warn('Maintenance start-now sync failed', err);
+            state.settings = { ...previousSettings };
+            saveState({ skipSync: true });
+            applySettingsToUI();
+            renderMaintenanceUI();
+            alert(`Maintenance start failed and was rolled back.\n${err?.message || err}`);
           }
         });
       }
@@ -5668,18 +5682,20 @@
           state.settings.maintenanceMode = 'graceful';
           state.settings.maintenanceRetryAfterSeconds = 3600;
           state.settings.maintenanceMessage = '';
-          saveState();
+          saveState({ skipSync: true });
           applySettingsToUI();
           renderMaintenanceUI();
           try {
+            await persistOwnerMaintenanceSettingsNow();
             await syncHardStopEdgeGate('maintenance_clear');
+            queueSupabaseSync(500);
           } catch (err) {
-            console.warn('Hard-stop sync failed after maintenance clear', err);
+            console.warn('Maintenance clear sync failed', err);
             state.settings = { ...previousSettings };
-            saveState();
+            saveState({ skipSync: true });
             applySettingsToUI();
             renderMaintenanceUI();
-            alert(`Maintenance clear was rolled back because Cloudflare hard-stop sync failed.\n${err?.message || err}`);
+            alert(`Maintenance clear failed and was rolled back.\n${err?.message || err}`);
           }
         });
       }
@@ -6014,6 +6030,91 @@
         }
       }
       return { status, message: message || fallbackMessage };
+    }
+
+    async function persistOwnerMaintenanceSettingsNow() {
+      if (!isOwner()) return { skipped: true };
+      if (!isSupabaseReady()) {
+        throw new Error('Supabase is unavailable right now. Please sign out and sign in again, then retry.');
+      }
+      const uid = String(supabaseSession?.user?.id || '').trim();
+      if (!uid) {
+        throw new Error('Supabase session is missing. Please sign out and sign in again, then retry.');
+      }
+
+      const settingsRowFull = {
+        user_id: uid,
+        maintenance_enabled: !!state.settings.maintenanceEnabled,
+        maintenance_mode: normalizeMaintenanceMode(state.settings.maintenanceMode || 'graceful'),
+        maintenance_start: state.settings.maintenanceStart || null,
+        maintenance_end: state.settings.maintenanceEnd || null,
+        maintenance_start_at: state.settings.maintenanceStartAt || null,
+        maintenance_end_at: state.settings.maintenanceEndAt || null,
+        maintenance_warning_start_at: state.settings.maintenanceWarningStartAt || null,
+        maintenance_retry_after_seconds: Math.max(60, Number(state.settings.maintenanceRetryAfterSeconds || 3600) || 3600),
+        maintenance_message: (state.settings.maintenanceMessage || '').trim() || null,
+        updated_at: new Date().toISOString()
+      };
+      const settingsRowMid = {
+        user_id: uid,
+        maintenance_enabled: !!state.settings.maintenanceEnabled,
+        maintenance_start: state.settings.maintenanceStart || null,
+        maintenance_end: state.settings.maintenanceEnd || null,
+        maintenance_start_at: state.settings.maintenanceStartAt || null,
+        maintenance_end_at: state.settings.maintenanceEndAt || null,
+        maintenance_message: (state.settings.maintenanceMessage || '').trim() || null,
+        updated_at: new Date().toISOString()
+      };
+      const settingsRowLegacy = {
+        user_id: uid,
+        maintenance_enabled: !!state.settings.maintenanceEnabled,
+        maintenance_start: state.settings.maintenanceStart || null,
+        maintenance_end: state.settings.maintenanceEnd || null,
+        maintenance_message: (state.settings.maintenanceMessage || '').trim() || null,
+        updated_at: new Date().toISOString()
+      };
+
+      let { error: settingsErr } = await supabaseClient
+        .from('owner_settings')
+        .upsert(settingsRowFull, { onConflict: 'user_id' });
+      if (settingsErr && isNetworkLoadFailure(settingsErr)) {
+        throw new Error('Could not persist maintenance settings due to network/CORS issues.');
+      }
+
+      if (settingsErr) {
+        const msg = String(settingsErr.message || settingsErr).toLowerCase();
+        if (
+          msg.includes('maintenance_mode') ||
+          msg.includes('maintenance_warning_start_at') ||
+          msg.includes('maintenance_retry_after_seconds')
+        ) {
+          const mid = await supabaseClient
+            .from('owner_settings')
+            .upsert(settingsRowMid, { onConflict: 'user_id' });
+          settingsErr = mid.error;
+          if (settingsErr && isNetworkLoadFailure(settingsErr)) {
+            throw new Error('Could not persist maintenance settings due to network/CORS issues.');
+          }
+        }
+      }
+
+      if (settingsErr) {
+        const nextMsg = String(settingsErr.message || settingsErr).toLowerCase();
+        if (nextMsg.includes('maintenance_start_at') || nextMsg.includes('maintenance_end_at')) {
+          const { error: legacyErr } = await supabaseClient
+            .from('owner_settings')
+            .upsert(settingsRowLegacy, { onConflict: 'user_id' });
+          settingsErr = legacyErr;
+          if (settingsErr && isNetworkLoadFailure(settingsErr)) {
+            throw new Error('Could not persist maintenance settings due to network/CORS issues.');
+          }
+        }
+      }
+
+      if (settingsErr) {
+        throw new Error(String(settingsErr.message || settingsErr || 'Owner settings update failed.'));
+      }
+      return { success: true };
     }
 
     async function syncHardStopEdgeGate(source = 'dashboard_maintenance') {
