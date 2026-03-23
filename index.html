@@ -1894,6 +1894,21 @@
                 <ul id="debugTestPairsList" class="space-y-2 max-h-56 overflow-y-auto scrollbar-thin"></ul>
               </div>
 
+              <div class="card p-5 text-xs space-y-3" data-owner-only data-owner-settings-panel="operations">
+                <h3 class="text-sm font-semibold mb-1">School term calendars</h3>
+                <p class="text-[11px] text-slate-500">
+                  Assign school-term date ranges to students so recurring sessions and monthly invoices only generate inside those windows.
+                </p>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button id="addTermCalendarBtn"
+                    class="px-3 py-1.5 rounded-2xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800">
+                    Add term calendar
+                  </button>
+                </div>
+                <div id="termCalendarsAdminStatus" class="text-[11px] text-slate-600 hidden"></div>
+                <ul id="termCalendarsAdminList" class="space-y-2 max-h-56 overflow-y-auto scrollbar-thin"></ul>
+              </div>
+
               <div class="card p-5 text-xs space-y-3" data-owner-settings-panel="general">
                 <h3 class="text-sm font-semibold mb-1" data-i18n="settings.data_backup">Data backup</h3>
                 <p data-i18n="settings.data_backup_hint">Export your dashboard data as JSON and paste it somewhere safe. You can import it later.</p>
@@ -2919,6 +2934,46 @@
       return slots;
     }
 
+    function getTermCalendarById(calendarId) {
+      const id = cleanId(calendarId);
+      if (!id) return null;
+      return (state.termCalendars || []).find(cal => cleanId(cal.id) === id) || null;
+    }
+
+    function getStudentTermCalendarId(student) {
+      return cleanId(student?.termCalendarId || student?.term_calendar_id || '');
+    }
+
+    function getStudentTermCalendar(student) {
+      const calendarId = getStudentTermCalendarId(student);
+      return calendarId ? getTermCalendarById(calendarId) : null;
+    }
+
+    function getStudentTermRanges(student) {
+      const calendarId = getStudentTermCalendarId(student);
+      if (!calendarId) return null;
+      const calendar = getTermCalendarById(calendarId);
+      return Array.isArray(calendar?.ranges) ? calendar.ranges : [];
+    }
+
+    function isDateWithinAnyTermRange(dateStr, ranges) {
+      if (!Array.isArray(ranges)) return false;
+      return ranges.some(range => isDateWithinRange(dateStr, range.startDate || range.start_date || '', range.endDate || range.end_date || ''));
+    }
+
+    function isDateAllowedForStudentSchedule(student, dateStr) {
+      const ranges = getStudentTermRanges(student);
+      if (ranges === null) return true;
+      if (!ranges.length) return false;
+      return isDateWithinAnyTermRange(dateStr, ranges);
+    }
+
+    function formatTermCalendarLabel(calendar) {
+      if (!calendar) return t('term.none');
+      const meta = [calendar.schoolName, calendar.academicYear].filter(Boolean).join(' • ');
+      return meta ? `${calendar.name} (${meta})` : String(calendar.name || '').trim();
+    }
+
     function formatScheduleSlotLabel(slot) {
       const dayLabel = getDayOfWeekLabel(slot.dayOfWeek);
       const duration = Number(slot.durationHours || 0) || Number(state.settings.defaultSessionDuration || 1);
@@ -2995,15 +3050,20 @@
       return results;
     }
 
-    function listScheduleOccurrences(slots, start, end) {
+    function listScheduleOccurrences(slots, start, end, options = {}) {
       const results = [];
       if (!slots.length || !start || !end) return results;
+      const student = options?.student || null;
       const cursor = new Date(start);
       cursor.setHours(0, 0, 0, 0);
       const endDate = new Date(end);
       endDate.setHours(0, 0, 0, 0);
       while (cursor <= endDate) {
         const dateStr = toDateOnly(cursor);
+        if (student && !isDateAllowedForStudentSchedule(student, dateStr)) {
+          cursor.setDate(cursor.getDate() + 1);
+          continue;
+        }
         if (isBusyDate(dateStr)) {
           cursor.setDate(cursor.getDate() + 1);
           continue;
@@ -3024,7 +3084,8 @@
       const scheduleStartDate = student.scheduleStartDate || student.schedule_start_date || '';
       const timezone = student.scheduleTimezone || student.schedule_timezone || DEFAULT_TIMEZONE;
       const scheduleNotes = student.scheduleNotes || student.schedule_notes || '';
-      return { scheduleSlots, scheduleStartDate, timezone, scheduleNotes };
+      const termCalendar = getStudentTermCalendar(student);
+      return { scheduleSlots, scheduleStartDate, timezone, scheduleNotes, termCalendar };
     }
 
     function formatScheduleSummary(student) {
@@ -3034,7 +3095,8 @@
       const startLabel = prefs.scheduleStartDate
         ? t('schedule.summary_start', { date: prefs.scheduleStartDate })
         : '';
-      return t('schedule.summary', { slots: slotLabel, start: startLabel ? ` ${startLabel}` : '' });
+      const termLabel = prefs.termCalendar ? ` • ${formatTermCalendarLabel(prefs.termCalendar)}` : '';
+      return t('schedule.summary', { slots: slotLabel, start: `${startLabel ? ` ${startLabel}` : ''}${termLabel}` });
     }
 
     function computeInvoiceTotal(baseAmount, inv) {
@@ -3236,6 +3298,7 @@
 
     const defaultState = {
       students: [],
+      termCalendars: [],
       parents: [],
       parentLinks: [],
       sessions: [],
@@ -3688,15 +3751,37 @@
     }
 
     function sanitizeState(st) {
-      ['students', 'parents', 'parentLinks', 'sessions', 'sessionCancellations', 'busyDays', 'resources', 'homework', 'documents', 'contracts', 'invoices', 'studentTodos', 'studentCheckins', 'messages'].forEach(key => {
+      ['students', 'termCalendars', 'parents', 'parentLinks', 'sessions', 'sessionCancellations', 'busyDays', 'resources', 'homework', 'documents', 'contracts', 'invoices', 'studentTodos', 'studentCheckins', 'messages'].forEach(key => {
         if (!Array.isArray(st[key])) st[key] = [];
       });
       if (!st.settings || typeof st.settings !== 'object') st.settings = {};
       st.settings = Object.assign({}, defaultState.settings, st.settings);
       if (!Array.isArray(st.activityLog)) st.activityLog = [];
+      st.termCalendars.forEach(cal => {
+        cal.id = cleanId(cal.id);
+        cal.name = String(cal.name || '').trim();
+        cal.schoolName = String(cal.schoolName || cal.school_name || '').trim();
+        cal.academicYear = Number(cal.academicYear || cal.academic_year || 0) || '';
+        cal.notes = String(cal.notes || '').trim();
+        if (!Array.isArray(cal.ranges)) cal.ranges = Array.isArray(cal.termRanges) ? cal.termRanges : [];
+        cal.ranges = cal.ranges.map((range, idx) => {
+          const start = parseDateOnly(range.startDate || range.start_date || '');
+          const end = parseDateOnly(range.endDate || range.end_date || '');
+          return {
+            id: cleanId(range.id),
+            label: String(range.label || '').trim(),
+            startDate: start ? toDateOnly(start) : String(range.startDate || range.start_date || '').slice(0, 10),
+            endDate: end ? toDateOnly(end) : String(range.endDate || range.end_date || '').slice(0, 10),
+            sortOrder: Number(range.sortOrder || range.sort_order || idx || 0) || 0
+          };
+        }).filter(range => range.startDate && range.endDate)
+          .sort((a, b) => compareDateOnly(a.startDate, b.startDate) || compareDateOnly(a.endDate, b.endDate) || a.sortOrder - b.sortOrder);
+      });
+      st.termCalendars.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')) || String(a.schoolName || '').localeCompare(String(b.schoolName || '')));
       st.students.forEach(s => {
         s.id = cleanId(s.id);
         s.authUserId = cleanId(s.authUserId || s.auth_user_id || '');
+        s.termCalendarId = cleanId(s.termCalendarId || s.term_calendar_id || '');
         s.studentEmail = (s.studentEmail || s.student_email || '').trim().toLowerCase();
         s.contractSigned = !!s.contractSigned;
         s.contractSignedAt = s.contractSignedAt || s.contract_signed_at || '';
@@ -3863,6 +3948,10 @@
 
     function enforceUuidFields() {
       state.students.forEach(s => { s.id = forceUuid(s.id); });
+      state.termCalendars.forEach(cal => {
+        cal.id = forceUuid(cal.id);
+        (cal.ranges || []).forEach(range => { range.id = forceUuid(range.id); });
+      });
       state.parents.forEach(p => { p.id = forceUuid(p.id); });
       state.parentLinks.forEach(pl => { pl.id = forceUuid(pl.id); pl.parentId = forceUuid(pl.parentId); pl.studentId = forceUuid(pl.studentId); });
       state.sessions.forEach(sess => { sess.id = forceUuid(sess.id); sess.studentIds = (sess.studentIds || []).map(forceUuid); sess.invoiceId = cleanId(sess.invoiceId); });
@@ -3890,6 +3979,7 @@
       sanitizeState(state);
       const maps = {
         students: new Map(),
+        termCalendars: new Map(),
         parents: new Map(),
         parentLinks: new Map(),
         sessions: new Map(),
@@ -3917,6 +4007,13 @@
         return newId;
       }
       state.students.forEach(s => ensureId(s, 'students', maps.students));
+      state.termCalendars.forEach(cal => {
+        ensureId(cal, 'termCalendars', maps.termCalendars);
+        (cal.ranges || []).forEach(range => {
+          range.id = cleanId(range.id);
+          if (!isUuid(range.id)) range.id = crypto.randomUUID();
+        });
+      });
       state.parents.forEach(p => ensureId(p, 'parents', maps.parents));
       state.parentLinks.forEach(pl => ensureId(pl, 'parentLinks', maps.parentLinks));
       state.sessions.forEach(sess => ensureId(sess, 'sessions', maps.sessions));
@@ -3930,6 +4027,11 @@
       state.studentCheckins.forEach(c => ensureId(c, 'studentCheckins', maps.studentCheckins));
       state.messages.forEach(m => ensureId(m, 'messages', maps.messages));
       state.messages.forEach(m => ensureId(m, 'messages', maps.messages));
+
+      state.students.forEach(s => {
+        const calId = cleanId(s.termCalendarId || s.term_calendar_id || '');
+        s.termCalendarId = maps.termCalendars.get(calId) || calId;
+      });
 
       // remap references
       state.sessions.forEach(sess => {
@@ -4066,6 +4168,70 @@
       return msg.includes('column') && msg.includes('does not exist');
     }
 
+    function isMissingRelationErrorMessage(err) {
+      const msg = String(err?.message || err || '').toLowerCase();
+      return msg.includes('relation') && msg.includes('does not exist');
+    }
+
+    function buildTermCalendarRows(uid) {
+      return (state.termCalendars || []).map(cal => {
+        const academicYearRaw = String(cal.academicYear ?? '').trim();
+        return {
+          id: cleanId(cal.id),
+          user_id: uid,
+          name: String(cal.name || '').trim() || 'Untitled calendar',
+          school_name: String(cal.schoolName || cal.school_name || '').trim() || null,
+          academic_year: academicYearRaw && Number.isFinite(Number(academicYearRaw)) ? Math.trunc(Number(academicYearRaw)) : null,
+          notes: String(cal.notes || '').trim() || null,
+          updated_at: new Date().toISOString()
+        };
+      }).filter(cal => cal.id && cal.name);
+    }
+
+    function buildTermCalendarRangeRows(uid, calendar) {
+      const calendarId = cleanId(calendar?.id || '');
+      if (!calendarId) return [];
+      return (calendar?.ranges || []).map(range => ({
+        id: cleanId(range.id),
+        user_id: uid,
+        calendar_id: calendarId,
+        label: String(range.label || '').trim() || null,
+        start_date: String(range.startDate || range.start_date || '').trim(),
+        end_date: String(range.endDate || range.end_date || '').trim(),
+        sort_order: Number.isFinite(Number(range.sortOrder)) ? Math.trunc(Number(range.sortOrder)) : 0
+      })).filter(range => range.id && range.start_date && range.end_date);
+    }
+
+    async function syncTermCalendarsNow(uid = supabaseSession?.user?.id) {
+      if (!supabaseClient || !uid) return;
+      const calendars = buildTermCalendarRows(uid);
+      if (!calendars.length) return;
+      const { error: calendarErr } = await supabaseClient.from('term_calendars').upsert(calendars);
+      if (calendarErr) throw calendarErr;
+      for (const calendar of (state.termCalendars || [])) {
+        const calendarId = cleanId(calendar?.id || '');
+        if (!calendarId) continue;
+        const { error: deleteErr } = await supabaseClient
+          .from('term_calendar_ranges')
+          .delete()
+          .eq('calendar_id', calendarId);
+        if (deleteErr) throw deleteErr;
+        const rangeRows = buildTermCalendarRangeRows(uid, calendar);
+        if (!rangeRows.length) continue;
+        const { error: insertErr } = await supabaseClient
+          .from('term_calendar_ranges')
+          .upsert(rangeRows);
+        if (insertErr) throw insertErr;
+      }
+    }
+
+    async function deleteTermCalendarNow(calendarId) {
+      const id = cleanId(calendarId);
+      if (!supabaseClient || !id) return;
+      const { error } = await supabaseClient.from('term_calendars').delete().eq('id', id);
+      if (error) throw error;
+    }
+
     function shouldAttemptFullSync() {
       if (tourMode || readOnlyMode) return false;
       if (!isSupabaseReady()) return false;
@@ -4129,6 +4295,12 @@
         await upsertAndPrune('parents', legacyParents, 'id');
       }
 
+      try {
+        await syncTermCalendarsNow(uid);
+      } catch (err) {
+        if (!isMissingRelationErrorMessage(err)) throw err;
+      }
+
       // prepare rows with user_id
       const students = state.students.map(s => {
         const slots = getScheduleSlots(s);
@@ -4159,7 +4331,8 @@
           schedule_timezone: scheduleTimezone,
           schedule_start_date: s.scheduleStartDate || null,
           session_length_hours: legacyDuration,
-          schedule_notes: s.scheduleNotes || null
+          schedule_notes: s.scheduleNotes || null,
+          term_calendar_id: isUuid(s.termCalendarId) ? cleanId(s.termCalendarId) : null
         };
       });
       try {
@@ -4715,6 +4888,262 @@
       if (!isSupabaseReady()) return;
       const { error } = await supabaseClient.from('invoices').delete().eq('id', cleanId(id));
       if (error) throw new Error('Supabase invoice delete failed: ' + error.message);
+    }
+
+    function setTermCalendarStatus(message = '', tone = '') {
+      const statusEl = document.getElementById('termCalendarsAdminStatus');
+      if (!statusEl) return;
+      statusEl.textContent = String(message || '').trim();
+      statusEl.className = 'text-[11px] hidden';
+      if (!statusEl.textContent) return;
+      statusEl.classList.remove('hidden');
+      statusEl.classList.add(tone === 'error' ? 'text-rose-700' : 'text-slate-600');
+    }
+
+    function getAssignedStudentCountForTermCalendar(calendarId) {
+      const id = cleanId(calendarId);
+      if (!id) return 0;
+      return (state.students || []).filter(student => getStudentTermCalendarId(student) === id).length;
+    }
+
+    function renderTermCalendarsAdminList() {
+      const listEl = document.getElementById('termCalendarsAdminList');
+      if (!listEl) return;
+      if (!isOwner()) {
+        listEl.innerHTML = '';
+        setTermCalendarStatus('');
+        return;
+      }
+      const calendars = [...(state.termCalendars || [])].sort((a, b) =>
+        String(a.name || '').localeCompare(String(b.name || '')) ||
+        String(a.schoolName || '').localeCompare(String(b.schoolName || ''))
+      );
+      if (!calendars.length) {
+        listEl.innerHTML = `<li class="text-slate-500 text-[11px]">No term calendars created yet.</li>`;
+        return;
+      }
+      listEl.innerHTML = calendars.map(calendar => {
+        const calendarId = cleanId(calendar.id);
+        const assignedCount = getAssignedStudentCountForTermCalendar(calendarId);
+        const rangeCount = Array.isArray(calendar.ranges) ? calendar.ranges.length : 0;
+        const firstRange = (calendar.ranges || []).slice().sort((a, b) => compareDateOnly(a.startDate || '', b.startDate || ''))[0];
+        const summary = firstRange
+          ? `${firstRange.startDate || ''} → ${firstRange.endDate || ''}`
+          : 'No date ranges';
+        return `
+          <li class="border border-slate-200 rounded-lg p-2 bg-white/80 space-y-1">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <div class="text-[11px] font-semibold">${esc(formatTermCalendarLabel(calendar) || 'Untitled calendar')}</div>
+                <div class="text-[10px] text-slate-500">${esc(rangeCount)} term window(s) • ${esc(assignedCount)} student(s) assigned</div>
+                <div class="text-[10px] text-slate-500">${esc(summary)}</div>
+              </div>
+              <div class="flex flex-wrap gap-2 text-[10px]">
+                <button type="button" class="px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50" data-edit-term-calendar="${esc(calendarId)}">Edit</button>
+                <button type="button" class="px-2 py-1 rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50" data-delete-term-calendar="${esc(calendarId)}">Delete</button>
+              </div>
+            </div>
+          </li>
+        `;
+      }).join('');
+      listEl.querySelectorAll('[data-edit-term-calendar]').forEach(btn => {
+        btn.onclick = () => openTermCalendarModal(String(btn.dataset.editTermCalendar || ''));
+      });
+      listEl.querySelectorAll('[data-delete-term-calendar]').forEach(btn => {
+        btn.onclick = () => deleteTermCalendar(String(btn.dataset.deleteTermCalendar || ''));
+      });
+    }
+
+    async function deleteTermCalendar(calendarId) {
+      if (!guardEdit() || !isOwner()) return;
+      const id = cleanId(calendarId);
+      const calendar = getTermCalendarById(id);
+      if (!calendar) return;
+      const assignedCount = getAssignedStudentCountForTermCalendar(id);
+      const confirmText = assignedCount
+        ? `Delete "${calendar.name}" and clear it from ${assignedCount} assigned student(s)?`
+        : `Delete "${calendar.name}"?`;
+      if (!confirm(confirmText)) return;
+      if (isSupabaseReady()) {
+        try {
+          await deleteTermCalendarNow(id);
+        } catch (err) {
+          console.warn('Term calendar delete failed', err);
+          setTermCalendarStatus(err?.message || 'Failed to delete term calendar.', 'error');
+          alert(err?.message || 'Failed to delete term calendar.');
+          return;
+        }
+      }
+      state.termCalendars = (state.termCalendars || []).filter(cal => cleanId(cal.id) !== id);
+      (state.students || []).forEach(student => {
+        if (getStudentTermCalendarId(student) === id) {
+          student.termCalendarId = '';
+        }
+      });
+      logActivity('Deleted term calendar', calendar.name || id);
+      saveState();
+      renderAllViews();
+      applySettingsToUI();
+      setTermCalendarStatus(`Deleted ${calendar.name || 'term calendar'}.`);
+    }
+
+    async function openTermCalendarModal(calendarId = '') {
+      if (!guardEdit() || !isOwner()) return;
+      const existing = getTermCalendarById(calendarId);
+      const isEdit = !!existing;
+      const ranges = (existing?.ranges || []).map(range => ({
+        id: cleanId(range.id) || (crypto?.randomUUID ? crypto.randomUUID() : forceUuid(generateId('termrange'))),
+        label: String(range.label || '').trim(),
+        startDate: String(range.startDate || range.start_date || '').trim(),
+        endDate: String(range.endDate || range.end_date || '').trim(),
+        sortOrder: Number(range.sortOrder || 0) || 0
+      }));
+      const html = `
+        <h2 class="text-sm font-semibold mb-3">${esc(isEdit ? 'Edit term calendar' : 'Add term calendar')}</h2>
+        <form id="termCalendarForm" class="space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] mb-1">Calendar name</label>
+              <input name="name" value="${esc(existing?.name || '')}" required class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            </div>
+            <div>
+              <label class="block text-[11px] mb-1">School name</label>
+              <input name="schoolName" value="${esc(existing?.schoolName || existing?.school_name || '')}" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] mb-1">Academic year</label>
+              <input name="academicYear" type="number" step="1" value="${esc(existing?.academicYear || '')}" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+            </div>
+            <div>
+              <label class="block text-[11px] mb-1">Notes</label>
+              <input name="notes" value="${esc(existing?.notes || '')}" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="Optional">
+            </div>
+          </div>
+          <div class="border border-slate-200 rounded-lg p-3 bg-slate-50">
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <div>
+                <div class="text-[11px] font-semibold">Term windows</div>
+                <div class="text-[10px] text-slate-500">Recurring sessions and monthly invoices only auto-generate inside these date ranges.</div>
+              </div>
+              <button type="button" id="addTermRangeBtn" class="px-2 py-1 rounded-lg border border-slate-300 text-[11px]">Add range</button>
+            </div>
+            <div id="termRangesContainer" class="space-y-2"></div>
+            <div id="termRangesEmpty" class="text-[10px] text-slate-500">No term windows added yet.</div>
+          </div>
+          <div class="flex justify-between items-center">
+            <button type="submit" class="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium">${esc(isEdit ? t('common.save_changes') : 'Save calendar')}</button>
+            ${isEdit ? `<button type="button" id="deleteTermCalendarModalBtn" class="px-3 py-1.5 rounded-xl border border-rose-300 text-rose-700 text-xs">Delete</button>` : ''}
+          </div>
+        </form>
+      `;
+      openModal(html, () => {
+        const form = document.getElementById('termCalendarForm');
+        const rangesContainer = document.getElementById('termRangesContainer');
+        const rangesEmpty = document.getElementById('termRangesEmpty');
+        const addRangeBtn = document.getElementById('addTermRangeBtn');
+
+        function updateRangesEmpty() {
+          const hasRows = rangesContainer?.querySelector('.term-range-row');
+          rangesEmpty?.classList.toggle('hidden', !!hasRows);
+        }
+
+        function addRangeRow(range = {}) {
+          if (!rangesContainer) return;
+          const row = document.createElement('div');
+          row.className = 'term-range-row grid grid-cols-1 sm:grid-cols-[1.2fr_1fr_1fr_auto] gap-2 items-end';
+          row.innerHTML = `
+            <div>
+              <label class="block text-[10px] mb-1">Label</label>
+              <input type="text" class="range-label w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" value="${esc(range.label || '')}" placeholder="Term 1">
+            </div>
+            <div>
+              <label class="block text-[10px] mb-1">Start</label>
+              <input type="date" class="range-start w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" value="${esc(range.startDate || '')}">
+            </div>
+            <div>
+              <label class="block text-[10px] mb-1">End</label>
+              <input type="date" class="range-end w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" value="${esc(range.endDate || '')}">
+            </div>
+            <button type="button" class="remove-term-range-btn px-2 py-1 rounded-lg border border-slate-300 text-[11px]">${esc(t('common.remove'))}</button>
+          `;
+          row.dataset.rangeId = cleanId(range.id) || (crypto?.randomUUID ? crypto.randomUUID() : forceUuid(generateId('termrange')));
+          row.querySelector('.remove-term-range-btn').onclick = () => {
+            row.remove();
+            updateRangesEmpty();
+          };
+          rangesContainer.appendChild(row);
+          updateRangesEmpty();
+        }
+
+        ranges.forEach(range => addRangeRow(range));
+        updateRangesEmpty();
+        addRangeBtn.onclick = () => addRangeRow({ label: '', startDate: '', endDate: '' });
+
+        if (isEdit) {
+          const deleteBtn = document.getElementById('deleteTermCalendarModalBtn');
+          if (deleteBtn) deleteBtn.onclick = async () => {
+            closeModal();
+            await deleteTermCalendar(existing.id);
+          };
+        }
+
+        form.onsubmit = async (event) => {
+          event.preventDefault();
+          const name = String(form.name.value || '').trim();
+          if (!name) {
+            alert('Calendar name is required.');
+            return;
+          }
+          const collectedRanges = [...form.querySelectorAll('.term-range-row')].map((row, index) => ({
+            id: cleanId(row.dataset.rangeId || '') || (crypto?.randomUUID ? crypto.randomUUID() : forceUuid(generateId('termrange'))),
+            label: String(row.querySelector('.range-label')?.value || '').trim(),
+            startDate: String(row.querySelector('.range-start')?.value || '').trim(),
+            endDate: String(row.querySelector('.range-end')?.value || '').trim(),
+            sortOrder: index
+          }));
+          for (const range of collectedRanges) {
+            if (!range.startDate || !range.endDate) {
+              alert('Each term window needs both a start and end date.');
+              return;
+            }
+            if (compareDateOnly(range.startDate, range.endDate) > 0) {
+              alert('A term window cannot end before it starts.');
+              return;
+            }
+          }
+          collectedRanges.sort((a, b) => compareDateOnly(a.startDate, b.startDate) || compareDateOnly(a.endDate, b.endDate));
+          collectedRanges.forEach((range, index) => {
+            range.sortOrder = index;
+          });
+          const nextCalendar = {
+            id: existing?.id || (crypto?.randomUUID ? crypto.randomUUID() : forceUuid(generateId('termcal'))),
+            name,
+            schoolName: String(form.schoolName.value || '').trim(),
+            academicYear: form.academicYear.value ? Number(form.academicYear.value) : null,
+            notes: String(form.notes.value || '').trim(),
+            ranges: collectedRanges
+          };
+          const idx = (state.termCalendars || []).findIndex(cal => cleanId(cal.id) === cleanId(nextCalendar.id));
+          if (idx >= 0) state.termCalendars[idx] = nextCalendar;
+          else state.termCalendars.push(nextCalendar);
+          logActivity(isEdit ? 'Updated term calendar' : 'Added term calendar', nextCalendar.name);
+          saveState();
+          closeModal();
+          renderAllViews();
+          applySettingsToUI();
+          setTermCalendarStatus(`${isEdit ? 'Updated' : 'Saved'} ${nextCalendar.name}.`);
+          if (isSupabaseReady()) {
+            try {
+              await syncTermCalendarsNow();
+            } catch (err) {
+              console.warn('Term calendar sync failed', err);
+              setTermCalendarStatus(err?.message || 'Saved locally. Supabase sync failed.', 'error');
+            }
+          }
+        };
+      });
     }
 
     async function provisionLoginCode(role, code, opts = {}) {
@@ -5738,6 +6167,12 @@
       if (refreshDebugPairsBtn) {
         refreshDebugPairsBtn.addEventListener('click', () => renderDebugTestPairs());
       }
+      const addTermCalendarBtn = document.getElementById('addTermCalendarBtn');
+      if (addTermCalendarBtn) {
+        addTermCalendarBtn.addEventListener('click', () => {
+          openTermCalendarModal();
+        });
+      }
       document.getElementById('exportDataBtn').addEventListener('click', () => {
         document.getElementById('backupTextarea').value = JSON.stringify(state, null, 2);
       });
@@ -5915,6 +6350,7 @@
         ownerAnnouncements = [];
         renderOwnerAnnouncementsList();
       }
+      renderTermCalendarsAdminList();
       renderDebugTestPairs();
     }
 
@@ -10431,6 +10867,13 @@
       // Owner: load everything (existing behaviour)
       if (isOwnerUser) {
         const fetchTable = (table, cols = '*') => supabaseClient.from(table).select(cols);
+        const fetchOptionalTable = async (table, cols = '*') => {
+          const res = await fetchTable(table, cols);
+          if (res?.error && isMissingRelationErrorMessage(res.error)) {
+            return { data: [], error: null };
+          }
+          return res;
+        };
         const fetchRecentActivity = () => supabaseClient
           .from('activity_log')
           .select('*')
@@ -10444,6 +10887,8 @@
           sessionStudentsRes,
           cancellationsRes,
           busyDaysRes,
+          termCalendarsRes,
+          termCalendarRangesRes,
           ownerSettingsRes,
           resourcesRes,
           homeworkRes,
@@ -10463,6 +10908,8 @@
           fetchTable('session_students'),
           fetchTable('session_cancellations'),
           fetchTable('busy_days'),
+          fetchOptionalTable('term_calendars'),
+          fetchOptionalTable('term_calendar_ranges'),
           fetchTable('owner_settings'),
           fetchTable('resources'),
           fetchTable('homework'),
@@ -10478,6 +10925,9 @@
 
         [studentsRes, parentsRes, parentLinksRes, sessionsRes, sessionStudentsRes, busyDaysRes, ownerSettingsRes, resourcesRes, homeworkRes, documentsRes, contractsRes, invoicesRes, todosRes, checkinsRes, activityRes, messagesRes, contractSignaturesRes].forEach(res => {
           if (res.error) throw res.error;
+        });
+        [termCalendarsRes, termCalendarRangesRes].forEach(res => {
+          if (res?.error) throw res.error;
         });
         if (cancellationsRes?.error) {
           console.warn('Session cancellations fetch failed', cancellationsRes.error);
@@ -10530,6 +10980,37 @@
         );
 
         const merged = deepClone(defaultState);
+        const termCalendarMap = new Map();
+        merged.termCalendars = (termCalendarsRes?.data || []).map(cal => {
+          const item = {
+            id: cal.id,
+            name: cal.name || '',
+            schoolName: cal.school_name || '',
+            academicYear: cal.academic_year || null,
+            notes: cal.notes || '',
+            ranges: []
+          };
+          termCalendarMap.set(cleanId(cal.id), item);
+          return item;
+        });
+        (termCalendarRangesRes?.data || []).forEach(range => {
+          const calendar = termCalendarMap.get(cleanId(range.calendar_id));
+          if (!calendar) return;
+          calendar.ranges.push({
+            id: range.id,
+            label: range.label || '',
+            startDate: range.start_date || '',
+            endDate: range.end_date || '',
+            sortOrder: range.sort_order || 0
+          });
+        });
+        merged.termCalendars.forEach(cal => {
+          cal.ranges.sort((a, b) =>
+            Number(a.sortOrder || 0) - Number(b.sortOrder || 0) ||
+            compareDateOnly(a.startDate || '', b.startDate || '') ||
+            compareDateOnly(a.endDate || '', b.endDate || '')
+          );
+        });
         merged.students = (studentsRes.data || []).map(s => ({
           id: s.id,
           name: s.name,
@@ -10553,7 +11034,8 @@
           scheduleTimezone: s.schedule_timezone || DEFAULT_TIMEZONE,
           scheduleStartDate: s.schedule_start_date || '',
           sessionLengthHours: s.session_length_hours || null,
-          scheduleNotes: s.schedule_notes || ''
+          scheduleNotes: s.schedule_notes || '',
+          termCalendarId: cleanId(s.term_calendar_id || '')
         }));
         merged.parents = (parentsRes?.data || []).map(p => ({
           id: p.id,
@@ -10743,6 +11225,23 @@
           localState.homework.forEach(hw => {
             const id = cleanId(hw.id);
             if (!remoteIds.has(id)) merged.homework.push(hw);
+          });
+        }
+        if (localState?.termCalendars?.length) {
+          const remoteIds = new Set(merged.termCalendars.map(cal => cleanId(cal.id)));
+          localState.termCalendars.forEach(cal => {
+            const id = cleanId(cal.id);
+            if (!remoteIds.has(id)) merged.termCalendars.push(cal);
+          });
+        }
+        if (localState?.students?.length) {
+          const localStudentsById = new Map(localState.students.map(s => [cleanId(s.id), s]));
+          merged.students.forEach(student => {
+            const localStudent = localStudentsById.get(cleanId(student.id));
+            if (!localStudent) return;
+            if (!cleanId(student.termCalendarId || '') && cleanId(localStudent.termCalendarId || localStudent.term_calendar_id || '')) {
+              student.termCalendarId = cleanId(localStudent.termCalendarId || localStudent.term_calendar_id || '');
+            }
           });
         }
         // Merge local invoices/messages if rows are missing (e.g., legacy rows without user_id)
@@ -13865,6 +14364,7 @@
       const sessionsInRange = state.sessions
         .filter(s => (s.studentIds || []).length === 1 && s.studentIds[0] === student.id)
         .filter(s => !!s.date && isDateWithinRange(s.date, serviceStartStr, serviceEndStr))
+        .filter(s => isDateAllowedForStudentSchedule(student, s.date))
         .filter(s => !s.invoiceId || s.invoiceId === inv.id);
       const billable = sessionsInRange.filter(s => !isSessionVoided(s));
       if (billable.length) {
@@ -13875,7 +14375,7 @@
       const serviceStart = parseDateOnly(serviceStartStr);
       const serviceEnd = parseDateOnly(serviceEndStr);
       if (!prefs.scheduleSlots.length || !serviceStart || !serviceEnd) return { numSessions: 0, baseAmount: 0 };
-      const occurrences = listScheduleOccurrences(prefs.scheduleSlots, serviceStart, serviceEnd);
+      const occurrences = listScheduleOccurrences(prefs.scheduleSlots, serviceStart, serviceEnd, { student });
       const numSessions = occurrences.length;
       const baseAmount = Number(occurrences.reduce((sum, occ) => {
         const rate = Number(student.rate || 0);
@@ -13896,7 +14396,7 @@
         if (!s.studentIds || s.studentIds.length !== 1) return;
         if (s.studentIds[0] !== student.id) return;
         if (!s.date) return;
-        const inRange = isDateWithinRange(s.date, startStr, endStr);
+        const inRange = isDateWithinRange(s.date, startStr, endStr) && isDateAllowedForStudentSchedule(student, s.date);
         if (inRange) {
           if (!s.invoiceId) {
             // Never auto-link newly created sessions to paid/locked invoices.
@@ -13940,11 +14440,12 @@
       const anchor = getScheduleAnchorDate(student);
       const scheduleStart = maxDate(anchor, periodStart);
       const expectedOccurrences = prefs.scheduleSlots.length
-        ? listScheduleOccurrences(prefs.scheduleSlots, scheduleStart, periodEnd)
+        ? listScheduleOccurrences(prefs.scheduleSlots, scheduleStart, periodEnd, { student })
         : [];
       const sessionsInRange = state.sessions
         .filter(s => (s.studentIds || []).length === 1 && s.studentIds[0] === student.id)
-        .filter(s => !!s.date && isDateWithinRange(s.date, serviceStart, serviceEnd));
+        .filter(s => !!s.date && isDateWithinRange(s.date, serviceStart, serviceEnd))
+        .filter(s => isDateAllowedForStudentSchedule(student, s.date));
       if (!existing && !sessionsInRange.length && !expectedOccurrences.length) return false;
 
       if (existing) {
@@ -14069,7 +14570,7 @@
       if (!student?.contractSigned || !prefs.scheduleSlots.length) return false;
       const anchor = getScheduleAnchorDate(student);
       const start = maxDate(anchor, windowStart);
-      const occurrences = listScheduleOccurrences(prefs.scheduleSlots, start, windowEnd);
+      const occurrences = listScheduleOccurrences(prefs.scheduleSlots, start, windowEnd, { student });
       if (!occurrences.length) return false;
 
       const existingKeys = new Set();
@@ -15856,6 +16357,15 @@
       const scheduleTimezone = student?.scheduleTimezone || student?.schedule_timezone || DEFAULT_TIMEZONE;
       const defaultSlotDuration = Number(state.settings.defaultSessionDuration || 1);
       const scheduleNotes = student?.scheduleNotes || student?.schedule_notes || '';
+      const currentTermCalendarId = getStudentTermCalendarId(student || {});
+      const termCalendarOptions = [
+        `<option value="">No term restriction</option>`,
+        ...(state.termCalendars || []).map(cal => {
+          const calId = cleanId(cal.id);
+          const selected = calId === currentTermCalendarId ? 'selected' : '';
+          return `<option value="${esc(calId)}" ${selected}>${esc(formatTermCalendarLabel(cal))}</option>`;
+        })
+      ].join('');
       const codeSection = `
         <div class="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
           <h3 class="text-xs font-semibold text-indigo-900 mb-2">🔑 ${esc(t('students.login_code_title'))}</h3>
@@ -15943,6 +16453,15 @@
               <label class="block text-[11px] mb-1">${esc(t('schedule.notes'))}</label>
               <input name="scheduleNotes" value="${esc(scheduleNotes)}"
                      class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" placeholder="${esc(t('common.optional'))}">
+            </div>
+            <div class="mt-2">
+              <label class="block text-[11px] mb-1">School term calendar</label>
+              <select name="termCalendarId" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs">
+                ${termCalendarOptions}
+              </select>
+              <div class="text-[10px] text-slate-500 mt-1">
+                Restrict recurring auto-scheduling and monthly invoice generation to the selected term dates.
+              </div>
             </div>
           </div>
           <div class="flex justify-between items-center mt-3">
@@ -16109,7 +16628,8 @@
             scheduleStartDate: form.scheduleStartDate.value,
             sessionLengthHours: Number(collectedSlots[0]?.durationHours || state.settings.defaultSessionDuration || 1),
             scheduleTimezone: scheduleTimezoneValue,
-            scheduleNotes: form.scheduleNotes.value.trim()
+            scheduleNotes: form.scheduleNotes.value.trim(),
+            termCalendarId: cleanId(form.termCalendarId?.value || '')
           };
 
           if (!newStudent.name) {
@@ -17681,7 +18201,7 @@
             }
             const paidAtDate = inv.paid ? (parseDateOnly(inv.paidAt || inv.paid_at) || new Date()) : null;
             const scheduleStart = inv.paid ? maxDate(serviceStart, paidAtDate) : serviceStart;
-            const occurrences = listScheduleOccurrences(prefs.scheduleSlots, scheduleStart, serviceEnd);
+            const occurrences = listScheduleOccurrences(prefs.scheduleSlots, scheduleStart, serviceEnd, { student });
             const expectedKeys = new Set();
             occurrences.forEach(occ => {
               const slotTime = normalizeTimeValue(occ.slot.startTime || '');
