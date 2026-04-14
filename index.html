@@ -1421,6 +1421,7 @@
                 <p class="text-[10px] uppercase tracking-wide text-slate-500" data-i18n="schedule.planner">Planner</p>
                 <h2 class="text-lg font-semibold" data-i18n="schedule.title">Schedule</h2>
                 <p class="text-xs text-slate-500" data-i18n="schedule.subtitle">Week grid, quick stats, and conflict signals.</p>
+                <div id="scheduleBusyRangeStatus" class="hidden mt-2 text-[11px]"></div>
               </div>
               <div class="flex items-center gap-2">
                 <button id="schedulePrevWeek"
@@ -1429,6 +1430,10 @@
                   class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs hover:bg-slate-50" data-i18n="schedule.today">Today</button>
                 <button id="scheduleNextWeek"
                   class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs hover:bg-slate-50" data-i18n="schedule.next">Next →</button>
+                <button id="addBusyRangeBtn" data-owner-only
+                  class="px-3 py-1.5 rounded-xl border border-rose-300 text-rose-700 text-xs font-medium hover:bg-rose-50">
+                  <span data-i18n="schedule.add_busy_range">Add busy range</span>
+                </button>
                 <button id="addSessionBtn" data-owner-only
                   class="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 shadow-sm">
                   <span data-i18n="schedule.add_session">＋ Session</span>
@@ -5917,6 +5922,12 @@
       document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
       document.getElementById('quickAddStudentBtn').addEventListener('click', () => { if (guardEdit()) openStudentModal(); });
       document.getElementById('quickAddSessionBtn').addEventListener('click', () => { if (guardEdit()) openSessionModal(); });
+      const addBusyRangeBtn = document.getElementById('addBusyRangeBtn');
+      if (addBusyRangeBtn) {
+        addBusyRangeBtn.addEventListener('click', () => {
+          openBusyRangeModal();
+        });
+      }
       document.getElementById('globalSearchInput').addEventListener('input', handleGlobalSearch);
       const signOutBtn = document.getElementById('signOutBtn');
       if (signOutBtn) {
@@ -8531,16 +8542,16 @@
       }
       const busyNotice = document.getElementById('portalBusyNotice');
       const busyList = document.getElementById('portalBusyList');
-      const upcomingBusy = getUpcomingBusyDays(45);
+      const upcomingBusy = getUpcomingBusyPeriods(45);
       if (busyNotice && busyList) {
         if (!upcomingBusy.length) {
           busyNotice.classList.add('hidden');
         } else {
           busyNotice.classList.remove('hidden');
-          busyList.innerHTML = upcomingBusy.map(b => `
+          busyList.innerHTML = upcomingBusy.map(period => `
             <li class="flex items-start gap-2">
               <span class="busy-badge">${esc(t('schedule.busy'))}</span>
-              <span>${esc(b.date)}${b.note ? ` • ${esc(b.note)}` : ''}</span>
+              <span>${esc(formatBusyPeriodLabel(period))}</span>
             </li>
           `).join('');
         }
@@ -9686,16 +9697,16 @@
 
       const parentBusyNotice = document.getElementById('parentBusyNotice');
       const parentBusyList = document.getElementById('parentBusyList');
-      const upcomingBusy = getUpcomingBusyDays(45);
+      const upcomingBusy = getUpcomingBusyPeriods(45);
       if (parentBusyNotice && parentBusyList) {
         if (!upcomingBusy.length) {
           parentBusyNotice.classList.add('hidden');
         } else {
           parentBusyNotice.classList.remove('hidden');
-          parentBusyList.innerHTML = upcomingBusy.map(b => `
+          parentBusyList.innerHTML = upcomingBusy.map(period => `
             <li class="flex items-start gap-2">
               <span class="busy-badge">${esc(t('schedule.busy'))}</span>
-              <span>${esc(b.date)}${b.note ? ` • ${esc(b.note)}` : ''}</span>
+              <span>${esc(formatBusyPeriodLabel(period))}</span>
             </li>
           `).join('');
         }
@@ -13948,6 +13959,17 @@
       return String(note || '').replace(/\s+/g, ' ').trim();
     }
 
+    function setScheduleBusyRangeStatus(message = '', tone = '') {
+      const statusEl = document.getElementById('scheduleBusyRangeStatus');
+      if (!statusEl) return;
+      const text = String(message || '').trim();
+      statusEl.textContent = text;
+      statusEl.className = 'hidden mt-2 text-[11px]';
+      if (!text) return;
+      statusEl.classList.remove('hidden');
+      statusEl.classList.add(tone === 'error' ? 'text-rose-700' : 'text-emerald-700');
+    }
+
     function getBusyDay(dateStr) {
       const target = String(dateStr || '').slice(0, 10);
       return state.busyDays.find(b => b.date === target);
@@ -13967,6 +13989,30 @@
         createdAt: new Date().toISOString()
       });
       return true;
+    }
+
+    function listBusyDatesInRange(startDateStr, endDateStr) {
+      const start = parseDateOnly(startDateStr);
+      const end = parseDateOnly(endDateStr);
+      if (!start || !end || start > end) return [];
+      const dates = [];
+      const cursor = new Date(start);
+      while (cursor <= end) {
+        dates.push(toDateOnly(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      return dates;
+    }
+
+    function addBusyDayRange(startDateStr, endDateStr, note = '') {
+      const dates = listBusyDatesInRange(startDateStr, endDateStr);
+      let added = 0;
+      let skipped = 0;
+      dates.forEach(dateStr => {
+        if (addBusyDay(dateStr, note)) added += 1;
+        else skipped += 1;
+      });
+      return { added, skipped, total: dates.length, dates };
     }
 
     function removeBusyDay(dateStr) {
@@ -14029,16 +14075,138 @@
       renderParentPortal();
     }
 
-    function getUpcomingBusyDays(limitDays = 30) {
+    function getUpcomingBusyPeriods(limitDays = 30) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const cutoff = new Date(today);
       cutoff.setDate(cutoff.getDate() + Number(limitDays || 30));
       const startStr = toDateOnly(today);
       const endStr = toDateOnly(cutoff);
-      return state.busyDays
+      const days = state.busyDays
         .filter(b => b.date >= startStr && b.date <= endStr)
         .sort((a, b) => a.date.localeCompare(b.date));
+      const periods = [];
+      days.forEach(day => {
+        const note = normalizeBusyNote(day.note);
+        const previous = periods[periods.length - 1];
+        if (!previous) {
+          periods.push({
+            startDate: day.date,
+            endDate: day.date,
+            note
+          });
+          return;
+        }
+        const previousEnd = parseDateOnly(previous.endDate);
+        if (!previousEnd) {
+          periods.push({
+            startDate: day.date,
+            endDate: day.date,
+            note
+          });
+          return;
+        }
+        const nextExpected = new Date(previousEnd);
+        nextExpected.setDate(nextExpected.getDate() + 1);
+        const isConsecutive = toDateOnly(nextExpected) === day.date;
+        if (isConsecutive && previous.note === note) {
+          previous.endDate = day.date;
+          return;
+        }
+        periods.push({
+          startDate: day.date,
+          endDate: day.date,
+          note
+        });
+      });
+      return periods;
+    }
+
+    function formatBusyPeriodLabel(period) {
+      if (!period) return '';
+      const startDate = String(period.startDate || '').slice(0, 10);
+      const endDate = String(period.endDate || '').slice(0, 10);
+      const note = normalizeBusyNote(period.note || '');
+      const dateLabel = startDate && endDate && startDate !== endDate
+        ? `${startDate} → ${endDate}`
+        : (startDate || endDate || '');
+      return note ? `${dateLabel} • ${note}` : dateLabel;
+    }
+
+    function openBusyRangeModal() {
+      if (!guardEdit()) return;
+      const html = `
+        <h2 class="text-sm font-semibold mb-3">${esc(t('schedule.add_busy_range'))}</h2>
+        <form id="busyRangeForm" class="space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] mb-1">${esc(t('schedule.busy_range_start'))}</label>
+              <input type="date" name="startDate" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" required>
+            </div>
+            <div>
+              <label class="block text-[11px] mb-1">${esc(t('schedule.busy_range_end'))}</label>
+              <input type="date" name="endDate" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs" required>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1">${esc(t('schedule.busy_range_note'))}</label>
+            <input type="text" name="note" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs"
+              placeholder="${esc(t('schedule.busy_range_note_placeholder'))}">
+          </div>
+          <div class="text-[10px] text-slate-500">${esc(t('schedule.busy_range_hint'))}</div>
+          <div class="flex justify-end gap-2">
+            <button type="button" id="busyRangeCancelBtn" class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs">${esc(t('common.cancel'))}</button>
+            <button type="submit" class="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-medium">${esc(t('common.save'))}</button>
+          </div>
+        </form>
+      `;
+      openModal(html, () => {
+        const form = document.getElementById('busyRangeForm');
+        const startInput = form?.startDate;
+        const endInput = form?.endDate;
+        const today = toDateOnly(new Date());
+        if (startInput && !startInput.value) startInput.value = today;
+        if (endInput && !endInput.value) endInput.value = today;
+        const syncEndMin = () => {
+          if (endInput && startInput?.value) {
+            endInput.min = startInput.value;
+            if (endInput.value && endInput.value < startInput.value) endInput.value = startInput.value;
+          }
+        };
+        if (startInput) startInput.addEventListener('input', syncEndMin);
+        syncEndMin();
+        const cancelBtn = document.getElementById('busyRangeCancelBtn');
+        if (cancelBtn) cancelBtn.onclick = closeModal;
+        form.onsubmit = (event) => {
+          event.preventDefault();
+          const startDate = String(form.startDate?.value || '').trim();
+          const endDate = String(form.endDate?.value || '').trim();
+          const note = normalizeBusyNote(form.note?.value || '');
+          if (!startDate || !endDate) {
+            alert(t('alert.busy_range_dates_required'));
+            return;
+          }
+          if (compareDateOnly(startDate, endDate) > 0) {
+            alert(t('alert.busy_range_invalid_order'));
+            return;
+          }
+          const result = addBusyDayRange(startDate, endDate, note);
+          if (!result.total) {
+            alert(t('alert.busy_range_dates_required'));
+            return;
+          }
+          recalcInvoicesForBusyDays();
+          saveState();
+          renderScheduleView();
+          renderStudentPortal();
+          renderParentPortal();
+          const statusMessage = result.added
+            ? t('schedule.busy_range_summary', { added: result.added, skipped: result.skipped })
+            : t('schedule.busy_range_summary_none_added', { skipped: result.skipped });
+          setScheduleBusyRangeStatus(statusMessage, result.added ? 'success' : 'error');
+          closeModal();
+        };
+      });
     }
 
     function renderScheduleView() {
