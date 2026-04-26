@@ -1876,6 +1876,13 @@
                     Publish announcement
                   </button>
                 </div>
+                <label class="flex items-start gap-2 text-[11px] text-slate-600">
+                  <input id="announcementSendEmailToggle" type="checkbox" checked class="mt-0.5">
+                  <span>
+                    <span data-i18n="announcement.send_email_toggle">Email parents about this announcement</span>
+                    <span class="block text-[10px] text-slate-500" data-i18n="announcement.send_email_toggle_hint">Turn this off for in-portal notices or internal corrections.</span>
+                  </span>
+                </label>
                 <div id="announcementAdminStatus" class="text-[11px] text-slate-600 hidden"></div>
                 <ul id="announcementAdminList" class="space-y-2 max-h-56 overflow-y-auto scrollbar-thin"></ul>
               </div>
@@ -2252,6 +2259,10 @@
                 <select id="parentCodeTargetSelect" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]"></select>
                 <button id="parentRegenerateCodeBtn" class="portal-cta-btn portal-cta-pay">Regenerate code</button>
               </div>
+              <label class="flex items-start gap-2 text-[11px] text-slate-600">
+                <input id="parentCodeSendEmailToggle" type="checkbox" checked class="mt-0.5">
+                <span data-i18n="parent.login_code_email_toggle">Send security email about this code change</span>
+              </label>
               <div id="parentCodeResultWrap" class="hidden p-2 rounded-lg border border-emerald-200 bg-emerald-50">
                 <div class="text-[10px] text-emerald-800 mb-1">New login code</div>
                 <div class="flex items-center gap-2">
@@ -2709,7 +2720,8 @@
       }
     }
 
-    async function notifyParentServiceEvent(payload, { silent = true } = {}) {
+    async function notifyParentServiceEvent(payload, { silent = true, enabled = true } = {}) {
+      if (!enabled) return { success: true, suppressed: true };
       if (!isSupabaseReady() || !isOwner()) return null;
       try {
         const accessToken = requireAccessToken(t('alert.sign_in_first'));
@@ -2736,7 +2748,8 @@
       }
     }
 
-    function maybeNotifyInvoiceIssued(inv, { dedupeKey = '' } = {}) {
+    function maybeNotifyInvoiceIssued(inv, { dedupeKey = '', sendEmail = true } = {}) {
+      if (!sendEmail) return;
       const invoice = inv || {};
       const status = String(invoice.invoiceStatus || invoice.invoice_status || '').toLowerCase();
       const total = Number(invoice.total || 0);
@@ -2752,8 +2765,16 @@
         meta: {
           student_name: student?.name || '',
           amount: formatRandAmount(total),
+          issue_date: invoice.issueDate || invoice.issue_date || '',
           due_date: invoice.dueDate || invoice.due_date || '',
-          cta_label: 'View invoice',
+          service_period_start: invoice.servicePeriodStart || invoice.service_period_start || '',
+          service_period_end: invoice.servicePeriodEnd || invoice.service_period_end || '',
+          num_sessions: invoice.numSessions ?? invoice.num_sessions ?? '',
+          invoice_type: invoice.invoiceType || invoice.invoice_type || 'manual',
+          status: invoice.invoiceStatus || invoice.invoice_status || (invoice.paid ? 'paid' : 'issued'),
+          total,
+          base_amount: Number(invoice.baseAmount ?? invoice.base_amount ?? total) || total,
+          cta_label: 'Pay now',
           cta_url: buildPortalInvoiceLink(invoiceId)
         }
       });
@@ -5163,7 +5184,8 @@
             code: normalized,
             studentId: opts.studentId || null,
             parentId: opts.parentId || null,
-            fullName: opts.fullName || ''
+            fullName: opts.fullName || '',
+            notify_parent_email: opts.notifyParentEmail !== false
           },
           headers: { Authorization: `Bearer ${accessToken}` }
         });
@@ -5406,8 +5428,8 @@
           } catch (syncErr) {
             console.warn('Debug pair sync before provisioning failed', syncErr);
           }
-          await provisionLoginCode('student', studentCode, { studentId, fullName: testStudent.name });
-          await provisionLoginCode('parent', parentCode, { parentId, fullName: testParent.name });
+          await provisionLoginCode('student', studentCode, { studentId, fullName: testStudent.name, notifyParentEmail: false });
+          await provisionLoginCode('parent', parentCode, { parentId, fullName: testParent.name, notifyParentEmail: false });
         }
 
         logActivity('Created debug test pair', `${testStudent.name} / ${testParent.name}`);
@@ -7209,6 +7231,7 @@
       };
       try {
         const payload = buildAnnouncementPayloadFromInputs();
+        const sendEmail = document.getElementById('announcementSendEmailToggle')?.checked !== false;
         if (!payload.title || !payload.body) {
           throw new Error('Title and message are required.');
         }
@@ -7247,7 +7270,7 @@
             cta_label: primaryButton?.label || payload.cta_label || 'Read announcement',
             cta_url: primaryButton?.url || payload.cta_url || buildPortalInvoiceLink('')
           }
-        });
+        }, { enabled: sendEmail });
       } catch (err) {
         console.error('Announcement publish failed', err);
         setStatus(err?.message || 'Failed to publish announcement.', true);
@@ -9229,6 +9252,7 @@
       const resultWrap = document.getElementById('parentCodeResultWrap');
       const resultValue = document.getElementById('parentCodeResultValue');
       const copyBtn = document.getElementById('parentCodeCopyBtn');
+      const sendEmailToggle = document.getElementById('parentCodeSendEmailToggle');
       const writeLocked = isMaintenanceGracefulWriteBlocked() || isMaintenanceHardStopForViewer();
 
       if (!selectEl || !regenerateBtn) return;
@@ -9274,7 +9298,8 @@
           role: role === 'student' ? 'student' : 'parent',
           studentId: role === 'student' ? id : null,
           parentId: role === 'parent' ? id : null,
-          generate: true
+          generate: true,
+          notify_parent_email: sendEmailToggle?.checked !== false
         };
 
         regenerateBtn.disabled = true;
@@ -9315,7 +9340,12 @@
             resultValue.textContent = newCode;
             resultWrap.classList.remove('hidden');
           }
-          setParentCodeStatus(t('parent.login_code_updated_notice'), 'success');
+          setParentCodeStatus(
+            body.notify_parent_email === false
+              ? t('parent.login_code_updated_notice_suppressed')
+              : t('parent.login_code_updated_notice'),
+            'success'
+          );
           renderParentPortal();
         } catch (err) {
           console.warn('Parent login code regeneration failed', err);
@@ -13141,7 +13171,7 @@
           closeModal();
           renderParentsList();
           if (newParent.loginCode && isSupabaseReady() && isOwner()) {
-            provisionLoginCode('parent', newParent.loginCode, { parentId: newParent.id, fullName: newParent.name });
+            provisionLoginCode('parent', newParent.loginCode, { parentId: newParent.id, fullName: newParent.name, notifyParentEmail: false });
           }
         };
         if (isEdit) {
@@ -15068,7 +15098,8 @@
       return inv;
     }
 
-    function createLateChangeInvoices(sess, actionLabel, movePayload = null) {
+    function createLateChangeInvoices(sess, actionLabel, movePayload = null, options = {}) {
+      const sendEmail = options.sendEmail !== false;
       const now = new Date();
       const nowStr = now.toISOString().slice(0, 10);
       const adjustmentReason = actionLabel === 'moved' ? 'late_move' : 'late_cancel';
@@ -15119,7 +15150,7 @@
         };
         state.invoices.push(inv);
         logActivity('Created invoice', inv.id);
-        maybeNotifyInvoiceIssued(inv);
+        maybeNotifyInvoiceIssued(inv, { sendEmail });
       });
     }
 
@@ -16832,7 +16863,7 @@
 
         // Provision Supabase auth account for code-based login
         if (newStudent.loginCode && isSupabaseReady() && isOwner()) {
-          provisionLoginCode('student', newStudent.loginCode, { studentId: newStudent.id, fullName: newStudent.name });
+          provisionLoginCode('student', newStudent.loginCode, { studentId: newStudent.id, fullName: newStudent.name, notifyParentEmail: false });
         }
         };
         if (isEdit) {
@@ -16972,6 +17003,15 @@
               </label>
               <div class="text-[10px] text-amber-800 mt-1">
                 ${esc(t('sessions.reschedule_no_invoice_hint'))}
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-slate-50/70 p-2">
+              <label class="flex items-center gap-2 text-[11px]">
+                <input type="checkbox" name="sendParentEmail" checked>
+                <span>${esc(t('sessions.send_email_toggle'))}</span>
+              </label>
+              <div class="text-[10px] text-slate-500 mt-1">
+                ${esc(t('sessions.send_email_toggle_hint'))}
               </div>
             </div>
           ` : ''}
@@ -17173,6 +17213,7 @@
             !existingInvoice.paid &&
             !isInvoiceVoid(existingInvoice);
           const bypassInvoice = !!form.rescheduleNoInvoice?.checked;
+          const sendParentEmail = form.sendParentEmail?.checked !== false;
           if (bypassInvoice) {
             const existingInvoice = session?.invoiceId ? state.invoices.find(i => i.id === session.invoiceId) : null;
             const paidExisting = existingInvoice && existingInvoice.paid && !isInvoiceVoid(existingInvoice);
@@ -17218,7 +17259,7 @@
               date: newSession.date,
               startTime: newSession.startTime || '',
               durationHours: newSession.durationHours
-            });
+            }, { sendEmail: sendParentEmail });
             const idx = state.sessions.findIndex(s => s.id === session.id);
             if (idx >= 0) {
               state.sessions[idx] = {
@@ -17325,7 +17366,7 @@
                     state.invoices.push(restoreInv);
                     newSession.invoiceId = restoreInv.id;
                     logActivity('Restored session invoiced', restoreInv.id);
-                    maybeNotifyInvoiceIssued(restoreInv);
+                    maybeNotifyInvoiceIssued(restoreInv, { sendEmail: sendParentEmail });
                   }
                 }
               }
@@ -17377,7 +17418,7 @@
                     cta_label: 'View schedule',
                     cta_url: buildPortalStudentLink(sid)
                   }
-                });
+                }, { enabled: sendParentEmail });
               });
             }
             if (prevStatus !== SESSION_STATUS.VOIDED && nextStatus === SESSION_STATUS.VOIDED) {
@@ -17396,7 +17437,7 @@
                     cta_label: 'Review schedule',
                     cta_url: buildPortalStudentLink(sid)
                   }
-                });
+                }, { enabled: sendParentEmail });
               });
             }
           }
@@ -17433,6 +17474,7 @@
                 }
               }
               logActivity('Voided session', `${sess.date} ${sess.startTime || ''}`);
+              const sendParentEmail = form.sendParentEmail?.checked !== false;
               const studentIdsForNotice = Array.from(new Set((sess.studentIds || []).filter(Boolean)));
               studentIdsForNotice.forEach((sid) => {
                 const stu = getStudentById(sid);
@@ -17448,7 +17490,7 @@
                     cta_label: 'Review schedule',
                     cta_url: buildPortalStudentLink(sid)
                   }
-                });
+                }, { enabled: sendParentEmail });
               });
               refreshAutoBilling();
               saveState();
@@ -18131,6 +18173,13 @@
             <label class="block text-[11px] mb-1">${esc(t('common.notes'))}</label>
             <textarea name="notes" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]">${esc(inv?.notes || '')}</textarea>
           </div>
+          <div class="rounded-lg border border-slate-200 bg-slate-50/70 p-2">
+            <label class="flex items-center gap-2 text-[11px]">
+              <input type="checkbox" name="sendInvoiceEmail" checked>
+              <span>${esc(t('invoice.send_email_toggle'))}</span>
+            </label>
+            <div class="text-[10px] text-slate-500 mt-1">${esc(t('invoice.send_email_toggle_hint'))}</div>
+          </div>
           <p class="text-[10px] text-slate-500">
             ${esc(t('invoice.tip_fees'))}
           </p>
@@ -18228,6 +18277,7 @@
         form.onsubmit = async (e) => {
           e.preventDefault();
           const selectedSessionIds = new Set([...form.querySelectorAll('input[name="sessionIds"]:checked')].map(i => i.value));
+          const sendInvoiceEmail = form.sendInvoiceEmail?.checked !== false;
           const newInv = {
             id: form.id.value.trim(),
             studentId: form.studentId.value,
@@ -18324,7 +18374,10 @@
               !newInv.paid &&
               (!isEdit || isInvoiceVoid(inv) || !!inv?.paid);
             if (shouldEmailInvoiceIssued) {
-              maybeNotifyInvoiceIssued(newInv, { dedupeKey: `invoice_issued:${newInv.id}` });
+              maybeNotifyInvoiceIssued(newInv, {
+                dedupeKey: `invoice_issued:${newInv.id}`,
+                sendEmail: sendInvoiceEmail
+              });
             }
             saveState();
             closeModal();
