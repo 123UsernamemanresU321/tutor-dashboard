@@ -1600,6 +1600,33 @@
                 <h3 class="text-sm font-semibold mb-2" data-i18n="dashboard.overdue_invoices">Overdue invoices</h3>
                 <ul id="overdueInvoicesList" class="space-y-2 text-[11px]"></ul>
                 <div class="mt-3 space-y-2" data-owner-only>
+                  <label class="flex items-start gap-2 text-[11px] text-slate-600 rounded-lg border border-slate-200 bg-slate-50/70 px-2 py-2">
+                    <input id="reminderAttachPdfToggle" type="checkbox" checked class="mt-0.5">
+                    <span>
+                      <span data-i18n="finance.attach_invoice_pdf">Attach invoice PDF</span>
+                      <span class="block text-[10px] text-slate-500" data-i18n="finance.attach_invoice_pdf_hint">Adds a PDF copy to reminder emails.</span>
+                    </span>
+                  </label>
+                  <div class="rounded-lg border border-slate-200 bg-white/80 px-2 py-2 space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                      <div>
+                        <div class="text-[11px] font-medium text-slate-700" data-i18n="finance.target_recipients">Target recipients</div>
+                        <div id="reminderTargetSummary" class="text-[10px] text-slate-500" data-i18n="finance.target_all">All eligible parents</div>
+                      </div>
+                      <button id="toggleReminderTargetsBtn" type="button"
+                        class="text-[10px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
+                        data-i18n="finance.select_parents">
+                        Select parents
+                      </button>
+                    </div>
+                    <div id="reminderTargetsPanel" class="hidden space-y-2 border-t border-slate-100 pt-2">
+                      <div class="flex items-center gap-2">
+                        <button id="selectAllReminderTargetsBtn" type="button" class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300" data-i18n="finance.select_all_targets">Select all</button>
+                        <button id="clearReminderTargetsBtn" type="button" class="text-[10px] px-2 py-0.5 rounded-lg border border-slate-300" data-i18n="finance.clear_targets">Clear</button>
+                      </div>
+                      <div id="reminderTargetParentsList" class="space-y-1 max-h-40 overflow-y-auto scrollbar-thin"></div>
+                    </div>
+                  </div>
                   <button id="sendOverdueReminderEmailsBtn"
                     class="portal-cta-btn portal-cta-pay portal-cta-btn-block text-[11px]"
                     data-i18n="finance.send_overdue_emails">
@@ -2655,6 +2682,8 @@
     let overdueReminderSendInFlight = false;
     let dueTodayReminderSendInFlight = false;
     let overdueReminderTestSendInFlight = false;
+    let reminderTargetPanelOpen = false;
+    const reminderTargetParentIds = new Set();
     let syncDebounceTimer = null;
     let syncInFlight = false;
     let syncQueued = false;
@@ -16012,6 +16041,148 @@
       }
     }
 
+    function getReminderAttachPdfEnabled() {
+      return document.getElementById('reminderAttachPdfToggle')?.checked !== false;
+    }
+
+    function getReminderTargetRows() {
+      const todayIso = toDateOnly(new Date());
+      const byParent = new Map();
+      (state.invoices || []).forEach(inv => {
+        if (!invoiceRequiresPayment(inv)) return;
+        const dueDate = inv.dueDate || inv.due_date || '';
+        if (!dueDate || compareDateOnly(dueDate, todayIso) > 0) return;
+        const studentId = cleanId(inv.studentId || inv.student_id || '');
+        const student = getStudentById(studentId);
+        if (!student) return;
+        getLinkedParentsForStudent(studentId).forEach(parent => {
+          const parentId = cleanId(parent?.id || '');
+          if (!parentId) return;
+          const row = byParent.get(parentId) || {
+            parent,
+            invoiceCount: 0,
+            total: 0,
+            studentNames: new Set()
+          };
+          row.invoiceCount += 1;
+          row.total += Number(inv.total || 0);
+          row.studentNames.add(student.name || t('common.unknown'));
+          byParent.set(parentId, row);
+        });
+      });
+      return Array.from(byParent.values()).sort((a, b) =>
+        String(a.parent?.name || '').localeCompare(String(b.parent?.name || ''))
+      );
+    }
+
+    function pruneReminderTargetParentIds(targetRows = getReminderTargetRows()) {
+      const validIds = new Set(targetRows.map(row => cleanId(row.parent?.id || '')).filter(Boolean));
+      Array.from(reminderTargetParentIds).forEach(parentId => {
+        if (!validIds.has(parentId)) reminderTargetParentIds.delete(parentId);
+      });
+      return targetRows;
+    }
+
+    function getSelectedReminderParentIds() {
+      pruneReminderTargetParentIds();
+      return Array.from(reminderTargetParentIds).filter(Boolean);
+    }
+
+    function buildReminderSendPayload(reminderScope) {
+      const parentIds = getSelectedReminderParentIds();
+      const body = {
+        dry_run: false,
+        attach_invoice_pdf: getReminderAttachPdfEnabled()
+      };
+      if (reminderScope === 'due_today') body.reminder_scope = 'due_today';
+      if (parentIds.length) {
+        body.parent_ids = parentIds;
+        body.force = true;
+      }
+      return body;
+    }
+
+    function buildReminderConfirmMessage(baseKey) {
+      const parentIds = getSelectedReminderParentIds();
+      const attachmentLine = getReminderAttachPdfEnabled()
+        ? t('finance.attach_pdf_on_confirm')
+        : t('finance.attach_pdf_off_confirm');
+      const targetLine = parentIds.length
+        ? t('finance.target_selected_confirm', { count: parentIds.length })
+        : t('finance.target_all_confirm');
+      return `${t(baseKey)}\n\n${attachmentLine}\n${targetLine}`;
+    }
+
+    function toggleReminderTargetPanel() {
+      reminderTargetPanelOpen = !reminderTargetPanelOpen;
+      renderFinanceView();
+    }
+
+    function setReminderTargetParent(parentId, checked) {
+      const id = cleanId(parentId);
+      if (!id) return;
+      if (checked) reminderTargetParentIds.add(id);
+      else reminderTargetParentIds.delete(id);
+      renderReminderTargetControls();
+    }
+
+    function selectAllReminderTargets() {
+      getReminderTargetRows().forEach(row => {
+        const id = cleanId(row.parent?.id || '');
+        if (id) reminderTargetParentIds.add(id);
+      });
+      renderReminderTargetControls();
+    }
+
+    function clearReminderTargets() {
+      reminderTargetParentIds.clear();
+      renderReminderTargetControls();
+    }
+
+    function renderReminderTargetControls() {
+      const panel = document.getElementById('reminderTargetsPanel');
+      const list = document.getElementById('reminderTargetParentsList');
+      const summary = document.getElementById('reminderTargetSummary');
+      const toggleBtn = document.getElementById('toggleReminderTargetsBtn');
+      const selectAllBtn = document.getElementById('selectAllReminderTargetsBtn');
+      const clearBtn = document.getElementById('clearReminderTargetsBtn');
+      const targetRows = pruneReminderTargetParentIds();
+      const selectedCount = reminderTargetParentIds.size;
+
+      if (panel) panel.classList.toggle('hidden', !reminderTargetPanelOpen);
+      if (summary) {
+        summary.textContent = selectedCount
+          ? t('finance.target_selected', { count: selectedCount })
+          : t('finance.target_all');
+      }
+      if (toggleBtn) {
+        toggleBtn.onclick = toggleReminderTargetPanel;
+        toggleBtn.textContent = reminderTargetPanelOpen
+          ? t('finance.hide_parent_targets')
+          : t('finance.select_parents');
+      }
+      if (selectAllBtn) selectAllBtn.onclick = selectAllReminderTargets;
+      if (clearBtn) clearBtn.onclick = clearReminderTargets;
+      if (!list) return;
+      if (!targetRows.length) {
+        list.innerHTML = `<div class="text-[10px] text-slate-500">${esc(t('finance.no_target_parents'))}</div>`;
+        return;
+      }
+      list.innerHTML = targetRows.map(row => {
+        const parentId = cleanId(row.parent?.id || '');
+        const checked = reminderTargetParentIds.has(parentId) ? 'checked' : '';
+        const studentNames = Array.from(row.studentNames || []).join(', ');
+        return `<label class="flex items-start gap-2 rounded-lg border border-slate-200 px-2 py-1 bg-slate-50/70">
+          <input type="checkbox" name="reminderTargetParentIds" value="${esc(parentId)}" ${checked}
+            onchange="setReminderTargetParent('${esc(parentId)}', this.checked)" class="mt-0.5">
+          <span class="min-w-0">
+            <span class="block font-medium text-slate-700">${esc(row.parent?.name || t('common.unknown'))}</span>
+            <span class="block text-[10px] text-slate-500">${esc(studentNames || t('common.unknown'))} • ${esc(t('finance.target_invoice_summary', { count: row.invoiceCount, total: row.total.toFixed(2) }))}</span>
+          </span>
+        </label>`;
+      }).join('');
+    }
+
     async function sendOverdueReminderEmails() {
       if (overdueReminderSendInFlight || dueTodayReminderSendInFlight) return;
       if (!guardEdit()) return;
@@ -16024,7 +16195,7 @@
         return;
       }
 
-      const confirmSend = confirm(t('finance.confirm_send_overdue_emails'));
+      const confirmSend = confirm(buildReminderConfirmMessage('finance.confirm_send_overdue_emails'));
       if (!confirmSend) return;
 
       const btn = document.getElementById('sendOverdueReminderEmailsBtn');
@@ -16038,7 +16209,7 @@
 
       try {
         const { data, error } = await supabaseClient.functions.invoke('send-overdue-invoice-reminders', {
-          body: { dry_run: false },
+          body: buildReminderSendPayload('overdue'),
           headers: { Authorization: `Bearer ${accessToken}` }
         });
         if (error) {
@@ -16091,7 +16262,7 @@
         return;
       }
 
-      const confirmSend = confirm(t('finance.confirm_send_due_today_emails'));
+      const confirmSend = confirm(buildReminderConfirmMessage('finance.confirm_send_due_today_emails'));
       if (!confirmSend) return;
 
       const btn = document.getElementById('sendDueTodayReminderEmailsBtn');
@@ -16105,7 +16276,7 @@
 
       try {
         const { data, error } = await supabaseClient.functions.invoke('send-overdue-invoice-reminders', {
-          body: { dry_run: false, reminder_scope: 'due_today' },
+          body: buildReminderSendPayload('due_today'),
           headers: { Authorization: `Bearer ${accessToken}` }
         });
         if (error) {
@@ -16243,6 +16414,7 @@
           ? t('finance.sending_test_overdue_email')
           : t('finance.send_test_overdue_email');
       }
+      renderReminderTargetControls();
       const tbody = document.getElementById('financeStudentTable');
       if (!state.students.length) {
         tbody.innerHTML = '';
